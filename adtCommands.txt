@@ -1,0 +1,62 @@
+Build for iOS Dev
+~/Desktop/AIR3.7/bin/adt -package -target ipa-app-store -provisioning-profile ~/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore ~/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -package -target ipa-app-store -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -package -target ipa-ad-hoc -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+
+Build for Android Dev
+..\AIRSDK_18\bin\adt -package -target apk-captive-runtime -storetype pkcs12 -keystore newcert.p12 -storepass "password" SpaceCrafter.apk SpaceCrafter-app.xml SpaceCrafter.swf icons\icon114.png icons\icon29.png icons\icon48.png icons\icon57.png icons\icon72.png Default.png Default@2x.png Default-568h@2x.png
+../../AIRSDK_21/bin/adt -package -target apk-captive-runtime -storetype pkcs12 -keystore newcert.p12 -storepass "password" SpaceCrafter.apk SpaceCrafter-app.xml SpaceCrafter.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png
+
+Install onto device
+~/Desktop/AIR3.7/bin/adt -installApp -platform ios -package SpaceCraft.ipa
+~/Desktop/AIR3.7/bin/adt -installApp -platform ios -package SpaceCraft.ipa
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -installApp -platform ios -package SpaceCraft.ipa
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -installApp -platform android -package SpaceCraft.apk
+
+
+Detect Device
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -devices -platform ios
+C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -devices -platform android
+
+
+
+http://help.adobe.com/en_US/air/build/WS901d38e593cd1bac1e63e3d128fc240122-8000.html
+
+usage:
+  adt -checkstore SIGNING_OPTIONS
+  adt -certificate -cn <name> ( -ou <org-unit> )? ( -o <org-name> )? ( -c <country> )? ( -validityPeriod <years> )? ( 1024-RSA | 2048-RSA ) <pfx-file> <password>
+  adt -help
+  adt -migrate SIGNING_OPTIONS ( <air-file-in> | <airn-file-in> ) <output-file>
+  adt -package SIGNING_OPTIONS ( -target air )? <output-package> ( <app-desc> FILE_OPTIONS | <input-package> )
+  adt -package SIGNING_OPTIONS -target airn <output-package> ( <app-desc> FILE-AND-PATH-OPTIONS | <input-package> )
+  adt -package -target ( apk | apk-debug | apk-emulator | apk-captive-runtime ) ( CONNECT_OPTIONS? | LISTEN_OPTIONS? ) ( -airDownloadURL <url> )? SIGNING_OPTIONS <output-package> ( <app-desc> PLATFORM-SDK-OPTION? FILE-AND-PATH-OPTIONS | <input-package> PLATFORM-SDK-OPTION? )
+  adt -package -target ( ipa-test | ipa-debug | ipa-app-store | ipa-ad-hoc | ipa-test-interpreter | ipa-debug-interpreter | ipa-test-interpreter-simulator | ipa-debug-interpreter-simulator ) ( CONNECT_OPTIONS? | LISTEN_OPTIONS? ) ( -sampler )? ANE_LINK_OPTIONS? SIGNING_OPTIONS <output-package> ( <app-desc> PLATFORM-SDK-OPTION? FILE-AND-PATH-OPTIONS | <input-package> PLATFORM-SDK-OPTION? )  adt -package SIGNING_OPTIONS? -target native SIGNING_OPTIONS? <output-package> ( <app-desc> FILE-AND-PATH-OPTIONS | <input-package> )
+  adt -package SIGNING_OPTIONS? -migrate SIGNING_OPTIONS -target native SIGNING_OPTIONS? <output-package> <app-desc> FILE_OPTIONS PATH-OPTION
+  adt -package SIGNING_OPTIONS? -target bundle SIGNING_OPTIONS? <output-package> ( <app-desc> FILE-AND-PATH-OPTIONS | <input-package> )
+  adt -package SIGNING_OPTIONS? -target ane <output-package> <ext-desc> ANE_OPTIONS
+  adt -prepare <airi-file> <app-desc> FILE_AND_PATH_OPTIONS
+  adt -sign SIGNING_OPTIONS ( -target ( air | airn | ane ) )? ( <airi-file> | <unsigned-ane-file> ) <output-file>
+  adt -devices          PLATFORM-OPTION PLATFORM-SDK-OPTION?
+  adt -installRuntime   PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION? ( -package <apk-file> )?
+  adt -installApp       PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION? -package <apk-file | ipa-file>
+  adt -uninstallRuntime PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION?  adt -uninstallApp     PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION? -appid <app-id>
+  adt -launchApp        { PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION? (-debuggerPort port )? -appid <app-id> }
+  adt -runtimeVersion   PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION?
+  adt -appVersion       PLATFORM-OPTION PLATFORM-SDK-OPTION? DEVICE-OPTION? -appid <app-id>
+  adt -version
+
+SIGNING_OPTIONS      : -storetype <type> ( -keystore <store> )? ( -storepass <pa
+ss> )? ( -alias <aliasName> )? ( -keypass <pass> )? ( -providerName <name> )? (
+-tsa <url> )? ( -provisioning-profile <profile> )?
+FILE_OPTIONS         : <fileOrDir>* ( ( -C <dir> <fileOrDir>+ ) | ( -e <file> <p
+ath> ) )*
+CONNECT_OPTIONS      : -connect <host>
+LISTEN_OPTIONS       : -listen <port>
+ANE_LINK_OPTIONS     : -hideAneLibSymbols ( yes | no )
+ANE_OPTIONS          : -swc <swc> ( -platform <name> (-platformoptions <file>)?
+<fileOrDir>* ( -C <dir> <fileOrDir>+ )* )*
+FILE-AND-PATH-OPTIONS: ( PATH-OPTION | FILE-OPTIONS ) FILE-AND-PATH-OPTIONS?
+PATH-OPTION          : -extdir <dir>
+PLATFORM-OPTION      : -platform (android | ios)
+PLATFORM-SDK-OPTION  : -platformsdk <platform-sdk-home-dir>
+DEVICE-OPTION        : -device ( deviceID | ios-simulator )

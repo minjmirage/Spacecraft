@@ -1,0 +1,4250 @@
+﻿package
+{
+	import com.greensock.*;
+	import core3D.*;
+	import flash.display.*;
+	import flash.events.*;
+	import flash.filters.*;
+	import flash.geom.*;
+	import flash.media.*;
+	import flash.text.*;
+	import flash.utils.*;
+	import flash.net.SharedObject;
+
+	[SWF(backgroundColor="#000000", frameRate="30", width="1334", height="750")]
+
+	public class SpaceCrafter extends Sprite
+	{
+		public var debugTf:TextField = null;
+		private var Assets:Object = null;
+		private var Mtls:Object = null;
+
+		private var Projectiles:Vector.<Projectile> = null;
+		private var Ships:Vector.<Ship> = null;
+		private var Hostiles:Vector.<Ship> = null;
+		private var Friendlies:Vector.<Ship> = null;
+		private var Exploding:Vector.<Ship> = null;
+
+		private var player:Ship = null;
+
+		private var frameS_MP:MeshParticles = null;		// small turret frames MeshParticles
+		private var frameM_MP:MeshParticles = null;		// medium turret frames MeshParticles
+		private var TurretMPs:Object = null;			// Turrets MeshParticles
+		private var EffectMPs:Object = null;			// Bullets MeshParticles
+		private var EffectEMs:Object = null;			// effects ParticleEmitters
+		private var BulletFXs:Object = null;			// projectile rendering Fns
+		private var SoundFxs:Object = null;				// dictionary of all SoundFxs
+		private var SndsToPlay:Object = null;
+
+		private var world:Mesh = null;
+		private var sky:Mesh = null;
+
+		private var mkr:Mesh = null;
+		private var buildMkr:Mesh = null;
+
+		private var lookPt:Vector3D = null;		// camera lookAt point
+		private var lookVel:Vector3D = null;	// camera lookAt point velocity
+		private var lookDBER:Vector3D = null;	// Dist,Bearing,Elevation,Roll
+		private var velDBER:Vector3D = null;	// Dist,Bearing,Elevation,Roll
+
+		private var gameTime:uint=0;
+		private var simulationPaused:Boolean = false;
+
+		public var stepFns:Vector.<Function> = null;
+
+		private var shipHUD:Sprite = null;
+		private var undoStk:Vector.<String> = null;
+
+		private var viewStep:Function = focusPlayerShipViewStep;
+		private var prevLookDBER:Vector3D = null;			// to restore back previous view
+		private var gridMesh:Mesh = null;
+
+		[Embed(source="3D/textures/tex.jpg")] 					private static var Tex:Class;
+		[Embed(source="3D/textures/TexPanel.jpg")] 			private static var TexPanel:Class;
+		[Embed(source="3D/textures/SpecPanel.jpg")] 		private static var SpecPanel:Class;
+		[Embed(source="3D/textures/TexStreak.png")] 		private static var TexStreak:Class;
+		[Embed(source="3D/textures/halo.png")] 					private static var TexHalo:Class;
+
+		[Embed(source="3D/textures/TexSpace1.jpg")] 		private static var TexSpace1:Class;
+		[Embed(source="3D/textures/TexSpace2.jpg")] 		private static var TexSpace2:Class;
+		[Embed(source="3D/textures/TexSpace3.jpg")] 		private static var TexSpace3:Class;
+		[Embed(source="3D/textures/TexSpace4.jpg")] 		private static var TexSpace4:Class;
+		[Embed(source="3D/textures/TexSpace5.jpg")] 		private static var TexSpace5:Class;
+
+		[Embed(source="3D/textures/TexPlanets.jpg")] 		private static var TexPlanets:Class;
+		[Embed(source="3D/textures/smoke3.png")] 				private static var TexSmoke3:Class;
+		[Embed(source="3D/textures/flareWhite.jpg")] 			private static var TexFlareWhite:Class;
+		[Embed(source="3D/textures/flareYellow.jpg")] 		private static var TexFlareYellow:Class;
+		[Embed(source="3D/textures/flareRed.jpg")]	 			private static var TexFlareRed:Class;
+		[Embed(source="3D/textures/linearGradient.png")]	private static var TexLinearGradient:Class;
+
+		[Embed(source="3D/textures/FxBitsSheet.png")] 		private static var FxBitsSheet:Class;
+		[Embed(source="3D/textures/FxBlastSheet.png")] 		private static var FxBlastSheet:Class;
+		[Embed(source="3D/textures/FxFlashSheet.png")] 		private static var FxFlashSheet:Class;
+		[Embed(source="3D/textures/FxRingsSheet.png")] 		private static var FxRingsSheet:Class;
+		[Embed(source="3D/textures/FxThrustSheet.png")] 	private static var FxThrustSheet:Class;
+		[Embed(source="3D/textures/FxTrailSheet.png")] 		private static var FxTrailSheet:Class;
+		[Embed(source="3D/textures/FxSparksSheet.png")] 	private static var FxSparksSheet:Class;
+		[Embed(source="3D/textures/FxWaveSheet.png")] 		private static var FxWaveSheet:Class;
+		[Embed(source="3D/textures/FxHyperSheet.jpg")] 		private static var FxHyperSheet:Class;
+
+		[Embed(source="icons/icoTick.png")] 		private static var icoTick:Class;
+		[Embed(source="icons/icoCross.png")] 		private static var icoCross:Class;
+		[Embed(source="icons/icoUndo.png")] 		private static var icoUndo:Class;
+
+		[Embed(source='3D/hullPosnMkr.rmf', mimeType='application/octet-stream')] 		private static var HullPosnMkr_Rmf:Class;
+		[Embed(source='3D/thrusterSmall.rmf', mimeType='application/octet-stream')] 	private static var ThrusterS_Rmf:Class;
+		[Embed(source='3D/missileSmall.rmf', mimeType='application/octet-stream')] 		private static var MissileS_Rmf:Class;
+		[Embed(source='3D/launcherSmall.rmf', mimeType='application/octet-stream')] 	private static var LauncherS_Rmf:Class;
+		[Embed(source='3D/mountSmall.rmf', mimeType='application/octet-stream')] 			private static var MountS_Rmf:Class;
+		[Embed(source='3D/frameSmall.rmf', mimeType='application/octet-stream')] 			private static var FrameS_Rmf:Class;
+		[Embed(source='3D/mountMedium.rmf', mimeType='application/octet-stream')] 		private static var MountM_Rmf:Class;
+		[Embed(source='3D/frameMedium.rmf', mimeType='application/octet-stream')] 		private static var FrameM_Rmf:Class;
+		[Embed(source='3D/gunAutoSmall.rmf', mimeType='application/octet-stream')] 		private static var GunAutoS_Rmf:Class;
+		[Embed(source='3D/gunFlakSmall.rmf', mimeType='application/octet-stream')] 		private static var GunFlakS_Rmf:Class;
+		[Embed(source='3D/gunIonSmall.rmf', mimeType='application/octet-stream')] 		private static var GunIonS_Rmf:Class;
+		[Embed(source='3D/gunPlasmaSmall.rmf', mimeType='application/octet-stream')] 	private static var GunPlasmaS_Rmf:Class;
+		[Embed(source='3D/gunRailSmall.rmf', mimeType='application/octet-stream')] 		private static var GunRailS_Rmf:Class;
+		[Embed(source='3D/railGunMedium.rmf', mimeType='application/octet-stream')] 	private static var RailGunM_Rmf:Class;
+		[Embed(source='3D/blasterMedium.rmf', mimeType='application/octet-stream')] 	private static var BlasterM_Rmf:Class;
+		[Embed(source='3D/laserMedium.rmf', mimeType='application/octet-stream')] 		private static var LaserM_Rmf:Class;
+
+		[Embed(source="snds/jumpIn.mp3")] 		private var sndJumpIn:Class;
+		[Embed(source="snds/hit.mp3")] 				private var sndHit:Class;
+		[Embed(source="snds/explosion.mp3")] 	private var sndExplosion:Class;
+		[Embed(source="snds/gunAutoS.mp3")] 	private var sndGunAutoS:Class;
+		[Embed(source="snds/gunFlakS.mp3")] 	private var sndGunFlakS:Class;
+		[Embed(source="snds/gunIonS.mp3")] 		private var sndGunIonS:Class;
+		[Embed(source="snds/gunPlasmaS.mp3")] private var sndGunPlasmaS:Class;
+		[Embed(source="snds/missileLaunch.mp3")] 	private var sndLauncherS:Class;
+		[Embed(source="snds/gunRailS.mp3")] 	private var sndGunRailS:Class;
+		[Embed(source="snds/gunIonM.mp3")] 		private var sndGunIonM:Class;
+		[Embed(source="snds/gunPlasmaM.mp3")] private var sndGunPlasmaM:Class;
+		[Embed(source="snds/gunRailM.mp3")] 	private var sndGunRailM:Class;
+		[Embed(source="snds/hullGroan1.mp3")] 	private var sndHullGroan1:Class;
+		[Embed(source="snds/hullGroan2.mp3")] 	private var sndHullGroan2:Class;
+		[Embed(source="snds/menuClick.mp3")] 	private var sndMenuClick:Class;
+
+
+		//===============================================================================================
+		// Constructor
+		//===============================================================================================
+		public function SpaceCrafter() : void
+		{
+			var ppp:Sprite = this;
+
+			function initHandler(ev:Event) : void
+			{
+				if (stage==null) return;
+
+				var readout:TextField = Mesh.createFPSReadout();
+
+				stage.addChild(readout);
+				debugTf = new TextField();
+				debugTf.defaultTextFormat = new TextFormat("arial",13,0xFFFFFF);
+				debugTf.autoSize = "left";
+				debugTf.wordWrap = false;
+				stage.addChild(debugTf);
+				debugTf.x = 600;
+
+				ppp.removeEventListener(Event.ENTER_FRAME,initHandler);
+				stage.scaleMode = StageScaleMode.NO_SCALE;
+				stage.align = StageAlign.TOP_LEFT;
+
+				init();
+
+			}
+			ppp.addEventListener(Event.ENTER_FRAME,initHandler);
+		}//endfunction
+
+		//===============================================================================================
+		// convenience tool to convert obj to rmf files
+		//===============================================================================================
+		public function convToRmf(A:Array,callBack:Function=null) : void
+		{
+			var idx:int=0;
+			function loadNext(e:Event=null):void
+			{
+				Mesh.loadObj(A[idx],function(m:Mesh):void
+				{
+					var saveFileN:String = A[idx++].split(".obj")[0].split("/").pop();
+					m.saveAsRmf(saveFileN);
+					if (idx>=A.length)
+					{
+						stage.removeEventListener(MouseEvent.CLICK,loadNext);
+						stage.removeChild(Mesh.debugTf);
+						if (callBack!=null)
+							callBack();
+					}
+				});
+				stage.addChild(Mesh.debugTf);
+			}
+			stage.addEventListener(MouseEvent.CLICK,loadNext);
+
+			loadNext();
+		}//endfunction
+
+		//===============================================================================================
+		// Initialize Game Stuffs
+		//===============================================================================================
+		private function init() : void
+		{
+			lookPt = new Vector3D(0,0,0);
+			lookVel = new Vector3D(0,0,0);
+			lookDBER = new Vector3D(7,0,0,0);
+			velDBER = new Vector3D(0,0,0,0);
+
+			world = new Mesh();
+
+			// ----- initialize 3D model assets
+			Assets = { buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
+						missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
+						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
+						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
+						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
+			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
+							TexPlanets:new TexPlanets().bitmapData,
+							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
+							TexSpace2:fadeVertEnds(new TexSpace2().bitmapData),
+							TexSpace3:fadeVertEnds(new TexSpace3().bitmapData),
+							TexSpace4:fadeVertEnds(new TexSpace4().bitmapData),
+							TexSpace5:fadeVertEnds(new TexSpace5().bitmapData)};
+			var tex:BitmapData = Mtls["Tex"];
+			for (var id:String in Assets)
+			{
+				Assets[id] = Mesh.parseRmfToMesh(new Assets[id]());
+				Assets[id].material.setTexMap(tex);
+				Assets[id].material.setSpecular(0);
+			}
+
+			// ----- initialize turrets particles
+			frameS_MP = new MeshParticles(Assets['frameS']);
+			frameM_MP = new MeshParticles(Assets['frameM']);
+			TurretMPs ={gunAutoS:new MeshParticles(Assets['gunAutoS']),
+						gunFlakS:new MeshParticles(Assets['gunFlakS']),
+						gunIonS:new MeshParticles(Assets['gunIonS']),
+						gunPlasmaS:new MeshParticles(Assets['gunPlasmaS']),
+						gunRailS:new MeshParticles(Assets['gunRailS']),
+						gunRailM:new MeshParticles(Assets['gunRailM']),
+						gunIonM:new MeshParticles(Assets['gunIonM']),
+						gunPlasmaM:new MeshParticles(Assets['gunPlasmaM'])};
+
+			world.addChild(frameS_MP.skin);
+			world.addChild(frameM_MP.skin);
+			for (var key:String in TurretMPs)	world.addChild(TurretMPs[key].skin);
+
+			// ----- initialize mesh particles
+			EffectMPs = new Object();
+			EffectMPs["missileS"] = new MeshParticles(Assets["missileS"]);
+			EffectMPs["gunAutoS"] = new MeshParticles(Mesh.createStreak(0.3, 0.03, new BitmapData(1, 1, false, 0x88FF88)));
+			EffectMPs["gunFlakS"] = new MeshParticles(Mesh.createSphere(0.05, 8, 4, new BitmapData(1, 1, false, 0x88FF88)));
+			EffectMPs["gunRailS"] = new MeshParticles(Mesh.createStreak(0.2, 0.07, new BitmapData(1, 1, false, 0xFFFFCC)));
+			EffectMPs["gunRailM"] = new MeshParticles(Mesh.createStreak(0.4, 0.14, new BitmapData(1, 1, false, 0xFFFFCC)));
+			var grad:BitmapData = new TexLinearGradient().bitmapData;
+			EffectMPs["thrustConeW"] = new MeshParticles(createLightCone(0.09,0.45,0,0.8,grad));
+			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1,grad));
+			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.1,grad));
+			for (key in EffectMPs)
+			{
+				(MeshParticles)(EffectMPs[key]).skin.setLightingParameters(1,1,1,0,0,false);
+				(MeshParticles)(EffectMPs[key]).skin.material.setBlendMode("add");
+				(MeshParticles)(EffectMPs[key]).skin.depthWrite = false;
+				world.addChild(EffectMPs[key].skin);
+			}
+			//(MeshParticles)(EffectMPs["missileS"]).skin.material.setBlendMode("normal");
+
+			// ---- initialize effects emitters
+			EffectEMs ={
+						smoke3:new ParticlesEmitter(new TexSmoke3().bitmapData,1,10,"add"),
+						flareWhite:new ParticlesEmitter(new TexFlareWhite().bitmapData,1,1,"add"),
+						flareYellow:new ParticlesEmitter(new TexFlareYellow().bitmapData,1,1,"add"),
+						flareRed:new ParticlesEmitter(new TexFlareRed().bitmapData,1,1,"add"),
+						halo:new ParticlesEmitter(new TexHalo().bitmapData,1,1,"add"),
+						hyperCharge:new ParticlesEmitter(new FxThrustSheet().bitmapData,25,4,"add"),
+						missileTrail:new ParticlesEmitter(new FxTrailSheet().bitmapData,25,2,"add"),
+						sparks:new ParticlesEmitter(new FxSparksSheet().bitmapData,9,0.5,"add"),
+						flash:new ParticlesEmitter(new FxFlashSheet().bitmapData,9,5,"add"),
+						ring:new ParticlesEmitter(new FxRingsSheet().bitmapData,25,2,"add"),
+						bit:new ParticlesEmitter(new FxBitsSheet().bitmapData, 25, 1),
+						blast:new ParticlesEmitter(new FxBlastSheet().bitmapData, 25, 10,"add"),
+						wave:new ParticlesEmitter(new FxWaveSheet().bitmapData, 25, 100,"add"),
+						hyperspace:new ParticlesEmitter(new FxHyperSheet().bitmapData, 16, 100, "add")};
+			for (key in EffectEMs)
+				world.addChild(EffectEMs[key].skin);
+
+			// ----- initialize projectile FXs
+			BulletFXs = new Object();
+			BulletFXs["launcherS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["missileS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["missileTrail"]).emit(p.px,p.py,p.pz,0,0,0,0.65);};
+			BulletFXs["gunAutoS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunAutoS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
+			BulletFXs["gunFlakS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunFlakS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
+			BulletFXs["gunIonS"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04); };
+			BulletFXs["gunPlasmaS"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareYellow"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04); };
+			BulletFXs["gunFlakS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunFlakS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
+			BulletFXs["gunRailS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunRailS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.6); (ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.5);};
+			BulletFXs["gunIonM"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08); };
+			BulletFXs["gunPlasmaM"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareWhite"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08); };
+			BulletFXs["gunRailM"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunRailM"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.9); (ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.8);};
+
+			// ----- initialize sounds
+			SoundFxs = {jumpIn:new sndJumpIn(),jumpIn_Af:0.3,
+									hit:new sndHit(),hit_Af:1,
+									explosion:new sndExplosion(),explosion_Af:0.3,
+									gunAutoS:new sndGunAutoS(),gunAutoS_Af:1,
+									gunFlakS:new sndGunFlakS(),gunFlakS_Af:1,
+									gunIonS:new sndGunIonS(),gunIonS_Af:1,
+									gunPlasmaS:new sndGunPlasmaS(),gunPlasmaS_Af:1,
+									gunRailS:new sndGunRailS(),gunRailS_Af:1,
+									launcherS:new sndLauncherS(),launcherS_Af:1,
+									gunIonM:new sndGunIonM(),gunIonM_Af:0.6,
+									gunPlasmaM:new sndGunPlasmaM(),gunPlasmaM_Af:0.6,
+									gunRailM:new sndGunRailM(),gunRailM_Af:0.6,
+									hullGroan1:new sndHullGroan1(),hullGroan1_Af:0.6,
+									hullGroan2:new sndHullGroan1(),hullGroan2_Af:0.6,
+									menuClick:new sndMenuClick(),menuClick_Af:1
+								};
+			SndsToPlay = new Object();
+			MenuUI.clickSfx = function():void {playSound(lookPt.x,lookPt.y,lookPt.z,"menuClick");};
+
+			mkr = Mesh.createSphere(0.2,16,8,null,true);
+			buildMkr = Assets["buildMkr"];
+			buildMkr.setLightingParameters(1,1,1,0,0,false);
+
+			// ----- create the top down tactical grid
+			gridMesh = new Mesh();
+			var gridTex:BitmapData = new BitmapData(1,1,true,0x99FFFFFF);
+			var crossH:Mesh = Mesh.createPlane(1,0.05,gridTex);
+			var crossV:Mesh = Mesh.createPlane(0.05,1,gridTex);
+			var cross:Mesh = new Mesh();
+			crossH.transform = new Matrix4x4().rotX(Math.PI/2);
+			crossV.transform = new Matrix4x4().rotX(Math.PI/2);
+			cross.addChild(crossH);
+			cross.addChild(crossV);
+			cross = cross.mergeTree();
+			for (var gx:int=-10; gx<=10; gx++)
+				for (var gz:int=-10; gz<=10; gz++)
+				{
+					cross = cross.clone();
+					cross.transform = new Matrix4x4().translate(gx*10,0,gz*10);
+					gridMesh.addChild(cross);
+				}
+			gridMesh = gridMesh.mergeTree();
+			gridMesh.material.setSpecular(0);
+			gridMesh.material.setAmbient(1,1,1);
+
+
+			Ships = new Vector.<Ship>();
+			Hostiles = new Vector.<Ship>();
+			Friendlies = new Vector.<Ship>();
+			Exploding = new Vector.<Ship>();
+			Projectiles = new Vector.<Projectile>();
+			stepFns = new Vector.<Function>();
+
+			undoStk = new Vector.<String>();
+
+			stage.addEventListener(Event.ENTER_FRAME,worldStep);
+			stage.addEventListener(Event.DEACTIVATE, deactivateHandler);
+			stage.addEventListener(Event.ACTIVATE, activateHandler);
+			stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDownHandler);
+			Input.init(stage);
+
+			homeBaseScene();
+
+		}//endfunction
+
+		//===============================================================================================
+		// Save user ship data
+		//===============================================================================================
+		private function saveShipsData(S:Vector.<Ship>):void
+		{
+			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
+			var s:String = "";
+			for (var i:int=0; i<S.length; i++)
+				s += S[i].toString()+";";
+			if (s.length>0) s = s.substr(0,s.length-1);
+			so.data.ships = s;
+			so.flush();
+		}//endfunction
+
+		//===============================================================================================
+		// Load user ship data return config string in ";" delimited form
+		//===============================================================================================
+		private function loadShipsData():String
+		{
+			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
+			return so.data.ships;
+		}//endfunction
+
+		//===============================================================================================
+		// shows your Level, your ships, option to build/modify Resource Units
+		//===============================================================================================
+		private function homeBaseScene():void
+		{
+			// ----- load user ships
+			var shipDat:String = loadShipsData();
+			if (shipDat!=null)
+			{
+				var shipStrs:Array = shipDat.split(";");
+				if (shipStrs.length>0)
+					for (var i:int=shipStrs.length-1; i>-1; i--)
+						player = addShipToScene(true,shipStrs[i]);		// adds user configured ship to scene
+			}
+			else
+			{
+				player = addShipToScene(true);			// creates a new random ship for user
+				saveShipsData(Friendlies);
+			}
+
+			if (sky!=null) world.removeChild(sky);
+			randScenery();
+
+			// ----- auto generate and show ship HUD if not exist
+			if (shipHUD==null && player!=null)
+			{
+				shipHUD = MenuUI.createShipHUD(player, stage);
+				addChild(shipHUD);
+			}
+
+			showMainMenu();
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function battleScene(shipsConf:String):void
+		{
+			var thisRef:SpaceCrafter = this;
+			randScenery();	// random sky and planets
+			var menu:Sprite =
+			MenuUI.createLeftStyleMenu(thisRef,
+																new < String > ["End Battle"],
+																new < Function>[function():void
+																{
+																	var jumpBearing:Number = Math.random()*Math.PI*2;
+																	for (var i:int=0; i<Friendlies.length; i++)
+																		jumpOut(Friendlies[i],jumpBearing);
+																}]);
+
+			// ----- default enemies
+			addShipToScene(false);	// hostile
+			addShipToScene(false);	// hostile
+			addShipToScene(false);	// hostile
+
+			var Conf:Array = shipsConf.split(";");
+			var friendlySpawn:Function = function():void
+			{
+				if (Conf.length>0)
+				{
+					if (gameTime%30==0)
+					{
+						addShipToScene(true,Conf.pop());		// friendly
+					}
+				}
+				else
+					stepFns.splice(stepFns.indexOf(friendlySpawn),1);
+			};
+			stepFns.push(friendlySpawn);
+
+			var battleTime:int = 0;
+			var battleStep:Function = function():void
+			{
+				// ----- auto select player
+				if (player == null || Ships.indexOf(player) == -1)
+				{
+					// ----- remove previous HUD
+					if (shipHUD != null && shipHUD.parent != null)
+						shipHUD.parent.removeChild(shipHUD);
+					shipHUD = null;
+					if (Friendlies.length > 0)
+						player = Friendlies[0];
+				}
+				if (shipHUD!=null)
+					menu.y = shipHUD.getChildAt(0).height;
+
+				battleTime++;
+
+				if (battleTime>100 &&
+						Exploding.length==0 &&
+						(Friendlies.length==0 || Hostiles.length==0))
+				{
+					stepFns.splice(stepFns.indexOf(battleStep),1);
+					galaxyScene(homeBaseScene);
+					if (menu.parent!=null)
+						menu.parent.removeChild(menu);
+				}
+			};
+
+			stepFns.push(battleStep);
+		}//endfunction
+
+		//===============================================================================================
+		// zoom out to galaxy find opponents screen
+		//===============================================================================================
+		private function galaxyScene(callBack:Function=null):void
+		{
+			world.removeChild(sky);
+
+			// ----- remove all ships and HUD
+			player = null;
+			while (Ships.length>0)
+			{
+				var shp:Ship = Ships.pop();
+				world.removeChild(shp.skin);
+			}
+			while (Exploding.length>0)
+			{
+				var expl:Ship = Exploding.pop();
+				world.removeChild(expl.skin);
+			}
+			while (Friendlies.length>0)	Friendlies.pop();
+			while (Hostiles.length>0)		Hostiles.pop();
+			while (Projectiles.length>0)	Projectiles.pop();
+			if (shipHUD!=null && shipHUD.parent!=null)
+				shipHUD.parent.removeChild(shipHUD);
+			shipHUD=null;
+
+			var oldViewStep:Function = viewStep;
+
+			// ----- precalculate galaxy spiral stars posns
+			var S3:Vector.<Vector3D> = new Vector.<Vector3D>();
+			var FW:Vector.<Vector3D> = new Vector.<Vector3D>();
+			var FY:Vector.<Vector3D> = new Vector.<Vector3D>();
+			var FR:Vector.<Vector3D> = new Vector.<Vector3D>();
+			var SinA:Vector.<Number> = new Vector.<Number>();
+			var CosA:Vector.<Number> = new Vector.<Number>();
+			var w:Number = 50;
+			var rotDiv:Number = 3000;
+			var i:int=0;
+			var j:int=0;
+			var len:Number = 0;
+			for (i=0; i<rotDiv; i++)
+			{	// (len,yoff,ang,scale)
+				SinA.push(Math.sin(i/rotDiv*Math.PI*2));
+				CosA.push(Math.cos(i/rotDiv*Math.PI*2));
+			}
+			for (i=0; i<600; i++)	// (len,yoff,ang,scale)
+			{
+				len = Math.sqrt(Math.random())*w;
+				S3.push(new Vector3D(len,(Math.random()-0.5)*0.01*w,probFn(len*90),(1-len/(w*2))*(Math.random()*0.2+0.8)));
+				len = Math.sqrt(Math.random())*w;
+				FW.push(new Vector3D(len,(Math.random()-0.5)*0.01*w,probFn(len*90),(1-len/w)*(Math.random()*0.2+0.6)));
+				len = (Math.random()*w+Math.sqrt(Math.random())*w)/2;
+				FY.push(new Vector3D(len,(Math.random()-0.5)*0.01*w,probFn(len*90),(1-len/w)*(Math.random()*0.2+0.8)));
+				len = Math.sqrt(Math.random())*w;
+				FR.push(new Vector3D(len,(Math.random()-0.5)*0.01*w,probFn(len*90),(1-len/w)*(Math.random()*0.2+0.8)));
+			}
+			function probFn(addR:Number):int	// provides the galaxy arms prob distribution
+			{
+				var r:Number = Math.random();
+				r = r*r*r*rotDiv/4;
+				if (Math.random()<0.5)
+					r *= -1;
+				r += rotDiv/4;
+				if (Math.random()>0.5)
+					r+=rotDiv/2;
+				r=(r+addR)%rotDiv;
+				return Math.floor(rotDiv-r);
+			}
+
+			var targStar:Vector3D = null;	 //for the reticle
+			var retAge:int=0;
+			var retS:Sprite = new Sprite();
+			addChild(retS);
+
+			// ----- draws a spiral galaxy
+			function galaxyStep():void
+			{
+				var smoke3Em:ParticlesEmitter = EffectEMs["smoke3"];
+				var flareWEm:ParticlesEmitter = EffectEMs["flareWhite"];
+				var flareYEm:ParticlesEmitter = EffectEMs["flareYellow"];
+				var flareREm:ParticlesEmitter = EffectEMs["flareRed"];
+				var sc:Number = lookDBER.x/50;
+				var v:Vector3D = null;
+				for (var i:int=FW.length-1; i>-1; i--)
+				{
+					v = S3[i];
+					v.z = (v.z+1)%rotDiv;
+					smoke3Em.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					v = FW[i];
+					v.z = (v.z+1)%rotDiv;
+					flareWEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					v = FY[i];
+					v.z = (v.z+1)%rotDiv;
+					flareYEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					v = FR[i];
+					v.z = (v.z+1)%rotDiv;
+					flareREm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+				}
+
+				// ----- draw reticle
+				if (lookDBER.x>49)	// when to show reticle
+				{
+					if (targStar==null)
+					{
+						for (i=0; i<20 && targStar==null; i++)
+						{
+							targStar = FY[Math.floor(Math.random()*FY.length)];
+							var dSq:Number = targStar.x*targStar.x + targStar.z*targStar.z;
+							if (dSq>w*w*0.7*0.7 || dSq<w*w*0.2*0.2)
+								targStar = null;
+						}
+					}
+					else
+					{
+						retAge++;
+						retS.graphics.clear();
+						var screenPt:Vector3D = Mesh.screenPosn(targStar.x*SinA[targStar.z],targStar.y,targStar.x*CosA[targStar.z]);
+						var color:uint = Math.floor((Math.cos(retAge)+1)*127);
+						color = color <<16 | color << 8 | color;
+						retS.graphics.lineStyle(0,color,1);
+						var gap:int = stage.stageWidth*0.01;
+						var lineGap:Number = Math.max(0,stage.stageWidth*0.5-retAge/10*stage.stageWidth*0.5);
+						retS.graphics.moveTo(0,screenPt.y-lineGap/2);
+						retS.graphics.lineTo(stage.stageWidth,screenPt.y-lineGap/2);
+						retS.graphics.moveTo(0,screenPt.y+lineGap/2);
+						retS.graphics.lineTo(stage.stageWidth,screenPt.y+lineGap/2);
+						retS.graphics.moveTo(screenPt.x-lineGap/2,0);
+						retS.graphics.lineTo(screenPt.x-lineGap/2,stage.stageHeight);
+						retS.graphics.moveTo(screenPt.x+lineGap/2,0);
+						retS.graphics.lineTo(screenPt.x+lineGap/2,stage.stageHeight);
+						if (lineGap<gap)
+							retS.graphics.drawRect(screenPt.x-gap,screenPt.y-gap,gap*2,gap*2);
+					}
+				}
+
+				if (Input.upPts.length>0 && targStar!=null)
+				{
+					lookVel = new Vector3D(targStar.x*SinA[targStar.z],targStar.y,targStar.x*CosA[targStar.z]).subtract(lookPt);
+					lookVel.scaleBy(1-0.9);	// set look velocity to center to selected position
+					retS.parent.removeChild(retS);
+					viewStep = zoomInAndCallBack;
+				}
+			}
+			stepFns.push(galaxyStep);
+
+			// ----- zoom out view
+			viewStep = function():Vector3D
+			{
+				var slowF:Number = 0.9;
+
+				lookVel.x = -lookPt.x*(1-slowF);		// center to (0,0,0)
+				lookVel.y = -lookPt.y*(1-slowF);
+				lookVel.z = -lookPt.z*(1-slowF);
+
+				velDBER.x = (50-lookDBER.x)*(1-slowF);									// set dist to 50
+				if (Math.sin(lookDBER.y)<0)
+					velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-slowF);	// set bearing to face north
+				else
+					velDBER.y =-Math.acos(Math.cos(lookDBER.y))*(1-slowF);	// set bearing to face north
+				velDBER.z = (-Math.PI*0.4-lookDBER.z)*(1-slowF);				// look from top down
+			}//endfunction
+
+			// ----- zoom in view and do callback
+			function zoomInAndCallBack():void
+			{
+				var slowF:Number = 0.9;
+				velDBER.x = (8-lookDBER.x)*(1-slowF);		// set dist to 1
+				velDBER.y += 0.01;												// spin
+				velDBER.z = (-Math.PI*0.1-lookDBER.z)*(1-slowF);				// look sideways
+
+				// ----- exit condition
+				if (lookDBER.x<8.5)
+				{
+					stepFns.splice(stepFns.indexOf(galaxyStep),1);
+					viewStep = oldViewStep;
+					if (callBack!=null)		callBack();
+				}
+			}//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// generate random sky and planets scenery
+		//===============================================================================================
+		private var planetsDat:Vector.<Vector3D> = null;	// axis x,y,z and w=rotAng
+		private function randScenery():Mesh
+		{
+			// ----- create skybox
+			if (sky!=null) world.removeChild(sky);
+			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
+			var colorTones:Vector.<uint> = new <uint> [0xeeeeee,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
+			var skyIdx:int = int(spaceTex.length*Math.random());
+			sky = new Mesh();
+			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
+			MenuUI.colorTone = colorTones[skyIdx];
+
+			for (var i:int=0; i<4; i++)
+			{
+				var p:Mesh = Mesh.createPlane(3000,3000,skyTex);
+				p.transform = new Matrix4x4().rotY(Math.PI/2*i).translate(Math.sin(Math.PI/2*i)*1500,0,Math.cos(Math.PI/2*i)*1500);
+				sky.addChild(p);
+			}
+			sky = sky.mergeTree();
+			sky.setLightingParameters(1,1,1,0,0,false);
+			world.addChild(sky);
+
+			var planet:Mesh = new Mesh();
+			planet.transform = planet.transform.rotFromTo(0,1,0,Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).translate(0,-100,0);
+
+			planetsDat = new Vector.<Vector3D>();
+			planet.removeAllChildren();
+			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
+			for (i=0; i<8; i++)
+				R.splice(Math.floor(Math.random()*R.length),0,i);
+			for (i=0; i<8; i++)
+			{
+				if (Math.random()<0.7 || i==0)
+				{
+					var r:int = Math.floor(Math.random()*8);
+					var ux:Number = int(r/4)/2;
+					var uy:Number = (r%4)/4;
+					p = createPlanetMesh((75/(i*2+1)),R[i],Mtls["TexPlanets"]);
+					var rad:Number = 0;
+					if (i>0)	rad =i*100 + 200/(i+1)+Math.random()*50;
+					var ang:Number = Math.random()*Math.PI*2;
+					p.transform = p.transform.translate(rad*Math.sin(ang),0,rad*Math.cos(ang));
+					p.material.setSpecular(0);
+					p.material.setAmbient(0,0,0);
+					planet.addChild(p);
+					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
+				}
+			}//endfor
+			sky.addChild(planet);
+			return sky;
+		}//
+
+		//===============================================================================================
+		// simulate planet movements
+		//===============================================================================================
+		private function planetStep():void
+		{
+			if (planetsDat==null || sky==null || !world.containsChild(sky)) return;
+			var planet:Mesh = sky.getChildAt(0);
+			for (var i:int=planetsDat.length-1; i>-1; i--)
+			{
+				var v:Vector3D = planetsDat[i];
+				var p:Mesh = planet.getChildAt(i);
+				var ox:Number = p.transform.ad;
+				var oy:Number = p.transform.bd;
+				var oz:Number = p.transform.cd;
+				var dist:Number = Math.sqrt(ox*ox+oy*oy+oz*oz);
+				p.transform = new Matrix4x4().rotFromTo(0,0,1,v.x,v.y,v.z).rotAbout(v.x,v.y,v.z,v.w).translate(ox,oy,oz);
+				if (dist>100)
+				{
+					p.transform = p.transform.rotY(0.1/dist);
+					v.w += 0.1/Math.sqrt(dist+100);
+				}
+				else
+					v.w += 0.0001;
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// create a sphere of given texture
+		//===============================================================================================
+		private static function createPlanetMesh(r:Number,planetType:uint,tex:BitmapData) : Mesh
+		{
+			if (planetType>=8)	planetType = planetType%8;
+			var lon:uint=32;
+			var lat:uint=16;
+			if (r>60) {lon*=2; lat*=2;}	// higher tri count for larger radius spheres
+			var S:Vector.<Number> = new Vector.<Number>();
+			var i:int = 0;
+			while (i<lat)
+			{
+				var sinL0:Number = Math.sin(Math.PI*i/lat)+0.0001;			// prevent UV artifact at poles of planet
+				var sinL1:Number = Math.sin(Math.PI*(i+1)/lat)+0.0001;
+				var cosL0:Number = Math.cos(Math.PI*i/lat);
+				var cosL1:Number = Math.cos(Math.PI*(i+1)/lat);
+				var A:Vector.<Number> = Mesh.createTrianglesBand(sinL0*r,
+															sinL1*r,
+															-cosL0*r,
+															-cosL1*r,
+															lon,true);
+
+				for (var j:int=0; j<A.length; j+=8)
+				{
+					// ----- recalculate normals
+					var nx:Number = A[j+0];
+					var ny:Number = A[j+1];
+					var nz:Number = A[j+2];
+					var nl:Number = Math.sqrt(nx*nx+ny*ny+nz*nz);
+					nx/=nl; ny/=nl; nz/=nl;
+					A[j+3]=nx; A[j+4]=ny; A[j+5]=nz;
+					// ----- adjust UVs
+					A[j+7]=i/lat+A[j+7]/lat;
+					var ux:Number = int(planetType/4)/2;
+					var uy:Number = (planetType%4)/4;
+					A[j+6] = ux + 0.0005 + A[j+6]*0.499;		// prevent UV bleed to other planet texture area
+					A[j+7] = uy + A[j+7]*0.25;
+				}
+				S = S.concat(A);
+				i++;
+			}//endfor
+
+			var m:Mesh = new Mesh();
+			m.createGeometry(S);
+			m.material.setTexMap(tex);
+			return m;
+		}//endfunction
+
+		//===============================================================================================
+		// queue sounds to be played on current frame
+		//===============================================================================================
+		private function playSound(px:Number,py:Number,pz:Number,id:String):void
+		{
+			if (SndsToPlay[id]==null)
+				SndsToPlay[id] = new Vector.<Number>();
+			(Vector.<Number>)(SndsToPlay[id]).push(px,py,pz);	// register sound to be played
+		}//endfunction
+
+		//===============================================================================================
+		// Plays queued sounds on current frame
+		//===============================================================================================
+		private function soundsStep(camPt:Vector3D):void
+		{
+			var px:Number = (camPt.x+lookPt.x)/2;
+			var py:Number = (camPt.y+lookPt.y)/2;
+			var pz:Number = (camPt.z+lookPt.z)/2;
+			for (var id:String in SndsToPlay)
+			{
+				var v:Vector.<Number> = SndsToPlay[id] as Vector.<Number>;
+				var loudness:Number = 0;
+				while (v.length>0)
+				{
+					var dz:Number = v.pop()-pz;
+					var dy:Number = v.pop()-py;
+					var dx:Number = v.pop()-px;
+					loudness += 2/((Number)(SoundFxs[id+"_Af"])*Math.sqrt(dx*dx+dy*dy+dz*dz));
+				}
+				if (loudness>3) loudness=3;
+				if (loudness>0.01)
+					(Sound)(SoundFxs[id]).play(0,0,new SoundTransform(loudness,0));
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// main world step function
+		//===============================================================================================
+		private function worldStep(ev:Event=null) : void
+		{
+			var i:int=0;
+			var key:String;
+			var debugTxt:String = "";
+			if (!simulationPaused)
+			{
+				// ----- reset mesh particles -------------------------------------
+				frameS_MP.reset();
+				frameM_MP.reset();
+				for (key in EffectMPs)	EffectMPs[key].reset();
+				for (key in TurretMPs)	TurretMPs[key].reset();
+
+				// ----- simulate ships
+				var time:uint = getTimer();
+				shipsStep();
+				debugTxt += "Ships:"+Ships.length+" Projectiles:"+Projectiles.length+" shipsT:"+(getTimer()-time);
+				time=getTimer();
+				var turretsCnt:int = 0;
+				for (i=Ships.length-1; i>-1; i--)
+					turretsCnt+=simulateShipTurrets(Ships[i],Ships[i].engageEnemy);
+				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
+				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
+				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
+
+				// ----- update mesh particles
+				var frameSShown:int = frameS_MP.update();
+				var frameMShown:int = frameM_MP.update();
+				for (key in TurretMPs)	TurretMPs[key].update();
+
+				// ----- exec misc step funs
+				for (i = stepFns.length - 1; i > -1; i--)
+					stepFns[i]();
+
+				// ----- simulate planets
+				planetStep();
+			}//endif !simulationPaused
+
+			viewStep();	// modifies velDBER and lookVel
+
+			// ----- camera Distance Bearing Elevation Rotation calcuation
+			lookDBER = lookDBER.add(velDBER);
+			lookDBER.z = Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,lookDBER.z));
+			lookDBER.x = Math.max(1, lookDBER.x);
+			velDBER.scaleBy(0.9);
+
+			// ----- calculate cam lookPt easing
+			lookPt = lookPt.add(lookVel);
+			lookVel.scaleBy(0.9);
+
+			// ----- calculate cam lookat direction
+			var camDir:Vector3D =
+			new Vector3D(	Math.cos(lookDBER.z)*Math.sin(lookDBER.y),
+										Math.sin(lookDBER.z),
+										Math.cos(lookDBER.z)*Math.cos(lookDBER.y));
+			var camPosn:Vector3D =
+			new Vector3D(	lookPt.x-camDir.x*lookDBER.x,
+										lookPt.y-camDir.y*lookDBER.x,
+										lookPt.z-camDir.z*lookDBER.x);
+
+			// ----- set camera position and orientation
+			Mesh.setCamera(camPosn.x,camPosn.y,camPosn.z,lookPt.x,lookPt.y,lookPt.z,1,0.01);
+			sky.transform = new Matrix4x4().translate(lookPt.x,lookPt.y,lookPt.z);
+
+			// ----- play sound FXs
+			soundsStep(camPosn);
+
+			// ----- update Mesh Particles/particle emitters
+			for (key in EffectMPs)	EffectMPs[key].update();
+			for (key in EffectEMs)	EffectEMs[key].update(camPosn.x,camPosn.y,camPosn.z,simulationPaused);
+			debugTxt+=" particlesT:"+(getTimer()-time); time=getTimer();
+			debugTxt+="   frameS:"+frameSShown+" frameM:"+frameMShown+" camDist:"+int(lookDBER.x*10)/10;
+			debugTf.text = debugTxt;
+			// ----- render 3D
+			//Mesh.setPointLighting(new <Number>[lookPt.x+100,lookPt.y+100,lookPt.z+100,1,1,1]);
+			Mesh.renderBranch(stage, world, false);
+
+			velDBER.x += lookDBER.x*(Input.zoomF-1);	// adjust zoom
+			Input.update();
+			gameTime++;
+		}//endfunction
+
+		//===============================================================================================
+		// to be used as viewStep function, to be executed in worldStep. focus ship view
+		//===============================================================================================
+		private function focusPlayerShipViewStep():void
+		{
+			// ----- enable drag to pan view interraction
+			if (Input.downPts.length==1)	// one finger
+			{
+				var downPt:InputPt = Input.downPts[0];
+				velDBER.y+=(downPt.x-downPt.ox)/1000;	// bearing change
+				velDBER.z-=(downPt.y-downPt.oy)/1000;	// elevation change
+			}
+
+			if (Input.upPts.length>0)
+			{
+				var upPt:InputPt = Input.upPts[0];
+				// enable ship selection on mouse click
+				if (upPt.endT - upPt.startT<300)
+				{
+					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
+					for (var i:int=Ships.length-1; i>-1; i--)
+						if (Ships[i]!=player && Ships[i].chassisSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
+						{
+							player = Ships[i];
+							if (shipHUD != null && shipHUD.parent != null)
+								shipHUD.parent.removeChild(shipHUD);
+							shipHUD = null;
+							velDBER.x = (player.radius*3-lookDBER.x)*(1-0.9);
+						}
+				}
+			}//
+
+			if (player!=null && lookDBER.x>player.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
+
+			// ----- auto generate and show ship HUD if not exist
+			if (shipHUD==null && player!=null)
+			{
+				shipHUD = MenuUI.createShipHUD(player, stage);
+				addChild(shipHUD);
+			}
+
+			// ----- calculate cam lookPt easing
+			if (player!=null)
+			{
+				lookVel = player.posn.subtract(lookPt);
+				lookVel.scaleBy(1-0.9);
+				lookDBER.x = Math.max(player.radius*1.1, lookDBER.x);
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// to be used as viewStep function, to be executed in worldStep. top down view with grid
+		//===============================================================================================
+		private function tacticalViewStep():void
+		{
+			// ----- enable ship selection on mouse click
+			var selected:Ship = null;
+			if (Input.upPts.length>0)
+			{
+				var upPt:InputPt=Input.upPts[0];
+				if (upPt.endT-upPt.startT<300)
+				{
+					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
+					for (var i:int=Ships.length-1; i>-1; i--)
+						if (Ships[i].chassisSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
+							selected = Ships[i];
+				}
+			}
+
+			velDBER.x = (50-lookDBER.x)*(1-0.9);									// set dist to 50
+			if (Math.sin(lookDBER.y)<0)
+				velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
+			else
+				velDBER.y =-Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
+			velDBER.z = (-Math.PI*0.5-lookDBER.z)*(1-0.9);				// look from top down
+
+			if (selected!=null)
+			{
+				player = selected;
+				toggleView();
+			}
+			else if (Input.zoomF<1)
+				toggleView();
+
+			// ----- calculate cam lookPt easing
+			if (Input.downPts.length==1)	// one finger
+			{
+				var downPt:InputPt = Input.downPts[0];
+				lookVel.x -= (downPt.x-downPt.ox)/100;
+				lookVel.z += (downPt.y-downPt.oy)/100;
+			}
+
+			// ----- position grid markings
+			gridMesh.transform.ad = Math.round((lookPt.x+lookVel.x)/10)*10;
+			gridMesh.transform.cd = Math.round((lookPt.z+lookVel.z)/10)*10;
+		}//endfunction
+
+		//===============================================================================================
+		// to be used as viewStep function, to be executed in worldStep
+		//===============================================================================================
+		[Inline]
+		private final function toggleView():void
+		{
+			if (viewStep==focusPlayerShipViewStep)
+			{
+				world.addChild(gridMesh);
+				prevLookDBER = lookDBER;
+				if (shipHUD!=null && shipHUD.parent!=null)
+					shipHUD.parent.removeChild(shipHUD);
+				shipHUD = null;
+
+				// ----- ease to mean position of ships
+				var meanPt:Vector3D = new Vector3D();
+				for (var i:int=Ships.length-1; i>-1; i--)
+					meanPt = meanPt.add(Ships[i].posn);
+				meanPt.scaleBy(1/Ships.length);
+				lookVel = meanPt.subtract(lookPt);
+				lookVel.scaleBy(1-0.9);
+				viewStep = tacticalViewStep;
+			}
+			else
+			{	// restore prev view
+				world.removeChild(gridMesh);
+				viewStep = focusPlayerShipViewStep;
+				if (player!=null) prevLookDBER.x = player.radius*3;	// hack to dist cam from ship
+				velDBER = prevLookDBER.subtract(lookDBER);
+				velDBER.scaleBy(1-0.9);
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// handles projectiles simulation
+		//===============================================================================================
+		private function projectilesStep() : void
+		{
+			var i:int = 0;
+			var key:String;
+
+			for (i=Projectiles.length-1; i>-1; i--)
+			{
+				var p:Projectile = Projectiles[i];
+				if (p.targ is HullBlock)
+				{
+					// ----- chk hit ship hull
+					for (var j:int=Ships.length-1; j>-1; j--)
+					{
+						var s:Ship = Ships[j];
+						var dx:Number = s.posn.x-p.px;
+						var dy:Number = s.posn.y-p.py;
+						var dz:Number = s.posn.z-p.pz;
+
+						if (dx*dx+dy*dy+dz*dz<s.radius*s.radius+p.vx*p.vx+p.vy*p.vy+p.vz*p.vz)
+						{
+							var hitPt:VertexData = s.chassisSkin.lineHitsMesh(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
+							if (hitPt!=null)
+							{
+								if (posnIsOnScreen(p.px,p.py,p.pz))
+								{
+									var _vl:Number = 0.1/Math.sqrt(p.vx*p.vx+p.vy*p.vy+p.vz*p.vz);
+									(ParticlesEmitter)(EffectEMs["flash"]).emit(hitPt.vx-p.vx*_vl,hitPt.vy-p.vy*_vl,hitPt.vz-p.vz*_vl,s.vel.x-p.vx/2,s.vel.y-p.vy/2,s.vel.z-p.vz/2,Math.sqrt(p.integrity)/10);
+									(ParticlesEmitter)(EffectEMs["bit"]).batchEmit(Math.sqrt(p.integrity), hitPt.vx, hitPt.vy, hitPt.vz, -p.vx * _vl + s.vel.x, -p.vy * _vl + s.vel.y, -p.vz * _vl + s.vel.z, Math.sqrt(p.vx*p.vx+p.vy*p.vy+p.vz*p.vz)/3);
+								}
+								p.ttl=0;
+								playSound(p.px,p.py,p.pz,"hit");
+								if (p.targ.parent==s)	// if is target
+								{
+									s.integrity -= p.integrity;	// ship to take damage
+									s.registerDamagePosn(hitPt,p.integrity);
+								}
+								p.integrity = 0;
+							}
+						}//endif
+					}//endfor
+
+					// ----- do missile step function
+					if (p is Missile)		(Missile)(p).homeInStep();
+				}
+				else	// is flak gun projectile
+				{
+					if (p.ttl<1)	// reached target flak point
+					{
+						dx = (p.px+p.vx*p.ttl) - (p.targ.px+p.targ.vx*p.ttl);
+						dy = (p.py+p.vy*p.ttl) - (p.targ.py+p.targ.vy*p.ttl);
+						dz = (p.pz+p.vz*p.ttl) - (p.targ.pz+p.targ.vz*p.ttl);
+						if (dx*dx+dy*dy+dz*dz<1)
+						{
+							p.targ.integrity-=p.integrity;
+							if (p.targ.integrity<=0) p.targ.ttl = p.ttl;
+						}
+						if (p.onDestroy!=null)
+							p.onDestroy();
+					}
+				}
+			}//endfor
+
+			for (i=Projectiles.length-1; i>=0; i--)
+			{
+				p = Projectiles[i];
+				if (p.ttl<=1)
+				{
+					Projectiles.splice(i, 1);
+					if (p.integrity>0 && posnIsOnScreen(p.px+p.vx*p.ttl, p.py+p.vy*p.ttl, p.pz+p.vz*p.ttl))
+						(ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+p.vx*p.ttl, p.py+p.vy*p.ttl, p.pz+p.vz*p.ttl, 0, 0, 0, Math.sqrt(p.integrity)/10);
+				}
+				else
+				{
+					p.ttl-=1;
+					p.px+=p.vx;	// move projectile
+					p.py+=p.vy;
+					p.pz+=p.vz;
+					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
+						p.renderFn(p);
+				}
+			}//endfor
+		}//endfunction
+
+		//===============================================================================================
+		// updates ship turrets positions and rotations
+		//===============================================================================================
+		private function simulateShipTurrets(ship:Ship,active:Boolean=true) : int
+		{
+			if (ship==null || ship.targets==null) return 0;
+
+			var i:int=0;
+			var j:int=0;
+
+			var M:Vector.<Module> = ship.modulesConfig;
+			for (i=M.length-1; i>-1; i--)
+			{
+				var m:Module = M[i];
+				if (m.type.substring(0,8)=="thruster")
+					simulateThrusterS(ship,m);
+				else
+				{
+					// ----- turret position ------------------------------------------
+					var T:Matrix4x4 = null;
+					if (m.type.charAt(m.type.length-1)=='M')	// mid sized module
+						T = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*1.57,m.y+m.ny*1.57,m.z+m.nz*1.57);	// turret local space
+					else
+						T = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*0.71,m.y+m.ny*0.71,m.z+m.nz*0.71);	// turret local space
+					T = ship.skin.transform.mult(T);	// turret global space
+
+					var turX:Number = T.ad;		// turret global space posn
+					var turY:Number = T.bd;
+					var turZ:Number = T.cd;
+
+					var targObj:Object = null;	// targ current position & vel
+					var interceptV:Vector3D=T.rotateVector(new Vector3D(0,0.01,1,m.range/m.speed));	// predicted intercept vector, defa parking posn
+
+					if (m.type=="launcherS")
+					{
+						if (m.ttf<=0)
+						{
+							// ----- seek nearest target hull posn ----------------------------
+							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+							if (targObj!=null)
+							{
+								playSound(turX,turY,turZ,m.type);
+								launch4Missiles(targObj,m,ship);
+								m.ttf = m.fireDelay+1;
+							}
+						}
+					}
+					else	// is weapon turret
+					{
+						// ----- seek nearest target projectile/hull posn -------------------
+						if (m.type=="gunAutoS" || m.type=="gunFlakS")
+							targObj = nearestTargProjectile(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+						else if (active)
+							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+
+						// ----- rotate turret towards interceptV ---------------------------
+						var canFire:Boolean = targObj!=null && m.ttf<=0;
+						var invT:Matrix4x4 = T.inverse();
+						var localPosn:Vector3D = invT.transform(new Vector3D(interceptV.x*interceptV.w+turX,
+																							interceptV.y*interceptV.w+turY,
+																							interceptV.z*interceptV.w+turZ));
+						interceptV.x+=ship.vel.x;
+						interceptV.y+=ship.vel.y;
+						interceptV.z+=ship.vel.z;
+
+						var nx:Number = localPosn.x;
+						var nz:Number = localPosn.z;
+						var _nl:Number = 1/Math.sqrt(nx*nx+nz*nz);
+						nx*=_nl; nz*=_nl;
+						var sinB:Number = Math.sin(m.bearing);
+						var cosB:Number = Math.cos(m.bearing);
+						var diffB:Number = nx*sinB+nz*cosB;	// using a.b = |a||b|cosA
+						if (diffB<-1) 		diffB=-1;
+						else if (diffB>1)	diffB= 1;
+						diffB = Math.acos(diffB);
+						if (nx*cosB-sinB*nz<0)	diffB*=-1;
+						if (diffB<-m.turnRate)			{diffB=-m.turnRate; canFire=false;}
+						else if (diffB> m.turnRate)	{diffB= m.turnRate; canFire=false;}
+						m.bearing+=diffB;
+						var diffE:Number = Math.atan2(localPosn.y,Math.sqrt(localPosn.x*localPosn.x+localPosn.z*localPosn.z))-m.elevation;
+						if (diffE<-m.turnRate)			{diffE=-m.turnRate; canFire=false;}
+						else if (diffE> m.turnRate)	{diffE= m.turnRate; canFire=false;}
+						m.elevation+=diffE;
+
+						if (canFire)	// if within range and ready to fire
+						{
+							if (ship.energy>m.damage)
+							{
+								m.ttf = m.fireDelay + 1;
+								if (targObj is HullBlock)
+									Projectiles.push(new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, m.range / m.speed, m.type));
+								else if (targObj is Projectile)
+								{	// target is projectile
+									(Projectile)(targObj).projIntegrity -= m.damage;	// prevent double targeting
+									var p:Projectile = new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, interceptV.w, m.type);
+									if (m.type=="gunFlakS") setAsFlakProjectile(ship,p);
+									Projectiles.push(p);
+								}
+								ship.energy -= m.damage;
+								muzzleFlash(turX,turY,turZ,interceptV.x,interceptV.y,interceptV.z,m.muzzleLen,m.damage);
+								playSound(turX,turY,turZ,m.type);
+							}
+						}
+
+						// ----- if turret is on screen then prep for render
+						if (posnIsOnScreen(turX,turY,turZ))
+						{
+							// ----- do turret recoil fx
+							var recoil:Number = m.ttf/m.fireDelay;
+							if (recoil<0) recoil=0;
+							var Tlocal:Matrix4x4 = new Matrix4x4(1,0,0,0,0,1,0,0,0,0,1,-recoil*m.fireDelay*0.002).rotX(-m.elevation).rotY(m.bearing);	// turret transform local
+
+							// ----- orientate turret
+							var turMP:MeshParticles = TurretMPs[m.type];
+							turMP.nextLocRotScale(T.mult(Tlocal));
+
+							// ----- orientate frame
+							if (m.type.charAt(m.type.length-1)=='M')
+							{
+								Tlocal = new Matrix4x4().translate(0,-1.57,0).rotX(-m.elevation*0.001).rotY(m.bearing);
+								var MTg:Matrix4x4 = T.mult(Tlocal);
+								if (Mesh.viewT.ca*MTg.ab + Mesh.viewT.cb*MTg.bb + Mesh.viewT.cc*MTg.cb<0.5)	// if frameS not facing away from camera, render
+									frameM_MP.nextLocRotScale(MTg);
+							}
+							else
+							{
+								Tlocal = new Matrix4x4().translate(0,-0.71,0).rotX(-m.elevation*0.001).rotY(m.bearing);
+								var STg:Matrix4x4 = T.mult(Tlocal);
+								if (Mesh.viewT.ca*STg.ab + Mesh.viewT.cb*STg.bb + Mesh.viewT.cc*STg.cb<0.5)	// if frameS not facing away from camera, render
+									frameS_MP.nextLocRotScale(STg);
+							}
+						}
+					}
+
+					m.ttf--;	// time to fire
+				}
+			}//endfor
+
+			return M.length;
+		}//endfunction
+
+		//===============================================================================================
+		// finds nearest hittable ship hull, modifies interceptV
+		//===============================================================================================
+		[Inline]
+		private final function nearestTargShipHull(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Object
+		{
+			var targObj:Object = null;	// targ current position & vel
+
+			for (var st:int=ship.targets.length-1; st>-1; st--)
+			{
+				var targ:Ship = ship.targets[st];
+				var dvx:Number = targ.vel.x - ship.vel.x;	// diff in speed between 2 ships
+				var dvy:Number = targ.vel.y - ship.vel.y;
+				var dvz:Number = targ.vel.z - ship.vel.z;
+				var targCV:Vector3D =
+				collisionVector3(pspeed,					// projectile speed
+									targ.posn.x-turX,targ.posn.y-turY,targ.posn.z-turZ,	// target ship posn from turret
+									dvx,dvy,dvz);						// target vel from turret
+				if (targCV!=null && targCV.w*pspeed<range+targ.radius*2)		// chk ship is in range culling
+					for (var j:int=targ.hullConfig.length-1; j>-1; j--)
+					{
+						var tPt:HullBlock = targ.hullConfig[j];
+						var iV:Vector3D =
+						collisionVector3(pspeed,			// projectile speed
+										tPt.extPosn.x-turX,tPt.extPosn.y-turY,tPt.extPosn.z-turZ,	// target block posn from turret
+										dvx,dvy,dvz);					// target vel from turret
+						if (iV!=null && interceptV.w>iV.w &&
+							ship.chassisSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform)==null)	// does not hit self
+						{
+							targObj = tPt;
+							interceptV.x = iV.x;
+							interceptV.y = iV.y;
+							interceptV.z = iV.z;
+							interceptV.w = iV.w;
+						}
+					}//endfor j
+			}//endfor st
+
+			return targObj;
+		}//endfunction
+
+		//===============================================================================================
+		// finds nearest interceptable incoming projectile, modifies interceptV
+		//===============================================================================================
+		[Inline]
+		private final function nearestTargProjectile(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Object
+		{
+			var targObj:Object = null;	// targ current position & vel
+
+			for (var j:int=Projectiles.length-1; j>-1; j--)
+			{
+				var pp:Projectile = Projectiles[j];
+				if (pp.targ is HullBlock && pp.targ.parent==ship && Projectiles[j].projIntegrity>0)
+				{
+					var ipV:Vector3D =
+					collisionVector3(pspeed, 			// projectile speed
+									pp.px-turX,pp.py-turY,pp.pz-turZ, 	// target block posn from turret
+									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z);	// target vel from turret
+					if (ipV!=null && interceptV.w>ipV.w &&
+						ship.chassisSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform)==null)	// does not hit self
+					{
+						targObj = pp;
+						interceptV.x = ipV.x;
+						interceptV.y = ipV.y;
+						interceptV.z = ipV.z;
+						interceptV.w = ipV.w;
+					}
+				}
+			}
+
+			return targObj;
+		}//endfunction
+
+		//===============================================================================================
+		// launches 4 missiles in sequence from launcher position
+		//===============================================================================================
+		private function launch4Missiles(targObj:Object,m:Module,shp:Ship):void
+		{
+			var delay:int = 30;
+			var launchFn:Function = function():void
+			{
+				if (delay%10==0)
+				{
+					var T:Matrix4x4 = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*0.51,m.y+m.ny*0.51,m.z+m.nz*0.51);
+					T = shp.skin.transform.mult(T);	// turret global space
+					var ang:Number = delay/20*Math.PI;
+					var px:Number = Math.sin(ang)*0.25;
+					var py:Number = 0;
+					var pz:Number = Math.cos(ang)*0.25;
+					var tpx:Number = T.aa*px+T.ab*py+T.ac*pz+T.ad;
+					var tpy:Number = T.ba*px+T.bb*py+T.bc*pz+T.bd;
+					var tpz:Number = T.ca*px+T.cb*py+T.cc*pz+T.cd;
+					var vx:Number = shp.vel.x+T.ab*m.speed;	// vel straight up from launcher
+					var vy:Number = shp.vel.y+T.bb*m.speed;
+					var vz:Number = shp.vel.z+T.cb*m.speed;
+					var mp:Missile = new Missile(tpx, tpy, tpz,	vx,vy,vz, targObj, BulletFXs[m.type], m.damage, m.range/m.speed, m.type);
+					Projectiles.push(mp);
+				}
+				if (delay==0)
+					stepFns.splice(stepFns.indexOf(launchFn),1);	// remove this function
+				else
+					delay--;
+			};
+			stepFns.push(launchFn);
+		}//endfunction
+
+		//===============================================================================================
+		// sets given projectile to explode on destruct and damage nearby projectiles
+		//===============================================================================================
+		private final function setAsFlakProjectile(firer:Ship,p:Projectile):void
+		{
+			p.onDestroy = function():void
+			{
+				(ParticlesEmitter)(EffectEMs["bit"]).batchEmit(10, p.px,p.py,p.pz, 0, 0, 0, 0.15);
+				(ParticlesEmitter)(EffectEMs["wave"]).emit(p.px,p.py,p.pz,0,0,0,5/100);
+
+				var delay:int = 10;
+				var delayedDestroy:Function = function():void
+				{
+					delay--;
+					if (delay>0) return;
+
+					for (var j:int=Projectiles.length-1; j>-1; j--)
+					{
+						var op:Projectile = Projectiles[j];
+						var dx:Number = p.px-op.px;
+						var dy:Number = p.py-op.py;
+						var dz:Number = p.pz-op.pz;
+						if (op.targ is HullBlock && op.targ.parent==firer && dx*dx+dy*dy+dz*dz<7)
+						{
+							if (op.integrity<=p.integrity)
+							{
+								(ParticlesEmitter)(EffectEMs["flash"]).emit(op.px, op.py, op.pz, 0, 0, 0, Math.sqrt(op.integrity)/10);
+								op.ttl=0;
+							}
+							else
+								(ParticlesEmitter)(EffectEMs["flash"]).emit(op.px, op.py, op.pz, 0, 0, 0, Math.sqrt(p.integrity)/10);
+							op.projIntegrity -= p.integrity;
+							op.integrity -= p.integrity;
+						}
+					}//endfor
+
+					stepFns.splice(stepFns.indexOf(delayedDestroy),1);	// remove this function
+				};//endfunction
+				stepFns.push(delayedDestroy);
+
+			};//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// simulates thruster glow
+		//===============================================================================================
+		[Inline]
+		private final function simulateThrusterS(ship:Ship,m:Module):void
+		{
+			var pt:Vector3D = ship.skin.transform.transform(new Vector3D(m.x+m.nx*0.7,m.y+m.ny*0.7,m.z+m.nz*0.7));
+			if (posnIsOnScreen(pt.x,pt.y,pt.z))
+			{
+				var dir:Vector3D = ship.skin.transform.rotateVector(new Vector3D(m.nx,m.ny,m.nz));
+				var thrustSc:Number = Math.min(2,ship.vel.length/ship.maxSpeed);
+				(MeshParticles)(EffectMPs["thrustConeW"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
+				(MeshParticles)(EffectMPs["thrustConeM"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
+				(MeshParticles)(EffectMPs["thrustConeN"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// convenience function to add muzzle flash to turrets
+		//===============================================================================================
+		private final function muzzleFlash(px:Number,py:Number,pz:Number,nx:Number,ny:Number,nz:Number,muzzleLen:Number,pwr:Number) : void
+		{
+			var _dl:Number = 1/Math.sqrt(nx*nx+ny*ny+nz*nz);
+			px += muzzleLen*nx*_dl;
+			py += muzzleLen*ny*_dl;
+			pz += muzzleLen*nz*_dl;
+			var sw:int = stage.stageWidth;
+			var sh:int = stage.stageHeight;
+			var ttl:int=3;
+			var flashStep:Function = function():void
+			{
+				var id:String = "thrustConeN";
+				if (ttl==2) id = "thrustConeM";
+				else if (ttl==1) id = "thrustConeW";
+				else if (ttl<=0) stepFns.splice(stepFns.indexOf(flashStep),1);
+				var scpt:Vector3D = Mesh.screenPosn(px,py,pz);			// offscreen culling
+				if (scpt.z>0 && scpt.x>0 && scpt.x<sw && scpt.y>0 && scpt.y<sh)	// is on screen
+					(MeshParticles)(EffectMPs[id]).nextLocDirScale(px,py,pz,nx,ny,nz,Math.sqrt(pwr)/9);
+				ttl--;
+			};
+			stepFns.push(flashStep);
+		}//endfunction
+
+		//===============================================================================================
+		// updates turrets status, rotates/displays turrets and frames
+		//===============================================================================================
+		private function shipsStep() : void
+		{
+			var i:int=0;
+			var j:int=0;
+
+			// ----- simulate ships movement and turrets ----------------------
+			for (i=Ships.length-1; i>=0; i--)
+			{
+				var ship:Ship = Ships[i];
+				if (ship.integrity<=0)
+					destroyShip(ship);
+				else
+				{
+					if (ship.stepFn!=null) ship.stepFn();
+
+					ship.updateStep();
+
+					ship.energy += ship.hullConfig.length/10;
+					if (ship.energy>ship.maxEnergy) ship.energy = ship.maxEnergy;
+
+					// ----- do damage FX --------------------------
+					var T:Matrix4x4 = ship.skin.transform;
+					for (j=ship.damagePosns.length-1; j>-1; j--)
+					{
+						var pt:VertexData = ship.damagePosns[j];
+						pt.u-=pt.w;
+						if (pt.u<=0)
+						{
+							var px:Number = T.aa*pt.vx + T.ab*pt.vy + T.ac*pt.vz + T.ad;
+							var py:Number = T.ba*pt.vx + T.bb*pt.vy + T.bc*pt.vz + T.bd;
+							var pz:Number = T.ca*pt.vx + T.cb*pt.vy + T.cc*pt.vz + T.cd;
+							var nx:Number = T.aa*pt.nx + T.ab*pt.ny + T.ac*pt.nz;
+							var ny:Number = T.ba*pt.nx + T.bb*pt.ny + T.bc*pt.nz;
+							var nz:Number = T.ca*pt.nx + T.cb*pt.ny + T.cc*pt.nz;
+							var cnt:int = Math.floor(-pt.u/50)+1;
+							if (posnIsOnScreen(px,py,pz))
+							{
+								var mag:Number = 0.02*Math.sqrt(pt.w);
+								(ParticlesEmitter)(EffectEMs["blast"]).emit(px+nx*0.01,py+ny*0.01,pz+nz*0.01,ship.vel.x,ship.vel.y,ship.vel.z,mag);
+								mag +=0.06;
+								(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.5,1);
+							}
+							pt.u=50;
+						}
+					}
+				}//endfor i
+
+				// ----- ensure separation between ships ----------------------
+				for (j=i-1; j>=0; j--)
+				{
+					var other:Ship = Ships[j];
+					var dx:Number = other.posn.x - ship.posn.x;
+					var dy:Number = other.posn.y - ship.posn.y;
+					var dz:Number = other.posn.z - ship.posn.z;
+					var dlSq:Number = dx*dx+dy*dy+dz*dz;
+					if (dlSq<(ship.radius+other.radius)*(ship.radius+other.radius))
+					{
+						var _dl:Number = 1/Math.sqrt(dlSq);
+						ship.vel.x -= dx*_dl*ship.accelF;	// move ship away
+						ship.vel.y -= dy*_dl*ship.accelF;
+						ship.vel.z -= dz*_dl*ship.accelF;
+						other.vel.x += dx*_dl*other.accelF;	// move ship away
+						other.vel.y += dy*_dl*other.accelF;
+						other.vel.z += dz*_dl*other.accelF;
+					}//endif
+				}//endfor
+			}//
+		}//endfunction
+
+		//===============================================================================================
+		// simulate ships distruction
+		//===============================================================================================
+		private function explodingStep() : void
+		{
+			for (var j:int=Exploding.length-1; j>=0; j--)
+			{
+				var ship:Ship = Exploding[j];
+				var hb:HullBlock = null;
+				if (ship.tte<=0)
+				{
+					playSound(ship.posn.x,ship.posn.y,ship.posn.z,"explosion");
+					ship.updateStep();
+					for (var k:int=ship.hullConfig.length-1; k>-1; k--)
+					{	// create final blasts
+						hb = ship.hullConfig[k];
+						var rand:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+						rand.scaleBy(0.1*Math.random()/rand.length);
+						(ParticlesEmitter)(EffectEMs["blast"]).emit(hb.extPosn.x,hb.extPosn.y,hb.extPosn.z,rand.x,rand.y,rand.z,Math.random()*0.2+0.8);
+					}
+					(ParticlesEmitter)(EffectEMs["wave"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*5/100);
+					world.removeChild(ship.skin);
+					Exploding.splice(j,1);
+				}
+				else
+				{	// ----- do multiple hull explosions
+					for (var i:int=ship.hullConfig.length-1; i>=0; i--)
+					{
+						hb = ship.hullConfig[i];
+						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(hb.x,hb.y,hb.z));
+						var dir:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+						dir.scaleBy(10000/dir.length);
+						var hitPt:VertexData = ship.chassisSkin.lineHitsMesh(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
+						if (hitPt!=null && posnIsOnScreen(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3))
+						{
+							(ParticlesEmitter)(EffectEMs["flash"]).emit(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3,0,0,0,Math.random()*0.5+0.5);
+							(ParticlesEmitter)(EffectEMs["bit"]).batchEmit(3,hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3,hitPt.nx*0.3,hitPt.ny*0.3,hitPt.nz*0.3,0.3);
+						}
+					}//endfor
+
+					// ----- tumble ship
+					ship.skin.transform = ship.skin.transform.translate(-ship.posn.x,-ship.posn.y,-ship.posn.z);
+					ship.skin.transform = ship.skin.transform.rotate(ship.vel.x,ship.vel.y,ship.vel.z);
+					ship.skin.transform = ship.skin.transform.translate(ship.posn.x, ship.posn.y, ship.posn.z);
+					ship.chassisSkin.material.ambR += 0.02;
+					simulateShipTurrets(ship,false);
+					ship.tte--;
+				}
+			}//endfor
+		}//endfunction
+
+		//===============================================================================================
+		// kill and remove ship from world
+		//===============================================================================================
+		private function destroyShip(ship:Ship):void
+		{
+			ship.vel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+			ship.vel.scaleBy(0.01/ship.vel.length);
+			Exploding.push(ship);
+			if (Ships.indexOf(ship)!=-1) 		Ships.splice(Ships.indexOf(ship),1);
+			if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
+			if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
+			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"hullGroan"+(1+Math.round(Math.random())));
+		}//endfunction
+
+		//===============================================================================================
+		// creates and adds a random ship to world
+		//===============================================================================================
+		private function addShipToScene(friendly:Boolean,config:String=null) : Ship
+		{
+			var ship:Ship = null;
+			if (config!=null)
+				ship = Ship.createShipFromConfigStr(Assets,config);
+			else
+				ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1);
+			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
+			var ang:Number = Math.random()*Math.PI*2;
+			world.addChild(ship.skin);
+			Ships.push(ship);
+			if (friendly)
+			{
+				ship.chassisSkin.material.setTexMap(Mtls["TexPanel"]);
+				ship.chassisSkin.material.setSpecMap(Mtls["SpecPanel"]);
+				Friendlies.push(ship);
+				ship.targets = Hostiles;
+			}
+			else
+			{
+				ship.chassisSkin.material.setSpecMap(Mtls["TexPanel"]);
+				ship.chassisSkin.material.setTexMap(Mtls["SpecPanel"]);
+				Hostiles.push(ship);
+				ship.targets = Friendlies;
+			}
+			ship.chassisSkin.material.setSpecular(2);
+			jumpIn(ship,Math.sin(ang)*30,Math.cos(ang)*30,ang+Math.PI,function():void {setDumbAI(ship);});
+			return ship;
+		}//endfunction
+
+		//===============================================================================================
+		// hyper jump out
+		//===============================================================================================
+		private function jumpOut(ship:Ship,bearing:Number,callBack:Function=null) : void
+		{
+			var ttJump:int = 120;
+			var sw:int = stage.stageWidth;
+			var sh:int = stage.stageHeight;
+			var M:Vector.<Module> = ship.modulesConfig;
+
+			ship.stepFn = function():void
+			{
+				var jumpDir:Vector3D = new Vector3D(Math.sin(bearing),0,Math.cos(bearing));
+				if (ttJump>=0)
+				{
+					ship.moveTowardsStep(ship.posn.add(jumpDir));
+					ship.vel.scaleBy(0.5);	// slow ship down
+					if (ship.facing.dotProduct(jumpDir)<0.98 && ttJump==0)
+						ttJump++;		// force complete turn before jump
+				}
+				else
+				{
+					ship.vel.x += -0.04*ttJump*jumpDir.x;	// accel ship
+					ship.vel.y += -0.04*ttJump*jumpDir.y;
+					ship.vel.z += -0.04*ttJump*jumpDir.z;
+					ship.moveTowardsStep(ship.posn.add(jumpDir));
+				}
+
+				ttJump--;
+
+				for (var i:int=M.length-1; i>-1; i--)
+				{
+					var m:Module = M[i];
+					if (m.type.substring(0,8)=="thruster")
+					{
+						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(m.x+m.nx*0.7,m.y+m.ny*0.7,m.z+m.nz*0.7));
+						var scpt:Vector3D = Mesh.screenPosn(pt.x,pt.y,pt.z);			// offscreen culling
+						if (scpt.z>0 && scpt.x>0 && scpt.x<sw && scpt.y>0 && scpt.y<sh)	// is on screen
+						{
+							var dir:Vector3D = ship.skin.transform.rotateVector(new Vector3D(m.nx,m.ny,m.nz));
+							var rand:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+							if (ttJump<0)
+							{
+								rand.scaleBy(0.005/rand.length);
+								(ParticlesEmitter)(EffectEMs["hyperCharge"]).emit(pt.x,pt.y,pt.z,dir.x*0.15+rand.x,dir.y*0.15+rand.y,dir.z*0.15+rand.z,1);
+							}
+							else
+							{
+								rand.scaleBy(1/rand.length);
+								var dp:Number = rand.dotProduct(dir);
+								if (dp<0)
+									rand = new Vector3D(rand.x-dir.x*dp*2,rand.y-dir.y*dp*2,rand.z-dir.z*dp*2);
+								(ParticlesEmitter)(EffectEMs["hyperCharge"]).emit(pt.x+rand.x,pt.y+rand.y,pt.z+rand.z,-rand.x*0.15,-rand.y*0.15,-rand.z*0.15,0.3);
+							}
+						}
+					}
+				}//endfor
+
+				if (ttJump<-15)
+				{
+					(ParticlesEmitter)(EffectEMs["hyperspace"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*3/100);
+					playSound(ship.posn.x,ship.posn.y,ship.posn.z,"jumpIn");
+					world.removeChild(ship.skin);
+					if (Ships.indexOf(ship)!=-1) 		Ships.splice(Ships.indexOf(ship),1);
+					if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
+					if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
+					if (callBack!=null) callBack();
+				}
+			};//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// hyper jump in ship given x,y,z position and w=bearing
+		//===============================================================================================
+		private function jumpIn(ship:Ship,px:Number,pz:Number,bearing:Number,callBack:Function) : void
+		{
+			var initialSpeed:Number = 5;
+			var dist:Number = initialSpeed/(1-ship.slowF*ship.slowF);
+			var sinB:Number = Math.sin(bearing);
+			var cosB:Number = Math.cos(bearing);
+			ship.posn.x = px-dist*sinB;
+			ship.posn.z = pz-dist*cosB;
+			ship.facing = new Vector3D(sinB,0,cosB);
+			ship.vel.x = initialSpeed*sinB;
+			ship.vel.z = initialSpeed*cosB;
+			var sw:int = stage.stageWidth;
+			var sh:int = stage.stageHeight;
+			(ParticlesEmitter)(EffectEMs["hyperspace"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*3/100);
+			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"jumpIn");
+			ship.updateStep();
+
+			ship.stepFn = function():void
+			{
+				var M:Vector.<Module> = ship.modulesConfig;
+				for (var i:int=M.length-1; i>-1; i--)
+				{
+					var m:Module = M[i];
+					if (m.type.substring(0,8)=="thruster")
+					{
+						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(m.x+m.nx*0.7,m.y+m.ny*0.7,m.z+m.nz*0.7));
+						var scpt:Vector3D = Mesh.screenPosn(pt.x,pt.y,pt.z);			// offscreen culling
+						if (scpt.z>0 && scpt.x>0 && scpt.x<sw && scpt.y>0 && scpt.y<sh)	// is on screen
+						{
+							var dir:Vector3D = ship.skin.transform.rotateVector(new Vector3D(m.nx,m.ny,m.nz));
+							(MeshParticles)(EffectMPs["thrustConeW"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,1);
+							var rand:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+							rand.scaleBy(0.005/rand.length);
+							(ParticlesEmitter)(EffectEMs["hyperCharge"]).emit(pt.x,pt.y,pt.z,dir.x*0.15+rand.x,dir.y*0.15+rand.y,dir.z*0.15+rand.z,1);
+						}
+					}
+				}//endfor
+				ship.vel.x*=ship.slowF;
+				ship.vel.y*=ship.slowF;
+				ship.vel.z*=ship.slowF;
+				if (ship.vel.length<0.01)	callBack();
+			}//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// creates hyper jump in effect given x,y,z position and w=bearing
+		//===============================================================================================
+		private function setDumbAI(ship:Ship):void
+		{
+			ship.stepFn = function():void
+			{
+				// ----- seek target to move towards
+				var T:Vector.<Ship> = ship.targets;
+				var targ:Ship = null;
+				var dlSq:Number = Number.MAX_VALUE;
+				if (T!=null)
+				for (var j:int=T.length-1; j>=0; j--)
+				{
+					var other:Ship = T[j];
+					var dx:Number = other.posn.x - ship.posn.x;
+					var dy:Number = other.posn.y - ship.posn.y;
+					var dz:Number = other.posn.z - ship.posn.z;
+					if (dlSq>dx*dx+dy*dy+dz*dz)
+					{
+						targ = other;
+						dlSq = dx*dx+dy*dy+dz*dz;
+					}
+				}//endfor
+
+				// ----- move towards target keeping targDist
+				if (targ!=null)
+				{
+					if (ship.energy<ship.maxEnergy*0.1)
+						ship.engageEnemy = false;
+					if (ship.energy==ship.maxEnergy)
+						ship.engageEnemy = true;
+
+					var targDist:Number = (ship.radius+other.radius)*10;
+					if (ship.engageEnemy)
+						targDist = (ship.radius+other.radius)*2;
+
+					var dv:Vector3D = targ.posn.subtract(ship.posn);	// vector to ship
+
+					var f:Number = Math.sqrt(1/(Math.abs(dv.length-targDist)+1));
+
+					if (dv.length-targDist<0)	dv.scaleBy(-1/dv.length);
+					else											dv.scaleBy( 1/dv.length);
+
+					var pv:Vector3D = new Vector3D(dz,0,-dx);	// perpenticular vector
+					if (ship.facing.x*dz-ship.facing.z*dx<0)
+						pv.scaleBy(-1);
+					pv.normalize();
+
+					// travel vector
+					var tv:Vector3D = new Vector3D(dv.x*(1-f)+pv.x*f,dv.y*(1-f)+pv.y*f,dv.z*(1-f)+pv.z*f);
+					//tv.scaleBy(ship.radius*1.2/tv.length);
+					var tp:Vector3D = ship.posn.add(tv);
+					//(ParticlesEmitter)(EffectEMs["flareWhite"]).emit(tp.x,tp.y,tp.z,0,0,0,1);		// debug
+					ship.moveTowardsStep(tp);
+
+					if (ship.integrity<ship.maxIntegrity*0.25)
+						jumpOut(ship,Math.random()*Math.PI*2);
+				}//endif
+			}//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// the main menu in home scene
+		//===============================================================================================
+		private function showMainMenu():void
+		{
+			var thisRef:SpaceCrafter = this;
+			var menu:Sprite =
+			MenuUI.createLeftStyleMenu(thisRef,
+					new < String > ["Find Opponent","Configure Ship"],
+					new < Function>[function ():void	{galaxyScene(function():void {battleScene(loadShipsData());});},
+													showShipModifyMenu]);
+			if (shipHUD!=null)
+			{
+				menu.y = shipHUD.getChildAt(0).height;
+				shipHUD.getChildAt(0).name = player.name+" : Home Base";
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// Main menu to start editing ship config
+		//===============================================================================================
+		private function showShipModifyMenu():void
+		{
+			var thisRef:SpaceCrafter = this;
+			var menu:Sprite =
+			MenuUI.createLeftStyleMenu(thisRef,
+										new < String > ["Extend Hull","Place Modules","Remove Modules/Hull","Import RMF","Back"],
+										new < Function>[function():void {showShipEditMenu("Extend Hull",extendChassisStep,showShipModifyMenu);},
+														function():void {modulesSelectMenu(showShipModifyMenu)},
+														function():void {showShipEditMenu("Remove Modules/Hull",trimChassisStep,showShipModifyMenu);},
+														function():void {
+															MenuUI.createConfirmDialog(thisRef,"ReImport RMF?",
+																									new icoTick().bitmapData,
+																									new icoCross().bitmapData,
+																									function(confirm:Boolean):void
+																									{
+																										if (confirm)
+																										convToRmf(['3D/missileSmall.obj',
+																													'3D/launcherSmall.obj',
+																													'3D/hullPosnMkr.obj',
+																													'3D/thrusterSmall.obj',
+																													'3D/mountSmall.obj',
+																													'3D/frameSmall.obj',
+																													'3D/mountMedium.obj',
+																													'3D/frameMedium.obj',
+																													'3D/gunAutoSmall.obj',
+																													'3D/gunFlakSmall.obj',
+																													'3D/gunIonSmall.obj',
+																													'3D/gunPlasmaSmall.obj',
+																													'3D/gunRailSmall.obj',
+																													'3D/railGunMedium.obj',
+																													'3D/blasterMedium.obj',
+																													'3D/laserMedium.obj'],
+																													showShipModifyMenu);	// init game after done parsing??!!
+																										else
+																											showShipModifyMenu();
+																									});
+																	},
+													showMainMenu]);
+			if (shipHUD!=null)
+			{
+				menu.y = shipHUD.getChildAt(0).height;
+				shipHUD.getChildAt(0).name = player.name+" : Outfit StarShip";
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// generic ship editing function menu
+		//===============================================================================================
+		private function showShipEditMenu(title:String,editStepFn:Function,callBack:Function):void
+		{
+			var tickBmd:BitmapData = new icoTick().bitmapData;
+			var crossBmd:BitmapData = new icoCross().bitmapData;
+			var undoBmd:BitmapData = new icoUndo().bitmapData;
+			var mainRef:SpaceCrafter = this;
+			var showBtns:Vector.<Boolean> = new <Boolean>[false,true,false];
+			undoStk = new Vector.<String>();
+			var btnsShowFn:Function = function():void
+			{
+				if (undoStk.length>0)
+					showBtns[0] = showBtns[2] = true;
+				else
+					showBtns[0] = showBtns[2] = false;
+			};//endfunction
+
+			function showThisEditMenu():void
+			{
+				stepFns.push(btnsShowFn);		// add dynamic show hide buttons
+				stepFns.push(editStepFn);		// add edit interraction
+
+				if (shipHUD!=null)
+					shipHUD.getChildAt(0).name = player.name+" : "+title;
+
+				var menu:Sprite =
+				MenuUI.createSimpleEditModeMenu(mainRef,tickBmd,crossBmd,undoBmd,
+				function(confirm:Boolean):void
+				{
+					// ----- remove edit ship interraction first
+					stepFns.splice(stepFns.indexOf(btnsShowFn),1);
+					stepFns.splice(stepFns.indexOf(editStepFn),1);
+					world.removeChild(buildMkr);
+
+					if (confirm)	// if tick pressed
+					{
+						MenuUI.createConfirmDialog(mainRef,"Keep Changes?",tickBmd,crossBmd,function(yes:Boolean):void
+						{
+							if (yes)
+								callBack();
+							else
+								showThisEditMenu();
+						});
+					}
+					else     // if cross pressed
+					{
+						if (undoStk.length>0)
+							MenuUI.createConfirmDialog(mainRef,"Discard Changes?",tickBmd,crossBmd,function(yes:Boolean):void
+							{
+								if (yes)
+								{
+									player.setFromConfig(undoStk.shift());	// restore original config
+									callBack();
+								}
+								else
+									showThisEditMenu();
+							});
+						else
+							callBack();
+					}
+				},
+				function():void		// undo function
+				{
+					if (undoStk.length>0)
+						player.setFromConfig(undoStk.pop());	// restore last config
+				},
+				showBtns);
+				if (shipHUD!=null)
+					menu.y = shipHUD.getChildAt(0).height;
+			};
+			showThisEditMenu();
+		}//endfunction
+
+
+		//===============================================================================================
+		// item selection carousel
+		//===============================================================================================
+		private function modulesSelectMenu(callBack:Function):void
+		{
+			var planets:Mesh = sky.getChildAt(0);
+			planets.setLightingParameters(0.2,0.2,0.2,0,0,false,true);
+			sky.material.setAmbient(0.2,0.2,0.2);
+
+			var Ids:Vector.<Object> =
+			new <Object>[	{id:'thrusterS', name:'Ship Thruster'},
+										{id:'gunAutoS', name:'Point Defense Gatling Gun'},
+										{id:'gunFlakS', name:'Point Defense Flak Gun'},
+										{id:'gunIonS', name:'Ion Blaster'},
+										{id:'gunPlasmaS', name:'Plasma Blaster'},
+										{id:'gunRailS', name:'Rail Gun'},
+										{id:'launcherS', name:'Missile Launcher'},
+										{id:'gunIonM', name:'Ion Cannon'},
+										{id:'gunRailM', name:'Rail Cannon'},
+										{id:'gunPlasmaM', name:'Plasma Cannon'}];
+
+			var n:int = Ids.length;
+			var Models:Vector.<Mesh> = new Vector.<Mesh>();
+
+			// ----- create carousel items
+			for (var i:int=n-1; i>-1; i--)
+			{
+				var m:Mesh = Assets[Ids[i].id].clone();
+				m.centerToGeometry();	// center to mesh bounding rect
+				var vol:Vector3D = m.maxXYZ().subtract(m.minXYZ());
+				var sc:Number = Math.pow(1/Math.pow(vol.x*vol.y*vol.z,0.7),1/3);	// tweak scale so diff is not too large
+				m.transform = new Matrix4x4().scale(sc,sc,sc);
+				m.material.setSpecular(0,0);
+				m.material.setAmbient(1,1,1);
+				var nm:Mesh = new Mesh();
+				nm.addChild(m);
+				nm.mergeTree();
+				world.addChild(nm);
+				Models.unshift(nm);
+			}
+
+			var itmsSc:Number = 0;
+			var rotOff:Number = 0;		// the carousel rotation state
+			var selIdx:int = 0;
+			var itmRot:Vector3D = new Vector3D(0,0,0,1);	// the rotation quaternion
+			var rotVel:Vector3D = new Vector3D(0,0,0,1);	// rotation vel of item
+
+			var oldViewStep:Function = viewStep;	// hijack viewStep
+
+			// ----- carousel rotation logic and cam view control
+			viewStep = function():void
+			{
+				var n:int = Models.length;
+				itmsSc = (itmsSc*4+1)/5;
+
+				// ----- apply rotation to selected item
+				var px:Number = Math.sin(rotOff);								// current rotoff vect
+				var py:Number = Math.cos(rotOff);
+				var qx:Number = Math.sin(-selIdx/n*Math.PI*2);	// target rotoff vect
+				var qy:Number = Math.cos(-selIdx/n*Math.PI*2);
+				var ang:Number = Math.acos(Math.max(-1,Math.min(1,px*qx+py*qy)));
+				if (px*qy-qx*py>0)	ang*=-1;
+				rotOff += Math.max(-0.1,Math.min(0.1,ang*0.2));	// spin carousel
+				itmRot = Matrix4x4.quatMult(rotVel,itmRot);
+				rotVel.scaleBy(0.93);	// reduce item rotation speed
+				rotVel.w = Math.sqrt(1 - rotVel.x*rotVel.x-rotVel.y*rotVel.y-rotVel.z*rotVel.z);
+
+				// ----- arrange items in carousel fashion
+				for (var i:int=n-1; i>-1; i--)
+				{
+					var m:Mesh = Models[i];
+					qx = Math.sin(-i/n*Math.PI*2);
+					qy = Math.cos(-i/n*Math.PI*2);
+					var angDiff:Number = Math.acos(Math.max(-1,Math.min(1,px*qx+py*qy)));
+					var sc:Number = 1+(1+Math.cos(Math.min(Math.PI,Math.max(-Math.PI,angDiff*10))));					// scale larger for selected
+					sc *= itmsSc;
+					var elevOff:Number = Math.PI*0.7;
+					var tiltTo:Vector3D = new Vector3D(	Math.cos(lookDBER.z+elevOff)*Math.sin(lookDBER.y),
+																							Math.sin(lookDBER.z+elevOff),
+																							Math.cos(lookDBER.z+elevOff)*Math.cos(lookDBER.y));
+					if (i==selIdx)
+						m.transform = Matrix4x4.quaternionToMatrix(itmRot.w,itmRot.x,itmRot.y,itmRot.z).scale(sc,sc,sc).translate(0,0,player.radius*(2-(sc-1)/3));
+					else
+						m.transform = new Matrix4x4().scale(sc,sc,sc).translate(0,0,player.radius*2);
+					m.transform = m.transform.rotY(i/n*Math.PI*2+rotOff+Math.PI+lookDBER.y).rotFromTo(0,1,0,tiltTo.x,tiltTo.y,tiltTo.z).translate(lookPt.x,lookPt.y,lookPt.z);
+				}
+
+				// ----- detect mouse click
+				if (Input.upPts.length>0)
+				{
+					var upPt:InputPt = Input.upPts[0];
+					if (upPt.endT-upPt.startT<300)
+					{
+						var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
+						for (i=n-1; i>-1; i--)
+						{
+							var hit:VertexData = Models[i].lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+							if (hit!=null)
+							{
+								if (selIdx==i)
+								{		// do addModule
+									menu.parent.removeChild(menu);
+									viewStep = oldViewStep;
+									for (var j:int=Models.length-1; j>-1; j--)
+										world.removeChild(Models[j]);
+									var addModStep:Function = addModuleFn(Ids[i].id);
+									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void {modulesSelectMenu(callBack);});
+								}
+								selIdx = i;
+								if (shipHUD!=null)
+								{
+									menu.y = shipHUD.getChildAt(0).height;
+									shipHUD.getChildAt(0).name = player.name+" : Outfit "+Ids[i].name;
+								}
+							}
+						}
+					}
+				}//endif
+
+				// ----- enable drag to pan view interraction
+				if (Input.downPts.length==1)	// one finger
+				{
+					var downPt:InputPt = Input.downPts[0];
+					velDBER.y+=(downPt.x-downPt.ox)/5000;	// bearing change
+					velDBER.z-=(downPt.y-downPt.oy)/5000;	// elevation change
+					rotVel = Matrix4x4.quatMult(new Matrix4x4().rotFromTo(0,0,1,(downPt.x-downPt.ox)/1000,-(downPt.y-downPt.oy)/1000,1).rotationQuaternion(),rotVel);
+				}
+
+				// ----- calculate cam lookPt easing
+				if (player!=null)
+				{
+					velDBER.x = (player.radius*4-lookDBER.x)*(1-0.8);	// fix dist to radius*4
+					lookVel = player.posn.subtract(lookPt);
+					lookVel.scaleBy(1-0.9);
+					lookDBER.x = Math.max(player.radius*1.1, lookDBER.x);
+				}
+			}//endfunction
+
+			var cleanUp:Function = function():void
+			{
+				planets.setLightingParameters(0,0,0,0,0,true,true);
+				sky.material.setAmbient(1,1,1);
+
+				viewStep = oldViewStep;
+				for (var i:int=Models.length-1; i>-1; i--)
+					world.removeChild(Models[i]);
+				if (callBack!=null) callBack();
+			}//endfunction
+
+			var menu:Sprite =	MenuUI.createLeftStyleMenu(this,new <String>["back"],new <Function>[cleanUp]);
+			if (shipHUD!=null)
+			{
+				menu.y = shipHUD.getChildAt(0).height;
+				shipHUD.getChildAt(0).name = player.name+" : Outfit Modules";
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// interraction to add ship module
+		//===============================================================================================
+		private function addModuleFn(type:String="") : Function
+		{
+			var size:int=1;
+			if (type.charAt(type.length-1)=="M")
+				size=2;
+			var mmkr:Mesh = Mesh.createTetra(0.3, new BitmapData(1,1,false,0x00FF00), false);
+			mmkr.applyTransform(new Matrix4x4().scale(2, 2, 1).rotX(-Math.PI/2));
+			var Mkrs:Vector.<Mesh> = new Vector.<Mesh>();
+			for (var i:int=0; i<size; i++)
+				for (var j:int=0; j<size; j++)
+					Mkrs.push(mmkr.clone());
+
+			world.addChild(mkr);
+			return function():void
+			{
+				var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
+				var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+
+				if (hit!=null)
+				{
+					mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
+
+					var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+					var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx*size/2,hit.vy-hit.ny*size/2,hit.vz-hit.nz*size/2));
+					var localNorm:Vector3D = shipInvT.rotateVector(new Vector3D(hit.nx, hit.ny, hit.nz));
+
+					var orient:Vector3D = new Vector3D(Math.round(localNorm.x),Math.round(localNorm.y),Math.round(localNorm.z));
+					var Pts:Vector.<Vector3D> = player.surfaceToOccupy(localPt.x,localPt.y,localPt.z,orient,size);
+					//var blocks:Vector.<HullBlock> = player.freeHullBlocks(localPt.x,localPt.y,localPt.z,size);
+
+					//debugTf.text = "Pts="+Pts.length+"  blocks="+blocks.length+" orient="+orient+" hitNormal="+int(localNorm.x*100)/100+","+int(localNorm.y*100)/100+","+int(localNorm.z*100)/100;
+
+					for (i=Math.min(Pts.length,Mkrs.length)-1; i>-1; i--)
+					{
+						var pt:Vector3D = Pts[i];
+						Mkrs[i].transform =  player.skin.transform.mult(new Matrix4x4().rotFromTo(0,1,0,orient.x,orient.y,orient.z).translate(pt.x-orient.x*0.3,pt.y-orient.y*0.3,pt.z-orient.z*0.3));
+						world.addChild(Mkrs[i]);
+					}
+					if (Input.upPts.length>0)
+					{
+						var upPt:InputPt = Input.upPts[0];
+						if (upPt.endT-upPt.startT<300)
+						{
+							undoStk.push(player.toString());
+							if (player.addModule(localPt.x,localPt.y,localPt.z,orient,type))	// orient,type,size
+								player.updateHull();
+							else
+								undoStk.pop();		// discard undo state
+						}
+					}
+				}
+				else
+				{
+					for (i=Mkrs.length-1; i>=0; i--)
+						world.removeChild(Mkrs[i]);
+					mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
+				}
+			}//endfunction
+		}//endfunction
+
+		//===============================================================================================
+		// interaction to trim ship chassis
+		//===============================================================================================
+		private function trimChassisStep() : void
+		{
+			// ----- ray cast cursor
+			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
+			var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			if (hit!=null)
+			{
+				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
+				var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx/2,hit.vy-hit.ny/2,hit.vz-hit.nz/2));
+				localPt.x = Math.round(localPt.x);
+				localPt.y = Math.round(localPt.y);
+				localPt.z = Math.round(localPt.z);
+
+				if (player.adjacentToSpace(localPt.x,localPt.y,localPt.z))
+				{
+					buildMkr.transform = player.skin.transform.mult(new Matrix4x4().scale(1.3,1.3,1.3).translate(localPt.x,localPt.y,localPt.z));
+					world.addChild(buildMkr);
+					if (Input.upPts.length>0)
+					{
+						var upPt:InputPt = Input.upPts[0];
+						if (upPt.endT-upPt.startT<300)
+						{
+							undoStk.push(player.toString());
+							var occupyingModule:Module = player.getHullBlocks(localPt.x,localPt.y,localPt.z,1)[0].module;
+							if (occupyingModule!=null)
+								player.removeModule(occupyingModule);
+							else
+								player.trimChassis(localPt.x,localPt.y,localPt.z);
+							player.updateHull();
+						}
+					}
+				}
+				else
+					world.removeChild(buildMkr);
+			}
+			else
+			{
+				world.removeChild(buildMkr);
+				mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
+			}
+		}//endfunction
+
+		//===============================================================================================
+		// interaction to extend ship chassis
+		//===============================================================================================
+		private function extendChassisStep() : void
+		{
+			// ----- ray cast cursor
+			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
+			var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			if (hit!=null)
+			{
+				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
+				var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx+hit.nx/2,hit.vy+hit.ny/2,hit.vz+hit.nz/2));
+				localPt.x = Math.round(localPt.x);
+				localPt.y = Math.round(localPt.y);
+				localPt.z = Math.round(localPt.z);
+				buildMkr.transform = player.skin.transform.mult(new Matrix4x4().translate(localPt.x,localPt.y,localPt.z));
+
+				if (player.adjacentToHull(localPt.x,localPt.y,localPt.z))
+				{
+					world.addChild(buildMkr);
+					if (Input.upPts.length>0)
+					{
+						var upPt:InputPt = Input.upPts[0];
+						if (upPt.endT-upPt.startT<300)
+						{
+							undoStk.push(player.toString());
+							player.extendChassis(localPt.x,localPt.y,localPt.z);
+							player.updateHull();
+						}
+					}
+				}
+				else
+					world.removeChild(buildMkr);
+			}
+			else
+			{
+				world.removeChild(buildMkr);
+				mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
+			}
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function keyDownHandler(ev:KeyboardEvent) : void
+		{
+			if (ev.keyCode==32)
+			{
+				toggleView();
+			}
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function deactivateHandler(ev:Event):void
+		{
+			simulationPaused = true;
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function activateHandler(ev:Event):void
+		{
+			simulationPaused = false;
+		}//endfunction
+
+		//===============================================================================================
+		// returns if point is visible in screen fustrum
+		//===============================================================================================
+		[Inline]
+		private final function posnIsOnScreen(px:Number, py:Number, pz:Number) : Boolean
+		{
+			var pt:Vector3D = Mesh.screenPosn(px,py,pz);	// offscreen culling
+			if (pt.z<=0) return false;
+			return pt.x >= 0 && pt.x < stage.stageWidth && pt.y >= 0 && pt.y < stage.stageHeight;
+		}//endfunction
+
+		//=================================================================================================
+		// given gun muzzle speed, and target (posn,vel) RELATIVE to gun,
+		// returns projectile intercept vector (x,y,z,w)	where w is time to collision
+		// pspeed: projectile velocity
+		// gun posn assumed to be at (0,0,0)
+		// targ posn (tpx,tpy,tpz) targ vel (tvx,tvy,tvz)
+		//=================================================================================================
+		[Inline]
+		public static function collisionVector3(pspeed:Number,tpx:Number,tpy:Number,tpz:Number,tvx:Number,tvy:Number,tvz:Number) : Vector3D
+		{
+			// finalP = initialP + targV*time			... (1)    target
+			// time = |finalP|/pspeed					... (2)	   projectile
+			// | initialP + targV*time | / pspeed		... sub (1) in (2)
+			// simplifying
+			// => 0 = (tpx*tpx + tpy*tpy + tpz*tpz) + 2*(tpx*tvx + tpy*tvy + tpz*tvz)*t + (tvx*tvx + tvy*tvy + tvz*tvz - pspeed*pspeed)*t*t
+			// using quadratic formula (-b +- sqrt(b*b-4*a*c))/(2*a) ...
+
+			var a:Number = tvx*tvx + tvy*tvy + tvz*tvz - pspeed*pspeed;
+			var b:Number = 2*(tpx*tvx + tpy*tvy +tpz*tvz);
+			var c:Number = tpx*tpx + tpy*tpy + tpz*tpz;
+
+			if (b*b-4*a*c>=0)						// if has solution
+			{
+				var det:Number = Math.sqrt(b*b-4*a*c);
+				var t:Number = (-b - det)/(2*a);	// time to hit
+				if (t<0) t = (-b + det)/(2*a);
+				var fpx:Number = tpx + tvx*t;	// target final position x
+				var fpy:Number = tpy + tvy*t;	// target final position y
+				var fpz:Number = tpz + tvz*t;	// target final position y
+				var _fpl:Number = pspeed/Math.sqrt(fpx*fpx+fpy*fpy+fpz*fpz);
+				return new Vector3D(fpx*_fpl,fpy*_fpl,fpz*_fpl,t);	// returns vector from gun posn to targ posn
+			}// endif has solution
+
+			return null;
+		}//endfunction
+
+		//===============================================================================================
+		// create a space nebula texture using perlin noise
+		//===============================================================================================
+		private static function createSpaceTexture(w:int,h:int,spaceBG:Sprite=null) : BitmapData
+		{
+			if (spaceBG==null)
+			{
+				spaceBG=new Sprite();
+				spaceBG.graphics.beginFill(0,1);
+				spaceBG.graphics.drawRect(-w/2,-h/2,w,h);
+				spaceBG.graphics.endFill();
+				for (var i:int=0; i<60; i++)
+				{
+					var r:int = int(20+Math.random()*80);
+					var p:Sprite = new Sprite();
+					p.graphics.beginFill(0x0044BB,1);
+					p.graphics.drawCircle(0,0,r);
+					p.graphics.endFill();
+					p.x = -w/2 + Math.random()*w;
+					p.y = -h/2 + Math.random()*h;
+					p.filters = [new BlurFilter(r,r,3)];
+					spaceBG.addChild(p);
+				}
+				for (i=0; i<15; i++)
+				{
+					r = int(20+Math.random()*50);
+					p = new Sprite();
+					p.graphics.beginFill(0x00AA88,1);
+					p.graphics.drawCircle(0,0,r);
+					p.graphics.endFill();
+					p.x = -w*0.4 + Math.random()*w*0.8;
+					p.y = -h*0.4 + Math.random()*h*0.8;
+					p.filters = [new BlurFilter(r*2,r*2,3)];
+					spaceBG.addChild(p);
+				}
+
+				var spider:Sprite = createSpiderCracksSprite(0,0,0xFF1199,1000,spaceBG,13);
+				spider.filters = [new BlurFilter(32,32,5)];
+			}
+
+			// ----- generate background perlin noise and colored overlay
+			var bmd:BitmapData = new BitmapData(w,h,false);
+			var seed:Number = Math.floor(Math.random()*10);
+			var offSets:Array =[new Point(0,0),new Point(0,0),new Point(0,0),new Point(0,0),
+								new Point(0,0),new Point(0,0),new Point(0,0),new Point(0,0),
+								new Point(0,0),new Point(0,0),new Point(0,0),new Point(0,0),
+								new Point(0,0),new Point(0,0),new Point(0,0),new Point(0,0)];
+			var channels:uint = BitmapDataChannel.RED | BitmapDataChannel.GREEN | BitmapDataChannel.BLUE;
+			bmd.perlinNoise(60, 60, 4, seed, false, true, 7, true, offSets);
+
+			// ----- create a displacement map filter and apply
+			var dispbmd:BitmapData = new BitmapData(w,h);
+			dispbmd.perlinNoise(320, 320, 2, seed, false, true, 7, false, offSets);
+			bmd.applyFilter(bmd,new Rectangle(0,0,bmd.width,bmd.height),new Point(0,0),new DisplacementMapFilter(dispbmd,new Point(0,0),BitmapDataChannel.BLUE,BitmapDataChannel.RED,80,80,DisplacementMapFilterMode.CLAMP));
+			dispbmd.dispose();
+			//bmd.applyFilter(bmd,new Rectangle(0,0,bmd.width,bmd.height),new Point(0,0),new ColorMatrixFilter([1,0,0,0,50, 0,1,0,0,50, 0,0,1,0,50, 0,0,0,1,0]));
+			bmd.draw(spaceBG,new Matrix(1,0,0,1,bmd.width/2,bmd.height/2),null,BlendMode.MULTIPLY,null,false);
+			return bmd;
+		}//endfunction
+
+		//===============================================================================================
+		// paint hole in mc at position (px,py)
+		//===============================================================================================
+		private static function createSpiderCracksSprite(px:Number,py:Number,color:Number,w:Number,mc,n:int=12) : Sprite
+		{
+			var hole:Sprite = new Sprite();
+			hole.x = px;
+			hole.y = py;
+
+			var ang:Number = Math.random()*Math.PI*2;
+
+			for (var i:int=0; i<n; i++)
+			{
+				ang += Math.random()*Math.PI;
+				var len:Number = w/2 + Math.random()*w/2;
+				var vx:Number = Math.sin(ang)*len;
+				var vy:Number =-Math.cos(ang)*len;
+				var pt:Point = mc.localToGlobal(new Point(px+vx,py+vy));
+				drawCrookedLine(0,0,		// from
+								vx,vy,		// to
+								w/32,0,		// thickness
+								8,color,	// kinks
+								hole);		// DSprite
+			}
+
+			mc.addChild(hole);
+			return hole;
+		}//endfunction
+
+		//===============================================================================================
+		// Draws a zigzag connecting line from (px,py) to (qx,qy) thickness fat1 to fat2
+		// n number of kinks inbetween, of color in given Sprite
+		//===============================================================================================
+		private static function drawCrookedLine(px:Number,py:Number,qx:Number,qy:Number,
+								 fat1:Number,fat2:Number,
+								 n:Number,color:Number,mc:Sprite) : void
+		{
+			var A:Array = [px,py];
+			var ux:Number = qx-px;
+			var uy:Number = qy-py;
+			var vl:Number = Math.sqrt(ux*ux + uy*uy);
+			ux /= vl;
+			uy /= vl;
+
+			var i:int=0;
+			var f:Number=0;
+
+			for (i=1; i<=n; i++)
+			{
+				f = i/(n+1);
+				var r:int = (Math.random()-0.5)*vl/n;
+				A.push((f*qx + (1-f)*px) + r*uy);
+				A.push((f*qy + (1-f)*py) - r*ux);
+			}
+			A.push(qx);
+			A.push(qy);
+
+			for (i=0; i<A.length-2; i+=2)
+			{
+				f = i/(A.length-2);
+				var f1:Number = fat2*f + fat1*(1-f);
+				f = (i+2)/(A.length-2);
+				var f2:Number = fat2*f + fat1*(1-f);
+				mc.graphics.beginFill(color);
+				mc.graphics.moveTo(A[i+0]+f1/2*uy	,A[i+1]-f1/2*ux);
+				mc.graphics.lineTo(A[i+2]+f2/2*uy	,A[i+3]-f2/2*ux);
+				mc.graphics.lineTo(A[i+2]-f2/2*uy	,A[i+3]+f2/2*ux);
+				mc.graphics.lineTo(A[i+0]-f1/2*uy	,A[i+1]+f1/2*ux);
+				mc.graphics.endFill();
+			}
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private static function fadeVertEnds(bmd:BitmapData) : BitmapData
+		{
+			var s:Sprite = new Sprite();
+			var mat:Matrix = new Matrix();
+			mat.createGradientBox(bmd.width,bmd.height,Math.PI/2,0,0);
+			s.graphics.beginGradientFill("linear",[0x000000,0xFFFFFF,0xFFFFFF,0x000000],[1,1,1,1],[0,105,150,255],mat);
+			s.graphics.drawRect(0,0,bmd.width,bmd.height);
+			s.graphics.endFill();
+			//var noise:BitmapData = new BitmapData(
+			bmd.draw(s,null,null,"multiply");
+			return bmd;
+		}//endfunction
+
+		//===============================================================================================
+		// convenience fn to create a double sided light cone inside and outside
+		//===============================================================================================
+		private static function createLightCone(r1:Number,r2:Number,z1:Number,z2:Number,bmd:BitmapData) : Mesh
+		{
+			var cone:Mesh = new Mesh();
+			cone.addChild(Mesh.createCylinder(r1,r2,z1,z2,12,bmd));
+			var r:Mesh = cone.clone();
+			r.transform = new Matrix4x4().scale(-1,1,1);
+			cone.addChild(r);
+			return cone.mergeTree();
+		}//endfunction
+
+	}//endClass
+
+}//endPackage
+
+import com.greensock.TweenLite;
+import com.greensock.plugins.TweenPlugin;
+import com.greensock.plugins.GlowFilterPlugin;
+import core3D.*;
+import flash.display.Stage;
+import flash.display.Bitmap;
+import flash.display.BitmapData;
+import flash.display.DisplayObject;
+import flash.display.Sprite;
+import flash.display3D.VertexBuffer3D;
+import flash.events.Event;
+import flash.events.MouseEvent;
+import flash.events.TouchEvent;
+import flash.filters.GlowFilter;
+import flash.geom.Point;
+import flash.geom.Matrix;
+import flash.geom.Vector3D;
+import flash.geom.Rectangle;
+import flash.geom.ColorTransform;
+import flash.media.SoundMixer;
+import flash.media.SoundTransform;
+import flash.text.TextField;
+import flash.text.TextFormat;
+import flash.utils.ByteArray;
+import flash.utils.getTimer;
+import flash.ui.Multitouch;
+import flash.ui.MultitouchInputMode;
+
+TweenPlugin.activate([GlowFilterPlugin]); //activation is permanent in the SWF, so this line only needs to be run once.
+
+class Input
+{
+	public static var zoomF:Number = 1;
+	public static var downPts:Vector.<InputPt> = null;
+	public static var upPts:Vector.<InputPt> = null;
+
+	private static var touchObj:Object = null;
+	private static var mousePt:InputPt = null;
+	private static var stage:Stage = null;
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public static function init(stageInstance:Stage):void
+	{
+		stage = stageInstance;
+		if (Multitouch.supportsGestureEvents)
+		{
+			Multitouch.inputMode = MultitouchInputMode.TOUCH_POINT;
+			stage.addEventListener(TouchEvent.TOUCH_BEGIN,Input.touchBeginHandler);
+			stage.addEventListener(TouchEvent.TOUCH_MOVE,Input.touchMoveHandler);
+			stage.addEventListener(TouchEvent.TOUCH_END,Input.touchEndHandler);
+		}
+		else
+		{
+			stage.addEventListener(MouseEvent.MOUSE_DOWN,Input.mouseDownHandler);
+			stage.addEventListener(MouseEvent.MOUSE_UP,Input.mouseUpHandler);
+			stage.addEventListener(MouseEvent.MOUSE_WHEEL,Input.mouseWheelHandler);
+		}
+
+		touchObj = new Object();
+		downPts = new Vector.<InputPt>();
+		upPts = new Vector.<InputPt>();
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public static function update():void
+	{
+		for (var i:int=downPts.length-1; i>-1; i--)
+		{
+			var pt:InputPt = downPts[i];
+			pt.ox = pt.x;
+			pt.oy = pt.y;
+		}
+
+		if (mousePt!=null)
+		{
+			mousePt.x = stage.mouseX;
+			mousePt.y = stage.mouseY;
+		}
+		while (upPts.length>0)	upPts.shift();
+		zoomF = 1;
+	}//endfunction
+
+	//===============================================================================================
+	// handles individual touch begin
+	//===============================================================================================
+	private static function touchBeginHandler(ev:TouchEvent) : void
+	{
+		var newInPt:InputPt = new InputPt(ev.stageX,ev.stageY);
+		touchObj[ev.touchPointID] = newInPt;
+		downPts.push(newInPt);
+		touchObj.cnt+=1;
+	}//endfunction
+
+	//===============================================================================================
+	// handles individual touch moves
+	//===============================================================================================
+	private static function touchMoveHandler(ev:TouchEvent) : void
+	{
+		if (touchObj[ev.touchPointID]!=null)
+		{
+			(InputPt)(touchObj[ev.touchPointID]).x = ev.stageX;
+			(InputPt)(touchObj[ev.touchPointID]).y = ev.stageY;
+		}
+
+		if (downPts.length>1)	// calculate zoomF
+		{
+			var pt1:InputPt = downPts[0];
+			var pt2:InputPt = downPts[1];
+			var dox:Number = pt1.ox-pt2.ox;
+			var doy:Number = pt1.oy-pt2.oy;
+			var dolSq:Number = dox*dox+doy*doy;
+			var dx:Number = pt1.x-pt2.x;
+			var dy:Number = pt1.y-pt2.y;
+			var dlSq:Number = dx*dx+dy*dy;
+			zoomF = Math.sqrt(dolSq/dlSq);
+		}
+	}//endfunction
+
+	//===============================================================================================
+	// handles individal touch end
+	//===============================================================================================
+	private static function touchEndHandler(ev:TouchEvent) : void
+	{
+		if (touchObj[ev.touchPointID]!=null)
+		{
+			var pt:InputPt = touchObj[ev.touchPointID];
+			pt.endT = getTimer();
+			downPts.splice(downPts.indexOf(pt),1);
+			upPts.push(pt);
+			delete touchObj[ev.touchPointID];
+		}
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function mouseDownHandler(ev:Event) : void
+	{
+		mousePt = new InputPt(stage.mouseX,stage.mouseY);
+		downPts.push(mousePt);
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function mouseUpHandler(ev:Event) : void
+	{
+		if (mousePt!=null)
+		{
+			mousePt.endT = getTimer();
+			upPts.push(mousePt);
+			downPts.splice(downPts.indexOf(mousePt),1);
+			mousePt = null;
+		}
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function mouseWheelHandler(ev:MouseEvent) : void
+	{
+		zoomF = 1 + ev.delta / 50;
+	}//endfunction
+}//endclass
+
+class InputPt
+{
+	public var x:int=0;
+	public var y:int=0;
+	public var ox:int=0;
+	public var oy:int=0;
+	public var startT:int=0;
+	public var endT:int=0;
+
+	public function InputPt(px:int,py:int):void
+	{
+		x = px;
+		y = py;
+		ox = px;
+		oy = py;
+		startT = getTimer();
+	}//endconstr
+ }//endclass
+
+class MenuUI
+{
+	private static var margF:Number = 0.01;
+	private static var fontScale:Number = 30/700;
+	public static var clickSfx:Function = null;
+	public static var colorTone:uint = 0x99FFFF;		// overridden externally as needed
+
+	//===============================================================================================
+	// Generic menu creation function
+	//===============================================================================================
+	public static function createLeftStyleMenu(targ:SpaceCrafter,selectionTxts:Vector.<String>,callBacks:Vector.<Function>) : Sprite
+	{
+		var sw:Number = targ.stage.stageWidth;
+		var sh:Number = targ.stage.stageHeight;
+
+		var s:Sprite = new Sprite();
+
+		var n:int = Math.min(selectionTxts.length, callBacks.length);
+		var Btns:Vector.<Sprite> = new Vector.<Sprite>();
+		var closing:Boolean = false;
+		function closeAndRemoveFn(callBack:Function):Function
+		{
+			return function():void
+			{
+				if (closing) return;
+				closing = true;
+				for (var i:int=0; i<Btns.length; i++)
+					TweenLite.to(Btns[i], 0.3, { x:0, alpha:0, delay:0.1*Btns.length-0.1*i } );
+				TweenLite.to(s, 0.3, { delay:0.1 * Btns.length, onComplete:function():void { if (s.parent != null) s.parent.removeChild(s); if (callBack!=null) callBack(); }} );
+			}
+		}//endfunction
+
+		for (var i:int=0; i<n; i++)
+		{
+			var addBtn:Sprite = createStandardButton(createTextBmp(selectionTxts[i],int(fontScale*sh),int(fontScale*sh),colorTone),closeAndRemoveFn(callBacks[i]));
+			addBtn.alpha = 0;
+			addBtn.y = addBtn.height*i;
+			s.addChild(addBtn);
+			Btns.push(addBtn);
+			TweenLite.to(addBtn, 0.3, { x:margF*sw, alpha:1, delay:0.1*i+0.1 } );
+		}
+
+		targ.addChild(s);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// Generic comfirmation dialog box
+	//===============================================================================================
+	public static function createConfirmDialog(targ:SpaceCrafter,titleTxt:String,
+																						tickIco:BitmapData,crossIco:BitmapData,callBack:Function) : Sprite
+	{
+		var sw:Number = targ.stage.stageWidth;
+		var sh:Number = targ.stage.stageHeight;
+		var margX:Number = margF*sw;		// margin value
+
+		var s:Sprite = new Sprite();
+
+		// ----- create title and buttons
+		var sc:Number = fontScale*sh/60;
+		var bw:Number = Math.max(tickIco.width*sc,crossIco.width*sc)+margX*10;	// ico bitmap w
+		var bh:Number = Math.max(tickIco.height*sc,crossIco.height*sc)+margX*2;	// ico bitmap h
+		var tickBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
+		var crossBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
+		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),new ColorTransform((colorTone>>16)/255,(colorTone>>8 & 0xFF)/255,(colorTone & 0xFF)/255),null,null,true);
+		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),new ColorTransform((colorTone>>16)/255,(colorTone>>8 & 0xFF)/255,(colorTone & 0xFF)/255),null,null,true);
+		var tickBtn:Sprite = createStandardButton(new Bitmap(tickBmd),closeAndRemoveFn(function():void {callBack(true);}));
+		var crossBtn:Sprite = createStandardButton(new Bitmap(crossBmd),closeAndRemoveFn(function():void {callBack(false);}));
+		var title:Bitmap = createTextBmp(titleTxt, int(1.7*fontScale*sh));
+
+		// ----- position buttons
+		var panelw:int = Math.max(title.width+margX*2,tickBtn.width+crossBtn.width+margX*3);
+		title.x = (panelw - title.width)/2;
+		title.y = margX;
+		s.addChild(title);
+		tickBtn.x = (panelw - tickBtn.width-margX-crossBtn.width)/2;
+		tickBtn.y = title.y+title.height+margX;
+		s.addChild(tickBtn);
+		crossBtn.x = tickBtn.x+tickBtn.width+margX;
+		crossBtn.y = tickBtn.y;
+		s.addChild(crossBtn);
+
+		s.graphics.lineStyle(0, colorTone);
+		s.graphics.drawRect(0,0,panelw,s.height+margX*2);
+
+		for (var i:int=0; i<s.numChildren; i++)
+		{
+			s.getChildAt(i).alpha = 0;
+			TweenLite.to(s.getChildAt(i), 0.3, {alpha:1, delay:0.1*i} );
+		}
+
+		function closeAndRemoveFn(callBack:Function):Function
+		{
+			return function():void
+			{
+				TweenLite.to(crossBtn, 0.3, { alpha:0 } );
+				TweenLite.to(tickBtn, 0.3, { alpha:0, delay:0.1 } );
+				TweenLite.to(title, 0.3, { alpha:0, delay:0.2, onComplete:function():void { if (s.parent != null) s.parent.removeChild(s); if (callBack!=null) callBack(); }} );
+			}
+		}//endfunction
+
+		s.x = (sw-s.width)/2;
+		s.y = (sh-s.height)/2;
+		targ.addChild(s);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// Generic ship editing mode menu
+	//===============================================================================================
+	public static function createSimpleEditModeMenu(targ:SpaceCrafter,
+																									tickIco:BitmapData,crossIco:BitmapData,undoIco:BitmapData,
+																									callBack:Function,undoFn:Function,showBtns:Vector.<Boolean>=null) : Sprite
+	{
+		if (showBtns!=null && showBtns.length!=3)		showBtns = null;
+		var sw:Number = targ.stage.stageWidth;
+		var sh:Number = targ.stage.stageHeight;
+		var margX:Number = margF*sw;		// margin value
+
+		var s:Sprite = new Sprite();
+
+		// ----- create title and buttons
+		var sc:Number = fontScale*sh/60;
+		var bw:Number = Math.max(tickIco.width*sc,crossIco.width*sc,undoIco.width)+margX*10;	// ico bitmap w
+		var bh:Number = Math.max(tickIco.height*sc,crossIco.height*sc,undoIco.width)+margX*2;	// ico bitmap h
+		var tickBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
+		var crossBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
+		var undoBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
+		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
+		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
+		undoBmd.draw(undoIco,new Matrix(sc,0,0,sc,(bw-undoIco.width*sc)/2,(bh-undoIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
+		var tickBtn:Sprite = createStandardButton(new Bitmap(tickBmd),closeAndRemoveFn(function():void {callBack(true);}));
+		var crossBtn:Sprite = createStandardButton(new Bitmap(crossBmd),closeAndRemoveFn(function():void {callBack(false);}));
+		var undoBtn:Sprite = createStandardButton(new Bitmap(undoBmd),undoFn);
+
+		if (showBtns==null)
+			TweenLite.to(crossBtn, 0.3, {x:margX, alpha:1, delay:0.1} );
+		else
+			crossBtn.visible = false;
+
+		if (showBtns==null)
+			TweenLite.to(tickBtn, 0.3, {x:margX, alpha:1, delay:0.2} );
+		else
+			tickBtn.visible = false;
+
+		if (showBtns==null)
+			TweenLite.to(undoBtn, 0.3, {x:sw-undoBtn.width-margX, alpha:1, delay:0.3} );
+		else
+			undoBtn.visible = false;
+		crossBtn.alpha = 0;
+		tickBtn.alpha = 0;
+		undoBtn.alpha = 0;
+		s.addChild(crossBtn);
+		s.addChild(tickBtn);
+		s.addChild(undoBtn);
+
+		function enterFrameHandler(ev:Event):void
+		{
+			if (showBtns[0])
+			{
+				if (!tickBtn.visible)
+				{
+					tickBtn.visible=true;
+					TweenLite.to(tickBtn, 0.3, {x:margX, alpha:1} );
+					tickBtn.y = sh-tickBtn.height-margX-s.y;
+				}
+			}
+			else
+			{
+				if (tickBtn.visible && tickBtn.alpha==1)
+					TweenLite.to(tickBtn, 0.3, {x:0, alpha:0, onComplete:function():void {tickBtn.visible = false;}} );
+			}
+
+			if (showBtns[1])
+			{
+				if (!crossBtn.visible)
+				{
+					crossBtn.visible=true;
+					TweenLite.to(crossBtn, 0.3, {x:margX, alpha:1} );
+				}
+			}
+			else
+			{
+				if (crossBtn.visible && crossBtn.alpha==1)
+					TweenLite.to(crossBtn, 0.3, {x:0, alpha:0, onComplete:function():void {crossBtn.visible = false;}} );
+			}
+
+			if (showBtns[2])
+			{
+				if (!undoBtn.visible)
+				{
+					undoBtn.visible = true;
+					TweenLite.to(undoBtn, 0.3, {x:sw-undoBtn.width-margX, alpha:1} );
+					undoBtn.x = sw - undoBtn.width;
+				}
+			}
+			else
+			{
+				if (undoBtn.visible && undoBtn.alpha==1)
+					TweenLite.to(undoBtn, 0.3, {x:sw-undoBtn.width, alpha:0, onComplete:function():void {undoBtn.visible = false;}} );
+			}
+		}//endfunction
+		if (showBtns!=null)
+			s.addEventListener(Event.ENTER_FRAME,enterFrameHandler);
+
+		function closeAndRemoveFn(callBack:Function):Function
+		{
+			s.removeEventListener(Event.ENTER_FRAME,enterFrameHandler);
+			return function():void
+			{
+				TweenLite.to(tickBtn, 0.3, { alpha:0 } );
+				TweenLite.to(crossBtn, 0.3, { alpha:0, delay:0.1 } );
+				TweenLite.to(undoBtn, 0.3, { alpha:0, delay:0.2 } );
+				TweenLite.to(s, 0.3, { delay:0.3, onComplete:function():void { if (s.parent != null) s.parent.removeChild(s); if (callBack!=null) callBack(); }} );
+			}
+		}//endfunction
+
+		targ.addChild(s);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// creates standard looking techy looking button
+	//===============================================================================================
+	public static function createStandardButton(bmp:Bitmap, onClick:Function=null) : Sprite
+	{
+		var lineColor:uint = uint((colorTone>>16)*0.5)<<16 | uint(((colorTone>>8) & 0xFF)*0.5)<<8 | uint((colorTone & 0xFF)*0.5);
+		var s:Sprite = new Sprite();
+		var lmarg:int = int(bmp.height/12);
+		var lcorn:int = int(bmp.height/4);
+		s.graphics.lineStyle(2, lineColor, lmarg);
+		s.graphics.beginFill(0x000000, 0.3);
+		s.graphics.moveTo(lmarg, lcorn);		// top left corner
+		s.graphics.lineTo(lcorn, lmarg);
+		s.graphics.lineTo(bmp.width-lmarg-lcorn/2, lmarg);		// top right corner
+		s.graphics.lineTo(bmp.width-lmarg, lmarg+lcorn/2);
+		s.graphics.lineTo(bmp.width-lmarg, bmp.height-lcorn);	// bottom right corner
+		s.graphics.lineTo(bmp.width-lmarg-lcorn/2, bmp.height-lcorn/2);
+		s.graphics.lineTo(bmp.width-lmarg-lcorn/2-bmp.width/3, bmp.height-lcorn/2);
+		s.graphics.lineTo(bmp.width - lcorn-bmp.width/3, bmp.height - lmarg);
+		s.graphics.lineTo(lmarg+lcorn/2, bmp.height - lmarg);	// bottom left corner
+		s.graphics.lineTo(lmarg, bmp.height - lmarg - lcorn/2);
+		s.graphics.lineTo(lmarg, lcorn);
+		var smallRectSize:int = bmp.height / 8;
+		s.graphics.beginFill(colorTone, 0.5);
+		s.graphics.drawRect(lmarg * 3, bmp.height - lmarg * 3 - smallRectSize, smallRectSize, smallRectSize);
+		s.graphics.endFill();
+		bmp.bitmapData.draw(s,null,null,"add");
+		s.graphics.clear();
+		s.addChild(bmp);
+		setAsBtn(s, onClick);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// create text bitmap
+	//===============================================================================================
+	public static function createTextBmp(txt:String, size:int=20, marg:int=0, color:uint=0x99FFFF) : Bitmap
+	{
+		var borderWidth:int = size / 4;
+		var tf:TextField = new TextField();
+		tf.autoSize = "left";
+		tf.wordWrap = false;
+		tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
+		tf.text = txt;
+		tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
+
+		var bmd:BitmapData = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x000000);
+		bmd.draw(tf, new Matrix(1, 0, 0, 1, borderWidth, borderWidth));
+		return new Bitmap(bmd);
+	}//endfunction
+
+	//===============================================================================================
+	// create a text bitmap with type out anim, text follows name value
+	//===============================================================================================
+	public static function createTypeOutTextBmp(s:String,size:int,marg:int=0) : Bitmap
+	{
+		if (s==null) s="";
+		var borderWidth:int = size / 4;
+		var tf:TextField = new TextField();
+		tf.autoSize = "left";
+		tf.wordWrap = false;
+		tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
+		tf.text = " ";
+		tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
+
+		var bmd:BitmapData = new BitmapData(1,tf.height+borderWidth*2,true,0x00000000);
+		var bmp:Bitmap = new Bitmap(bmd);
+		var mat:Matrix = new Matrix(1, 0, 0, 1, borderWidth, borderWidth);
+		var rect:Rectangle = new Rectangle(0,0,bmd.width,bmd.height);
+		bmp.name = s;
+
+		var targTxt:String = "";
+
+		function enterFrameHandler(ev:Event):void
+		{
+			if (bmp.name==null) bmp.name="";
+			if (bmp.name!=targTxt)
+			{	// ----- detect text change, change to new sized bmd for new text
+				targTxt = bmp.name;
+				var otxt:String = tf.text;
+				tf.text = targTxt;
+				bmd = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x00000000);
+				rect.width = bmd.width;
+				rect.height = bmd.height;
+				tf.text = otxt;
+			}
+
+			var txt:String = tf.text;
+
+			if (bmp.bitmapData!=bmd && txt.length<=targTxt.length)
+			{	// not yet swapped to new sized bmd
+				bmp.bitmapData.dispose();
+				bmp.bitmapData = bmd;
+			}
+
+			// ----- type text out
+			if (txt.length>targTxt.length || targTxt.substr(0,txt.length)!=txt)
+			{
+				tf.text = txt.substr(0,txt.length-1);
+				bmd.fillRect(rect,0x00000000);
+				bmd.draw(tf, mat);	// draw textField on bmd
+			}
+			else if (txt.length<targTxt.length)
+			{
+				tf.text = targTxt.substr(0,txt.length+1);
+				bmd.fillRect(rect,0x00000000);
+				bmd.draw(tf, mat);	// draw textField on bmd
+			}
+		}//endfunction
+		tf.addEventListener(Event.ENTER_FRAME,enterFrameHandler);
+
+		function removeHandler(ev:Event):void
+		{
+			tf.removeEventListener(Event.ENTER_FRAME, enterFrameHandler);
+			tf.removeEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+		}//endfunction
+		tf.addEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+
+		return bmp;
+	}//endfunction
+
+	//===============================================================================================
+	// generic button interraction
+	//===============================================================================================
+	private static function setAsBtn(s:Sprite,onClick:Function=null) : void
+	{
+		s.buttonMode = true;
+		s.mouseChildren = false;
+		var glowTween:TweenLite = TweenLite.to(s, 1, { glowFilter: { color:colorTone, blurX:0, blurY:0, strength:0, alpha:0, remove:true }} );;
+		function rollOverHandler(ev:Event):void
+		{
+			glowTween.kill();
+			glowTween = TweenLite.to(s, 0.2, { glowFilter: { color:colorTone, blurX:8, blurY:1, strength:1, alpha:1 }} );
+		}
+
+		function rollOutHandler(ev:Event):void
+		{
+			glowTween.kill();
+			glowTween = TweenLite.to(s, 1, { glowFilter: { color:colorTone, blurX:0, blurY:0, strength:0, alpha:0, remove:true}} );
+		}
+
+		function clickHandler(ev:Event):void
+		{
+			glowTween.kill();
+			s.filters = [new GlowFilter(0xFFFFFF, 1, 16, 4, 3, 2)];
+			glowTween = TweenLite.to(s, 0.3, { glowFilter: { color:colorTone, blurX:0, blurY:0, strength:0, alpha:0, remove:true }} );
+			if (clickSfx!=null)	clickSfx();		// play the click sound
+			if (onClick!=null) onClick();
+		}
+
+		function removedHandler(ev:Event):void
+		{
+			glowTween.kill();
+			s.filters = [];
+			s.removeEventListener(MouseEvent.ROLL_OVER,rollOverHandler);
+			s.removeEventListener(MouseEvent.ROLL_OUT,rollOutHandler);
+			s.removeEventListener(MouseEvent.CLICK,clickHandler);
+			s.removeEventListener(Event.REMOVED_FROM_STAGE,removedHandler);
+		}
+
+		s.addEventListener(MouseEvent.ROLL_OVER,rollOverHandler);
+		s.addEventListener(MouseEvent.ROLL_OUT,rollOutHandler);
+		s.addEventListener(MouseEvent.CLICK,clickHandler);
+		s.addEventListener(Event.REMOVED_FROM_STAGE,removedHandler);
+	}//endfunction
+
+	//===============================================================================================
+	// create textured font with textured edges
+	//===============================================================================================
+	public static function createTexturedTitle(txt:String,tex1:BitmapData,tex2:BitmapData,borderWidth:int=10) : Bitmap
+	{
+		var tf:TextField = new TextField();
+		tf.autoSize = "left";
+		tf.wordWrap = false;
+		tf.htmlText = txt;
+		tf.x = borderWidth;
+		tf.y = borderWidth;
+		tf.filters = [new GlowFilter(0xFFFFFF,1,borderWidth*2,borderWidth*2,100,1)];
+
+		var tfmc:Sprite = new Sprite();
+		tfmc.addChild(tf);
+
+		// ----- draw text inner background
+		var bg:Sprite = new Sprite();
+		bg.graphics.beginBitmapFill(tex2,new Matrix(0.5,0,0,0.5));
+		bg.graphics.drawRect(0,0,tf.width+borderWidth*2,tf.height+borderWidth*2);
+		bg.graphics.endFill();
+
+		// ----- draw outer text border
+		var bmd:BitmapData = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x000000);
+		var s:Sprite = new Sprite();
+		s.addChild(tfmc);
+		bmd.draw(bg);
+		bmd.draw(s,null,null,'alpha',null,false);
+		bmd.applyFilter(bmd,new Rectangle(0,0,bmd.width,bmd.height),new Point(0,0),new GlowFilter(0,1,borderWidth,borderWidth,2,1,true));
+
+		// ----- draw inner Text
+		tf.filters = [];
+		bg.graphics.clear();
+		bg.graphics.beginBitmapFill(tex1,new Matrix(0.5,0,0,0.5));
+		bg.graphics.drawRect(0,0,tf.width+borderWidth*2,tf.height+borderWidth*2);
+		bg.graphics.endFill();
+		s.addChildAt(bg,0);
+		tfmc.cacheAsBitmap = true;
+		bg.mask = tfmc;
+		var tmd:BitmapData = new BitmapData(bmd.width,bmd.height,true,0x00000000);
+		tmd.draw(s);
+		tmd.applyFilter(tmd,new Rectangle(0,0,tmd.width,tmd.height),new Point(0,0),new GlowFilter(0,1,borderWidth,borderWidth,1,1,true));
+		tmd.applyFilter(tmd,new Rectangle(0,0,tmd.width,tmd.height),new Point(0,0),new GlowFilter(0,1,2,2,2,1));
+
+		// ----- combine inner and outer text
+		bmd.copyPixels(tmd,new Rectangle(0,0,tmd.width,tmd.height),new Point(borderWidth,borderWidth),null,null,true);
+		tmd.dispose();
+		return new Bitmap(bmd);
+	}//endfunction
+
+	//===============================================================================================
+	// draws out waveform of sound output
+	// sampInt: sample interval minimum 4
+	// mag: height/2 of the display area
+	//===============================================================================================
+	public static function createSoundOutputDisplay(sampInt:int=8,mag:int=20) : Sprite
+	{
+		sampInt = Math.max(sampInt,4);
+		var canvas:Sprite = new Sprite();
+		canvas.addEventListener(Event.ENTER_FRAME,readWaveform);
+		canvas.addEventListener(MouseEvent.CLICK,clickHandler);
+
+		// ---------------------------------------------------------------------------
+		function readWaveform(ev:Event):void
+		{
+			// ----- float on top of other movieClips ---------------
+			/*
+			if (canvas.parent!=null && canvas.parent.numChildren>canvas.parent.getChildIndex(canvas))
+			{
+				var pp = canvas.parent;
+				pp.addChild(pp.removeChild(canvas));
+			}
+			*/
+			var vol:Number = SoundMixer.soundTransform.volume;
+
+			// ----- draw bounding box ------------------------------
+			canvas.graphics.clear();
+			canvas.graphics.lineStyle(0,0xFFFFFF,0.10);
+			canvas.graphics.beginFill(0x000000,0.5);
+			canvas.graphics.drawRect(0,0,256/sampInt*4,mag*2);
+			canvas.graphics.endFill();
+
+			// ----- read waveform data -----------------------------
+			var bytes:ByteArray = new ByteArray();
+			SoundMixer.computeSpectrum(bytes);
+			bytes.position=0;
+
+			// ----- draw left channel waveform ---------------------
+			canvas.graphics.lineStyle(0,0x33FFFF,1);
+			var val:Number = bytes.readFloat();
+			canvas.graphics.moveTo(0,val*vol*mag+mag);
+			for (bytes.position=4; bytes.position<1024; bytes.position+=sampInt-4)
+			{
+				val = bytes.readFloat();
+				canvas.graphics.lineTo(bytes.position/sampInt,val*vol*mag+mag);
+			}//endFor
+
+			// ----- draw right channel waveform --------------------
+			val = bytes.readFloat();
+			canvas.graphics.moveTo(0,val*vol*mag+mag);
+			for (bytes.position=1024; bytes.position<2048; bytes.position+=sampInt-4)
+			{
+				val = bytes.readFloat();
+				canvas.graphics.lineTo((bytes.position-1024)/sampInt,val*vol*mag+mag);
+			}//endFor
+
+			// ----- draw end rectangles ----------------------------
+			canvas.graphics.lineStyle();
+			canvas.graphics.beginFill(0x999999,1);
+			canvas.graphics.drawRect(-1,(1-vol)*mag,2,vol*mag*2);
+			canvas.graphics.drawRect(256/sampInt*4-1,(1-vol)*mag,2,vol*mag*2);
+			canvas.graphics.endFill();
+
+		}//endfunction
+
+		// ---------------------------------------------------------------------------
+		function clickHandler(ev:MouseEvent):void
+		{
+			if (SoundMixer.soundTransform.volume>0.6)
+				SoundMixer.soundTransform = new SoundTransform(0.5,0);
+			else if (SoundMixer.soundTransform.volume>0)
+				SoundMixer.soundTransform = new SoundTransform(0,0);
+			else
+				SoundMixer.soundTransform = new SoundTransform(1,0);
+		}//endfunction
+
+		canvas.buttonMode = true;
+		return canvas;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public static function createShipHUD(ship:Ship, stage:Stage) : Sprite
+	{
+		var s:Sprite = new Sprite();
+		var nameBmp:Bitmap = createTypeOutTextBmp(ship.name,1.4*fontScale*stage.stageHeight);
+		s.addChild(nameBmp);
+
+		var txt:String = "Integrity\nEnergy\nAcceleration\nMax Speed";
+		var labelsBmp:Bitmap = createTextBmp(txt,fontScale*stage.stageHeight/2,0,colorTone);
+		s.addChild(labelsBmp);
+		txt = ship.maxIntegrity+"\n"+ship.maxEnergy+"\n"+Math.floor(ship.accelF*100000)/100+"\n"+Math.floor(ship.maxSpeed*100000)/100;
+		var valuesBmp:Bitmap = createTextBmp(txt,fontScale*stage.stageHeight/2,0,0xFFFFFF);
+		s.addChild(valuesBmp);
+
+		function drawBar(x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint):void
+		{
+			if (p1<0) p1=0;
+			if (p2<p1) p2=p1;
+			s.graphics.lineStyle(0, 0xBBCC00, 1);			// draw border
+			s.graphics.drawRect(x, y, w, h);
+			s.graphics.lineStyle();
+			x += 2;			// create bar inset
+			y += 2;
+			w -= 4;
+			h -= 4;
+			p1*= w;
+			p2*= w;
+			var matr:Matrix = new Matrix();
+			matr.createGradientBox(w, h, Math.PI/2, x, y);
+			s.graphics.beginGradientFill("linear", [c3, c3+0x333333, c3+0x111111], [0.5,0.5,0.5], [0x00,0x80,0xFF], matr, "pad"); 	// grey bar
+			s.graphics.drawRect(x+p2, y, w-p2, h);
+			s.graphics.endFill();
+			if (p2 > p1)
+			{
+				s.graphics.beginGradientFill("linear", [ c2, c2+0x333333, c2+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");	// red retreat bar
+				s.graphics.drawRect(x+p1, y, p2-p1, h);
+				s.graphics.endFill();
+			}
+			s.graphics.beginGradientFill("linear", [c1, c1+0x333333, c1+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");			// green health bar
+			s.graphics.drawRect(x, y, p1, h);
+			s.graphics.endFill();
+		}//endfunction
+
+		var curE:int = 0;
+		var curH:int = 0;
+		var p1:Number=0;
+		var p2:Number=0;
+		function redraw(ev:Event=null):void
+		{
+			var bw:int = Math.round(stage.stageWidth*(1-margF*2));
+			var bh:int = Math.round(stage.stageHeight*0.013);
+
+			nameBmp.x = (stage.stageWidth-bw)/2;
+			nameBmp.y = bh;
+
+			valuesBmp.x = stage.stageWidth*(1-margF)-valuesBmp.width;
+			valuesBmp.y = stage.stageHeight-bh*3.5-valuesBmp.height;
+			labelsBmp.x = valuesBmp.x - labelsBmp.width;
+			labelsBmp.y = stage.stageHeight-bh*3.5-labelsBmp.height;
+
+			s.graphics.clear();
+			var targE:int = Math.round(ship.energy);
+			var targH:int = Math.round(ship.integrity);
+			if (targE!=curE || targH!=curH)
+			{
+				// --- draw energy bar
+				p1 = targE / ship.maxEnergy;
+				p2 = curE / ship.maxEnergy;
+				drawBar((stage.stageWidth-bw)/2,stage.stageHeight-bh*3.5,bw,bh,p1,p2,0x00AACC,0xCC0000,0x111111);
+				curE = Math.round((curE*2 + targE) / 3);
+				if ((curE-targE)*(curE-targE)<1) curE = targE;
+				// --- draw health bar
+				p1 = targH / ship.maxIntegrity;
+				p2 = curH / ship.maxIntegrity;
+				drawBar((stage.stageWidth-bw)/2,stage.stageHeight-bh*2,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111);
+				curH = Math.round((curH*2 + targH) / 3);
+				if ((curH-targH)*(curH-targH)<1) curH = targH;
+			}
+
+			if (ship.integrity <= 0)	removeHandler();
+		}//endfunction
+
+		function removeHandler(ev:Event=null):void
+		{
+			s.removeEventListener(Event.ENTER_FRAME, redraw);
+			s.removeEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+		}
+
+		s.addEventListener(Event.ENTER_FRAME, redraw);
+		s.addEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+
+		redraw();
+		return s;
+	}//endfunction
+}//endclass
+
+class Ship
+{
+	public var name:String = "";
+
+	public var modelAssets:Object = null;				// ref to external models assets
+
+	public var hullConfig:Vector.<HullBlock> = null;	// hull shape configuration
+	public var modulesConfig:Vector.<Module> = null;	// mounted modules configuration
+
+	public var skin:Mesh = null;
+	public var chassisSkin:Mesh = null;
+	public var modulesSkin:Mesh = null;
+
+	public var maxIntegrity:Number = 1;
+	public var integrity:Number = 1;					// health of ship
+	public var maxEnergy:Number = 1;
+	public var energy:Number = 1;
+
+	public var tte:int = 90;									// time to explode
+
+	public var pivot:Vector3D = null;					// point ship rotates about
+	public var posn:Vector3D = null;					// ship position
+	public var vel:Vector3D = null;						// current velocity of ship
+	public var facing:Vector3D = null;				// current facing of ship
+	public var rotVel:Vector3D = null;				// current rotational velocity of ship
+	public var radius:Number = 0;							// radius of ship
+	public var accelF:Number = 0.001;					// ship acceleration factor
+	public var slowF:Number = 0.9;						// ship slow down factor
+	public var maxSpeed:Number = accelF/(1/slowF-1);	// ship max speed, calculated
+	public var banking:Number = 0;
+
+	public var engageEnemy:Boolean = true;
+
+	public var targets:Vector.<Ship> = null;			// list of targets for ship
+	public var stepFn:Function = null;
+	public var damagePosns:Vector.<VertexData> = null;
+
+	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
+
+	private static var RandNames:Vector.<String> =
+	new <String>["Androsynth","Arilou","Chenjesu","Earthling","Ilwrath","Mmrnmhrm","Mycon","Shofixti","Spathi",
+	"Syreen","Umgah","Ur-Quan","Kohr-Ah","VUX","Yehat","Chmmr","Dnyarri","Druuge","Melnorme","Orz","Pkunk",
+	"Slylandro","Supox","Thraddash","Utwig","Zoq-Fot-Pik","Taalo"];
+
+	//===============================================================================================
+	// constructs a ship entity
+	//===============================================================================================
+	public function Ship(assets:Object,shpName:String=null):void
+	{
+		if (shpName!=null)
+			name = shpName;
+		else
+			name = RandNames[Math.floor(Math.random()*RandNames.length)];
+
+		modelAssets = assets;
+		pivot = new Vector3D();	// point ship rotates about
+		posn = new Vector3D();
+		vel = new Vector3D();
+		facing = new Vector3D(0,0,1);	// default facing
+		rotVel = new Vector3D();
+
+		skin = new Mesh();
+		chassisSkin = new Mesh();
+		chassisSkin.material.setSpecular(1);
+		modulesSkin = new Mesh();
+		modulesSkin.material.setSpecular(0.2);
+		skin.addChild(chassisSkin);
+		skin.addChild(modulesSkin);
+
+		if (Adj==null)
+		Adj = Vector.<Vector3D>([new Vector3D(0,0,-1),	// front
+								 new Vector3D(1,0,0),	// right
+								 new Vector3D(0,0,1),	// back
+								 new Vector3D(-1,0,0),	// left
+								 new Vector3D(0,-1,0),	// bottom
+								 new Vector3D(0,1,0)]);	// top
+
+		hullConfig = new Vector.<HullBlock>();
+		modulesConfig = new Vector.<Module>();
+		damagePosns = new Vector.<VertexData>();
+
+		// ----- initializes with default hull
+		hullConfig.push(new HullBlock(0,1,-1,this));
+		hullConfig.push(new HullBlock(0,-1,-1,this));
+		hullConfig.push(new HullBlock(0,0,-1,this));
+		hullConfig.push(new HullBlock(0,0,0,this));
+		hullConfig.push(new HullBlock(0,0,1,this));
+		hullConfig.push(new HullBlock(1,0,1,this));
+		hullConfig.push(new HullBlock(-1,0,1,this));
+
+		// ----- initializes with default modules
+		addModule( 1,0,1,new Vector3D(1,0,0),"gunAutoS");			//
+		addModule( 0,0,1,new Vector3D(0,0,1),"gunIonS");			//
+		addModule( -1,0,1,new Vector3D(-1,0,0),"gunAutoS");		//
+
+		addModule(0,-1,-1,new Vector3D(0,0,-1),"thrusterS");		// thruster
+		addModule(0, 1,-1,new Vector3D(0,0,-1),"thrusterS");		// thruster
+		addModule(0, 0,-1,new Vector3D(0,0,-1),"thrusterS");		// thruster
+
+		updateHull();				// update hull look from config infos
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public static function createRandomShip(assets:Object,hullCnt:uint=10,thrustersCnt:uint=4):Ship
+	{
+		var s:Ship = new Ship(assets);
+		s.modulesConfig = new Vector.<Module>();
+		s.randomHullConfig(hullCnt);
+		s.randomThrustersConfig(thrustersCnt);
+		s.randomModulesConfig();
+		s.updateHull();
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public static function createShipFromConfigStr(assets:Object,config:String):Ship
+	{
+		var s:Ship = new Ship(assets);
+		s.setFromConfig(config);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// records down the damage position and magnitude
+	//===============================================================================================
+	public function registerDamagePosn(hitPt:VertexData,dmg:Number):void
+	{
+		var invT:Matrix4x4 = skin.transform.inverse();
+		var nvx:Number = hitPt.vx*invT.aa + hitPt.vy*invT.ab + hitPt.vz*invT.ac + invT.ad;
+		var nvy:Number = hitPt.vx*invT.ba + hitPt.vy*invT.bb + hitPt.vz*invT.bc + invT.bd;
+		var nvz:Number = hitPt.vx*invT.ca + hitPt.vy*invT.cb + hitPt.vz*invT.cc + invT.cd;
+		hitPt.vx = nvx;
+		hitPt.vy = nvy;
+		hitPt.vz = nvz;
+		var nnx:Number = hitPt.nx*invT.aa + hitPt.ny*invT.ab + hitPt.nz*invT.ac;
+		var nny:Number = hitPt.nx*invT.ba + hitPt.ny*invT.bb + hitPt.nz*invT.bc;
+		var nnz:Number = hitPt.nx*invT.ca + hitPt.ny*invT.cb + hitPt.nz*invT.cc;
+		hitPt.nx = nnx;
+		hitPt.ny = nny;
+		hitPt.nz = nnz;
+		hitPt.w = dmg;
+		damagePosns.push(hitPt);
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function setFromConfig(config:String):void
+	{
+		var A:Array = config.split("&");
+		name = A[0];
+		var H:Array = A[1].split(",");
+		var M:Array = A[2].split(",");
+
+		// ----- replicate from hullConfig info
+		hullConfig = new Vector.<HullBlock>();
+		for (var i:int=0; i<H.length; i+=3)
+			hullConfig.push(new HullBlock(parseInt(H[i],10),parseInt(H[i+1],10),parseInt(H[i+2],10),this));
+
+		// ----- replicate from modulesConfig info
+		modulesConfig = new Vector.<Module>();
+		for (i=0; i<M.length; i+=7)
+			addModule(parseFloat(M[i]),parseFloat(M[i+1]),parseFloat(M[i+2]),		// position
+								new Vector3D(parseFloat(M[i+3]),parseFloat(M[i+4]),parseFloat(M[i+5])),		// orientation
+								M[i+6]);		// moduleType
+		updateHull();
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function moveTowardsStep(pt:Vector3D):void
+	{
+		// ----- modify ship heading to travel towards point
+		var targV:Vector3D = new Vector3D(pt.x - posn.x,pt.y - posn.y,pt.z - posn.z);
+		targV.normalize();
+		var turn:Vector3D = facing.crossProduct(targV);		// rotation needed to face target
+
+		var targTurnVel:Vector3D = turn.clone();
+		targTurnVel.scaleBy(1-slowF);							// target turning vel
+		var rotAccel:Vector3D = targTurnVel.subtract(rotVel);	// diff actual rotVel to target turn vel
+		if (rotAccel.length>accelF*0.4)						// limit rot accel
+			rotAccel.scaleBy(accelF*0.4/rotAccel.length);
+
+		rotVel.x += rotAccel.x;				// increment rotational Vel
+		rotVel.y += rotAccel.y;
+		rotVel.z += rotAccel.z;
+
+		var ang:Number = Vector3D.angleBetween(facing,targV);
+		var thrustTresh:Number = Math.PI*0.5;
+		if (ang<thrustTresh)
+		{
+			var thrustF:Number = (thrustTresh-ang)/(thrustTresh)*accelF;
+			vel.x += facing.x*thrustF;	// increment vel
+			vel.y += facing.y*thrustF;
+			vel.z += facing.z*thrustF;
+		}
+	}//endfunction
+
+	//===============================================================================================
+	// update orientate ship hull according to facing, position
+	//===============================================================================================
+	public function updateStep():void
+	{
+		// ----- move ship with current velocity
+		posn.x += vel.x;			// update ship position
+		posn.y += vel.y;
+		posn.z += vel.z;
+		facing = new Matrix4x4().rotate(rotVel.x,rotVel.y,rotVel.z).rotateVector(facing);
+		facing.normalize();
+		vel.scaleBy(slowF);			// speed slow
+		rotVel.scaleBy(slowF);	// rotation slow
+
+		// ----- update ship transform
+		banking *= 1-(1-slowF)*(1-slowF);
+		banking += -rotVel.y*0.5;
+		skin.transform = new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z).rotZ(banking).rotFromTo(0,0,1,facing.x,facing.y,facing.z).translate(posn.x,posn.y,posn.z);
+		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
+	}//endfunction
+
+	//===============================================================================================
+	// updates hullblocks extPosns property to current world position
+	//===============================================================================================
+	public function updateHullBlocksWorldPosns():void
+	{
+    var t:Matrix4x4 = skin.transform;
+		for (var j:int=hullConfig.length-1; j>-1; j--)
+		{
+			var hb:HullBlock = hullConfig[j];
+			hb.extPosn.x = hb.x*t.aa+hb.y*t.ab+hb.z*t.ac+t.ad;
+			hb.extPosn.y = hb.x*t.ba+hb.y*t.bb+hb.z*t.bc+t.bd;
+			hb.extPosn.z = hb.x*t.ca+hb.y*t.cb+hb.z*t.cc+t.cd;
+		}
+	}//endfunction
+
+	//===============================================================================================
+	// adds module at given position at specified orientation
+	//===============================================================================================
+	public function addModule(px:Number,py:Number,pz:Number,orient:Vector3D,type:String) : Boolean
+	{
+		var i:int=0;
+		var size:uint=1;
+		if (type.charAt(type.length-1)=='M')
+			size=2;
+
+		// ----- chk if enough available hull blocks to contain module
+		var blocks:Vector.<HullBlock> = freeHullBlocks(px,py,pz,size);
+		if (blocks.length!=size*size*size)	return false;
+
+		// ----- chk enough surface area
+		var surf:Vector.<Vector3D> = surfaceToOccupy(px,py,pz,orient,size);
+		for (i=surf.length-1; i>=0; i--)
+			if (hullIdx(surf[i].x,surf[i].y,surf[i].z)!=-1)
+				return false;
+
+		var meanPt:Vector3D = new Vector3D(0,0,0);
+		for (i=blocks.length-1; i>=0; i--)
+		{
+			var blk:HullBlock = blocks[i];
+			meanPt.x+=blk.x;
+			meanPt.y+=blk.y;
+			meanPt.z+=blk.z;
+		}
+		meanPt.x/=blocks.length;
+		meanPt.y/=blocks.length;
+		meanPt.z/=blocks.length;
+
+		var mod:Module = new Module(meanPt.x,meanPt.y,meanPt.z,orient.x, orient.y,orient.z,type);
+
+		// ----- register blocks as taken up by this module
+		for (i=blocks.length-1; i>=0; i--)		blocks[i].module=mod;
+
+		modulesConfig.push(mod);	// register module
+
+		return true;
+	}//endfunction
+
+	//===============================================================================================
+	// removes specified module
+	//===============================================================================================
+	public function removeModule(m:Module) : void
+	{
+		var i:int=0;
+		for (i=hullConfig.length-1; i>-1; i--)
+			if (hullConfig[i].module==m)
+				hullConfig[i].module=null;
+		if (modulesConfig.indexOf(m)!=-1)
+			modulesConfig.splice(modulesConfig.indexOf(m),1);
+	}//endfunction
+
+	//===============================================================================================
+	// random place lv 1 modules... fills up rest of available slots
+	//===============================================================================================
+	public function randomModulesConfig(symmetry:Boolean=true) : void
+	{
+		var D:Vector.<Vector3D> = new <Vector3D>[new Vector3D(0,1,0), 	// top
+												new Vector3D(0,-1,0), 	// bottom
+												new Vector3D(-1,0,0), 	// left
+												new Vector3D(1,0,0),	// right
+												new Vector3D(0,0,1),	// front
+												new Vector3D(0,0,-1)]; 	// back
+		var left:Vector3D = D[2];
+		var right:Vector3D = D[3];
+
+		// ----- auto get gun module ids
+		var ModIds:Vector.<String> = new Vector.<String>();
+		for (var id:String in modelAssets)
+			if (id.charAt(id.length-1)=='S' && (id.substr(0,3)=="gun" || id.substr(0,8)=="launcher"))
+				ModIds.push(id);
+
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var hull:HullBlock = hullConfig[i];
+			if (hull.module==null)
+			{
+				// ----- generate random seq array
+				var R:Vector.<uint> = new Vector.<uint>();
+				for (var j:int=0; j<6; j++)	R.splice(int(Math.random()*(R.length+1)),0,j);
+				if (symmetry && hull.x==0)		// if middle block
+				{
+					R.splice(R.indexOf(2),1);
+					R.splice(R.indexOf(3),1);
+				}
+
+				while (hull.module==null && R.length>0)
+				{	// add module at x,y,z, dir, type, size
+					var modType:String = ModIds[int(Math.random()*ModIds.length)];
+					var dir:Vector3D = D[R.shift()];
+					addModule(hull.x,hull.y,hull.z,dir,modType);
+					if (symmetry && hull.x!=0)
+					{
+						var hidx:int=hullIdx(-hull.x,hull.y,hull.z);
+						if (hidx!=-1 && hullConfig[hidx].module==null)
+						{
+							if (dir==left)			dir=right;
+							else if (dir==right)	dir=left;
+							addModule(-hull.x,hull.y,hull.z,dir,modType);
+						}
+					}
+				}//endwhile
+			}//endif
+		}//endfor
+	}//endfunction
+
+	//===============================================================================================
+	// random place thrusters
+	//===============================================================================================
+	public function randomThrustersConfig(n:uint=4,symmetry:Boolean=true) : void
+	{
+		var R:Vector.<uint> = new Vector.<uint>();
+		for (var j:int=0; j<hullConfig.length; j++)	R.splice(int(Math.random()*(R.length+1)),0,j);
+
+		var back:Vector3D = new Vector3D(0, 0, -1);
+
+		var cnt:uint=0;
+		while (R.length>0 && cnt<n)
+		{
+			var hull:HullBlock = hullConfig[R.shift()];
+			if (hull.module==null && addModule(hull.x,hull.y,hull.z,back,"thrusterS"))
+				cnt++;
+
+			if (symmetry)
+			{
+				var hidx:int=hullIdx(-hull.x,hull.y,hull.z);
+				if (hidx!=-1 && hullConfig[hidx].module==null  && addModule(-hull.x,hull.y,hull.z,back,"thrusterS"))
+				cnt++;
+			}
+		}//endfor
+	}//endfunction
+
+	//===============================================================================================
+	// randomly generates a hull shape
+	//===============================================================================================
+	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
+	{
+		if (n==0) return;
+		hullConfig = new Vector.<HullBlock>();
+		hullConfig.push(new HullBlock(0,0,0,this));
+		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
+														new Vector3D(0,1,0),new Vector3D(0,-1,0),
+														new Vector3D(1,0,0),new Vector3D(-1,0,0)]);
+		for (var i:int=1; i<n; i++)
+		{
+			do {
+				var dir:Vector3D = Adj[int(Adj.length*Math.random())];
+				var hull:HullBlock = hullConfig[int(hullConfig.length*Math.random())];
+			} while (hullIdx(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z)!=-1);
+			hullConfig.push(new HullBlock(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z,this));
+			if (symmetry && hullIdx(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z)==-1)
+			{
+				hullConfig.push(new HullBlock(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z,this));
+				i++;
+			}
+		}//endfor
+	}//endfunction
+
+	//===============================================================================================
+	// extends ship chassis adding new block at position
+	//===============================================================================================
+	public function extendChassis(px:int,py:int,pz:int) : Boolean
+	{
+		if (adjacentToHull(px,py,pz))
+		{
+			hullConfig.push(new HullBlock(px, py, pz,this));
+			return true;
+		}
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// trims ship chassis removing block at position
+	//===============================================================================================
+	public function trimChassis(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullConfig.length<=1)	return false;
+
+		if (adjacentToSpace(px,py,pz))	// posn in hull and next to skin surface
+		{
+			var idx:int = hullIdx(px,py,pz);
+			var h:HullBlock = hullConfig[idx];
+			hullConfig.splice(idx,1);
+			if (isOnePiece())
+			{
+				if (h.module!=null && modulesConfig.indexOf(h.module as Module)!=-1)
+					modulesConfig.splice(modulesConfig.indexOf(h.module as Module), 1);
+				return true;
+			}
+			else
+			{
+				hullConfig.push(h);
+				return false;
+			}
+		}
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// creates the chassis mesh geometry from hullConfig info
+	//===============================================================================================
+	public function updateHull() : void
+	{
+		if (modelAssets==null) return;
+
+		// ----- update chassis skin
+		pivot = new Vector3D();
+		var tmp:Mesh = new Mesh();
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			tmp.addChild(createChassisPart(h.x,h.y,h.z));
+			pivot.x+=h.x;
+			pivot.y+=h.y;
+			pivot.z+=h.z;
+		}
+
+		tmp = tmp.mergeTree();
+		chassisSkin.setGeometry(tmp.vertData,tmp.idxsData);
+		pivot.scaleBy(1/hullConfig.length);
+		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+
+		maxIntegrity = hullConfig.length*100;
+		integrity = hullConfig.length*100;
+		maxEnergy = hullConfig.length*100;
+		energy = hullConfig.length*100;
+
+		// ----- update chassis mounts
+		var thrustCnt:int = 0;
+		tmp = new Mesh();
+		for (i=modulesConfig.length-1; i>=0; i--)
+		{
+			var m:Module = modulesConfig[i];
+			var mt:Mesh = null;
+			if (m.type.indexOf("thruster")!=-1)	// thruster
+			{
+				mt = modelAssets[m.type].clone();
+				thrustCnt++;
+			}
+			else if (m.type.indexOf("launcher")!=-1)	// missile luncher
+				mt = modelAssets[m.type].clone();
+			else if (m.type.charAt(m.type.length-1)=='S')		// small gun
+				mt = modelAssets['mountS'].clone();
+			else if (m.type.charAt(m.type.length-1)=='M')		// medium gun
+				mt = modelAssets['mountM'].clone();
+			mt.transform = new Matrix4x4().rotFromTo(0, 1, 0, m.nx, m.ny, m.nz).translate(m.x, m.y, m.z);
+			tmp.addChild(mt);
+		}
+
+		accelF = thrustCnt/hullConfig.length*0.01;
+		maxSpeed = accelF/(1/slowF-1);
+
+		tmp = tmp.mergeTree();
+		modulesSkin.setGeometry(tmp.vertData, tmp.idxsData);
+	}//endfunction
+
+	//===============================================================================================
+	// returns if hull position is adjacent to empty space
+	//===============================================================================================
+	public function adjacentToSpace(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)==-1)	return false;	// chk if not in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)==-1)
+				return true;
+
+		return false;
+	}//endfunctioh
+
+	//===============================================================================================
+	// returns if empty space position is adjacent to current hull configuration
+	//===============================================================================================
+	public function adjacentToHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)!=-1)	return false;	// chk if in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				return true;
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// returns index of hullBlock occupying position, useful to check if position is within ship hull
+	//===============================================================================================
+	private function hullIdx(px:int,py:int,pz:int) : int
+	{
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			if (h.x==px && h.y==py && h.z==pz)
+				return i;
+		}
+
+		return -1;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the necessary face extensions to form the hull skin only
+	//===============================================================================================
+	private function createChassisPart(px:int,py:int,pz:int) : Mesh
+	{
+		var i:int=0;
+
+		// vertices
+		var V:Vector.<Number> = new <Number>[-0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5,
+												 -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
+												 -0.5,0,0,  0.5,0,0,	// 8left 9right
+												 0,0.5,0,  0,-0.5,0,	// 10up 11down
+												 0,0,-0.5,  0,0,0.5];	// 12front 13back
+		// tri indices
+		var I:Vector.<uint> = new <uint>[0,3,12, 3,2,12, 2,1,12, 1,0,12, 	// front 0,3,2,1
+											 1,2,9, 2,6,9, 6,5,9, 5,1,9,			// right 1,2,6,5
+											 5,6,13, 6,7,13, 7,4,13, 4,5,13,	// back 5,6,7,4
+											 4,7,8, 7,3,8, 3,0,8, 0,4,8,			// left 4,7,3,0
+											 4,0,11, 0,1,11, 1,5,11, 5,4,11,	// bottom  4,0,1,5
+											 3,7,10, 7,6,10, 6,2,10, 2,3,10];	// top  3,7,6,2
+
+		// determine which face to delete
+		for (i=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				I.splice(i*12,12);
+
+		// shrink vertice inwards if not connected to adj hull plate
+		for (var v:int=0; v<8; v++)	// for all corner points
+		{
+			var fcnt:int=0;		// if not connected, corner point must have 6 tri faces using it
+			for (i=I.length-1; i>-1; i--)
+				if (I[i]==v)
+					fcnt++;
+
+			if (fcnt==6)
+			{
+				V[v*3+0]*=0.78;
+				V[v*3+1]*=0.78;
+				V[v*3+2]*=0.78;
+			}
+		}
+
+		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
+													0,1, 1,1, 0.5,0.5,
+													1,1, 1,0, 0.5,0.5,
+													1,0, 0,0, 0.5,0.5];	// UV coords
+		var ul:uint=U.length;
+		var VData:Vector.<Number> = new Vector.<Number>();
+		for (i=0; i<I.length; i+=3)
+		VData.push(	V[I[i+0]*3+0],V[I[i+0]*3+1],V[I[i+0]*3+2],	// vertex a
+					0,0,0,	// normal a
+					U[i*2%ul+0],U[i*2%ul+1],
+					V[I[i+1]*3+0],V[I[i+1]*3+1],V[I[i+1]*3+2],	// vertex b
+					0,0,0,	// normal b
+					U[i*2%ul+2],U[i*2%ul+3],
+					V[I[i+2]*3+0],V[I[i+2]*3+1],V[I[i+2]*3+2],	// vertex c
+					0,0,0,	// normal c
+					U[i*2%ul+4],U[i*2%ul+5]);
+
+		var m:Mesh = new Mesh();
+		m.createGeometry(VData);
+		m.transform = new Matrix4x4().translate(px,py,pz);
+		return m;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the free hullBlocks to be occupied by module of given size
+	//===============================================================================================
+	public function freeHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
+	{
+		var HB:Vector.<HullBlock> = getHullBlocks(px,py,pz,size);
+		for (var i:int=HB.length-1; i>-1; i--)
+			if (HB[i].module!=null)
+				HB.splice(i,1);
+		return HB;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the free hullBlocks to be occupied by module of given size
+	//===============================================================================================
+	public function getHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
+	{
+		if (size==0) 	size=1;
+		var V:Vector.<HullBlock> = new Vector.<HullBlock>();
+		var off:Number = (size-1)/2;
+		for (var x:int=0; x<size; x++)
+			for (var y:int=0; y<size; y++)
+				for (var z:int=0; z<size; z++)
+				{
+					var idx:int = hullIdx(Math.round(px+ x-off),Math.round(py+ y-off),Math.round(pz+ z-off));
+					if (idx!=-1) V.push(hullConfig[idx]);
+				}
+		return V;
+	}//endfunction
+
+	//===============================================================================================
+	// surface area required to house module of given size
+	//===============================================================================================
+	public function surfaceToOccupy(px:Number,py:Number,pz:Number,orient:Vector3D,size:uint=1) : Vector.<Vector3D>
+	{
+		var x:int=0;
+		var y:int=0;
+		var z:int=0;
+		var off:Number = (size-1)/2;
+		var V:Vector.<Vector3D> = new Vector.<Vector3D>();
+		if (Math.abs(orient.x)==1)
+		{
+			for (y=0; y<size; y++)
+				for (z=0; z<size; z++)
+					V.push(new Vector3D(Math.round(px+off*orient.x+orient.x),Math.round(py+y-off),Math.round(pz+z-off)));
+		}
+		else if (Math.abs(orient.y)==1)
+		{
+			for (x=0; x<size; x++)
+				for (z=0; z<size; z++)
+					V.push(new Vector3D(Math.round(px+x-off),Math.round(py+off*orient.y+orient.y),Math.round(pz+z-off)));
+		}
+		else if (Math.abs(orient.z)==1)
+		{
+			for (x=0; x<size; x++)
+				for (y=0; y<size; y++)
+					V.push(new Vector3D(Math.round(px+x-off),Math.round(py+y-off),Math.round(pz+off*orient.z+orient.z)));
+		}
+
+		return V;
+	}//endfunction
+
+	//===============================================================================================
+	// checks if there are disjointed hull pieces
+	//===============================================================================================
+	public function isOnePiece() : Boolean
+	{
+		if (hullConfig==null || hullConfig.length==0)	return false;
+
+		var i:int=0;
+
+		hullConfig[0].walked = true;
+		var CA:Vector.<HullBlock> = Vector.<HullBlock>([hullConfig[0]]);
+
+		while (CA.length>0)
+		{
+			var b:HullBlock = CA.shift();
+			for (i=Adj.length-1; i>=0; i--)
+			{
+				var idx:int = hullIdx(b.x+Adj[i].x,b.y+Adj[i].y,b.z+Adj[i].z);
+				if (idx!=-1 && !hullConfig[idx].walked)
+				{
+					hullConfig[idx].walked = true;
+					CA.push(hullConfig[idx]);
+				}
+			}//endfor
+		}//endwhile
+
+		var onePiece:Boolean = true;
+		for (i=hullConfig.length-1; i>=0; i--)
+		{
+			if (!hullConfig[i].walked) onePiece=false;
+			hullConfig[i].walked=false;
+		}//endfor
+
+		return onePiece;
+	}//endfunction
+
+	//===============================================================================================
+	// to represent this ship config as a string
+	//===============================================================================================
+	public function toString():String
+	{
+		var s:String = name+"&";
+		for (var i:int=0; i<hullConfig.length; i++)
+			s+= Math.round(hullConfig[i].x)+","+Math.round(hullConfig[i].y)+","+Math.round(hullConfig[i].z)+",";
+
+		s = s.substr(0,s.length-1)+"&";
+		for (i=0; i<modulesConfig.length; i++)
+			s+=modulesConfig[i].toString()+",";
+
+		return s.substr(0,s.length-1);
+	}//endfunction
+}//endClass
+
+class Module		// data class
+{
+	public var x:Number=0;	// center
+	public var y:Number=0;
+	public var z:Number=0;
+
+	public var nx:Number=0;	// orientation
+	public var ny:Number=0;
+	public var nz:Number=0;
+
+	public var type:String=null;	// type of weapon
+
+	public var bearing:Number=0;	// elevation of turret (local space)
+	public var elevation:Number=0;	// bearing of turret (local space)
+
+	public var ttf:int=0;			// time to fire
+	public var fireDelay:int=3;		// delay to next shot
+	public var range:Number=10;		// range of weapon
+	public var turnRate:Number=0.05;// rotation speed of turret
+	public var speed:Number=0.1;	//
+	public var damage:Number=1;		//
+	public var muzzleLen:Number=0.3;
+
+	/**
+	 *
+	 * @param	px
+	 * @param	py
+	 * @param	pz
+	 * @param	vx
+	 * @param	vy
+	 * @param	vz
+	 * @param	kind
+	 */
+	public function Module(px:Number=0,py:Number=0,pz:Number=0,vx:Number=0,vy:Number=0,vz:Number=-1,kind:String=""):void
+	{
+		x=px;
+		y=py;
+		z=pz;
+		nx=vx;
+		ny=vy;
+		nz=vz;
+		type=kind;
+
+		if (kind=="launcherS")
+		{
+			fireDelay=1000;
+			speed=0.15;		// only initial launch speed. missiles have accel
+			damage=50;
+			range=50;
+		}
+		else if (kind=="gunAutoS")
+		{
+			fireDelay=3;
+			speed=0.5;
+			damage=2;
+			range=7;
+			turnRate=0.1;
+			muzzleLen=0.26;
+		}
+		else if (kind=="gunFlakS")
+		{
+			fireDelay=50;
+			speed=0.15;
+			damage=20;
+			range=7;
+			muzzleLen=0.3;
+		}
+		else if (kind=="gunIonS")
+		{
+			fireDelay=40;
+			speed=0.15;
+			damage=20;
+			range=15;
+			muzzleLen=0.35;
+		}
+		else if (kind=="gunPlasmaS")
+		{
+			fireDelay=40;
+			speed=0.1;
+			damage=80;
+			range=10;
+			muzzleLen=0.35;
+		}
+		else if (kind=="gunRailS")
+		{
+			fireDelay=60;
+			speed=0.2;
+			damage=20;
+			range=20;
+			muzzleLen=0.37;
+		}
+		else if (kind=="gunIonM")
+		{
+			fireDelay=80;
+			speed=0.15;
+			damage=160;
+			turnRate = 0.01;
+			range=40;
+			muzzleLen=0.7;
+		}
+		else if (kind=="gunRailM")
+		{
+			fireDelay=100;
+			speed=0.4;
+			damage=320;
+			turnRate = 0.01;
+			range=40;
+			muzzleLen=0.7;
+		}
+		else if (kind=="gunPlasmaM")
+		{
+			fireDelay=100;
+			speed=0.2;
+			damage=400;
+			turnRate = 0.01;
+			range=20;
+			muzzleLen=0.7;
+		}
+	}//endconstr
+
+	public function toString():String
+	{
+			return 	Math.round(x*10)/10+","+Math.round(y*10)/10+","+Math.round(z*10)/10+","+
+							Math.round(nx*10)/10+","+Math.round(ny*10)/10+","+Math.round(nz*10)/10+","+type;
+	}//endfunction
+}//endclass
+
+class HullBlock		// data class
+{
+	public var x:int=0;
+	public var y:int=0;
+	public var z:int=0;
+
+	public var parent:Ship = null;			// used for projectile collision resolution
+	public var extPosn:Vector3D = null;	// used for calc turret aim
+	public var module:Module=null;			// module occupying this hullBlock
+	public var walked:Boolean = false;
+
+	public function HullBlock(px:int,py:int,pz:int,ship:Ship):void
+	{
+		x=px;
+		y=py;
+		z=pz;
+		parent=ship;
+		extPosn = new Vector3D(px,py,pz);
+	}//endconstr
+}//endclass
+
+class Projectile	// data class
+{
+	public var px:Number = 0;
+	public var py:Number = 0;
+	public var pz:Number = 0;
+	public var vx:Number = 0;
+	public var vy:Number = 0;
+	public var vz:Number = 0;
+	public var ttl:Number = 120;
+	public var integrity:Number = 1;
+	public var projIntegrity:Number = 1;	// to prevent double targeting
+	public var maxIntegrity:Number = 1;
+	public var targ:Object = null;
+	public var renderFn:Function = null;
+	public var type:String = null;
+	public var onDestroy:Function =null;
+
+	public function Projectile(px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number,targ:Object=null,renderFn:Function=null,dmg:Number=1,ttl:Number=120,type:String=null):void
+	{
+		this.px = px;
+		this.py = py;
+		this.pz = pz;
+		this.vx = vx;
+		this.vy = vy;
+		this.vz = vz;
+		this.renderFn = renderFn;
+		this.integrity = dmg;
+		this.projIntegrity = dmg;
+		this.maxIntegrity = dmg;
+		this.ttl = ttl;
+		this.targ = targ;
+		this.type = type;
+	}//endfunction
+}//endclass
+
+class Missile extends Projectile
+{
+	var accel:Number = 0.02;
+	var damp:Number = 0.9;
+	var turnRate:Number = 0.3;
+
+	public function Missile(px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number,targ:Object=null,renderFn:Function=null,dmg:Number=1,ttl:Number=120,type:String=null):void
+	{
+		super(px,py,pz,vx,vy,vz,targ,renderFn,dmg,ttl*1.2,type);
+		//s = s*damp + a
+		//damp = (speed-accel)/speed;
+	}//endfunction
+
+	public function homeInStep():void
+	{
+		if (!(targ is HullBlock) || targ.extPosn==null) return;
+		var speed:Number = Math.sqrt(vx*vx+vy*vy+vz*vz);
+		var dpx:Number = targ.extPosn.x-px;
+		var dpy:Number = targ.extPosn.y-py;
+		var dpz:Number = targ.extPosn.z-pz;
+		var shp:Ship = targ.parent;
+		var cv:Vector3D = SpaceCrafter.collisionVector3(speed,dpx,dpy,dpz,shp.vel.x,shp.vel.y,shp.vel.z);
+		if (cv!=null)
+		{
+			// ----- determine rotation of missile
+			var ang:Number = (cv.x*vx+cv.y*vy+cv.z*vz)/(speed*speed);
+			if (ang<-1) ang=-1;
+			if (ang>1)	ang=1;
+			ang = Math.acos(ang);	// turn angle in radians
+			if (ang>turnRate)		ang = turnRate;
+			var axis:Vector3D = new Vector3D(vx,vy,vz).crossProduct(cv);
+			if (axis.length>0)
+			{
+				// ----- apply rotation
+				var rM:Matrix4x4 = new Matrix4x4().rotAbout(axis.x,axis.y,axis.z,ang);
+				var nvx:Number = rM.aa*vx + rM.ab*vy + rM.ac*vz;
+				var nvy:Number = rM.ba*vx + rM.bb*vy + rM.bc*vz;
+				var nvz:Number = rM.ca*vx + rM.cb*vy + rM.cc*vz;
+				var nvl:Number = Math.sqrt(nvx*nvx+nvy*nvy+nvz*nvz);
+				vx = vx*damp + nvx/nvl*accel;
+				vy = vy*damp + nvy/nvl*accel;
+				vz = vz*damp + nvz/nvl*accel;
+			}
+		}
+	}//endfunction
+}//endclass
