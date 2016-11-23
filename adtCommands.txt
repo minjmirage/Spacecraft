@@ -1,22 +1,21 @@
+Compile SWF
+../../AIRSDK_23/bin/mxmlc -inline -use-network=false SpaceCrafter.as
+
 Build for iOS Dev
-~/Desktop/AIR3.7/bin/adt -package -target ipa-app-store -provisioning-profile ~/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore ~/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -package -target ipa-app-store -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -package -target ipa-ad-hoc -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+../../AIRSDK_23/bin/adt -package -target ipa-app-store -provisioning-profile ~/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore ~/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+../../AIRSDK_23/bin/adt -package -target ipa-app-store -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
+../../AIRSDK_23/bin/adt -package -target ipa-ad-hoc -provisioning-profile C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.mobileprovision -storetype pkcs12 -keystore C:/Users/CRYSH/Desktop/MinjCertificates/MingMirageDev.p12 -storepass "andromeda" SpaceCraft.ipa SpaceCraft-app.xml SpaceCraft.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png -extdir .
 
 Build for Android Dev
-..\AIRSDK_18\bin\adt -package -target apk-captive-runtime -storetype pkcs12 -keystore newcert.p12 -storepass "password" SpaceCrafter.apk SpaceCrafter-app.xml SpaceCrafter.swf icons\icon114.png icons\icon29.png icons\icon48.png icons\icon57.png icons\icon72.png Default.png Default@2x.png Default-568h@2x.png
-../../AIRSDK_21/bin/adt -package -target apk-captive-runtime -storetype pkcs12 -keystore newcert.p12 -storepass "password" SpaceCrafter.apk SpaceCrafter-app.xml SpaceCrafter.swf icons/icon114.png icons/icon29.png icons/icon48.png icons/icon57.png icons/icon72.png Default.png Default@2x.png Default-568h@2x.png
+..\..\AIRSDK_23\bin\adt -package -target apk-captive-runtime -storetype pkcs12 -keystore newcert.p12 -storepass "password" SpaceCrafter.apk SpaceCrafter-app.xml SpaceCrafter.swf icons\icon114.png icons\icon29.png icons\icon48.png icons\icon57.png icons\icon72.png Default.png Default@2x.png Default-568h@2x.png
 
 Install onto device
-~/Desktop/AIR3.7/bin/adt -installApp -platform ios -package SpaceCraft.ipa
-~/Desktop/AIR3.7/bin/adt -installApp -platform ios -package SpaceCraft.ipa
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -installApp -platform ios -package SpaceCraft.ipa
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -installApp -platform android -package SpaceCraft.apk
-
+../../AIRSDK_23/bin/adt -installApp -platform ios -package SpaceCraft.ipa
+../../AIRSDK_23/bin/adt -installApp -platform android -package SpaceCraft.apk
 
 Detect Device
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -devices -platform ios
-C:/Users/CRYSH/Desktop/AIR3.8/bin/adt -devices -platform android
+../../AIRSDK_23/bin/adt -devices -platform ios
+../../AIRSDK_23/bin/adt -devices -platform android
 
 
 

@@ -353,7 +353,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// Save user ship data
+		// Saves all given user ships data
 		//===============================================================================================
 		private function saveShipsData(S:Vector.<Ship>):void
 		{
@@ -1878,6 +1878,9 @@
 		//===============================================================================================
 		private function showShipEditMenu(title:String,editStepFn:Function,callBack:Function):void
 		{
+			if (player!=null)
+				velDBER.x = (player.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
+
 			var tickBmd:BitmapData = new icoTick().bitmapData;
 			var crossBmd:BitmapData = new icoCross().bitmapData;
 			var undoBmd:BitmapData = new icoUndo().bitmapData;
@@ -1914,7 +1917,10 @@
 						MenuUI.createConfirmDialog(mainRef,"Keep Changes?",tickBmd,crossBmd,function(yes:Boolean):void
 						{
 							if (yes)
+							{
+								saveShipsData(Friendlies);
 								callBack();
+							}
 							else
 								showThisEditMenu();
 						});
@@ -1947,7 +1953,6 @@
 			};
 			showThisEditMenu();
 		}//endfunction
-
 
 		//===============================================================================================
 		// item selection carousel
@@ -2056,6 +2061,7 @@
 										world.removeChild(Models[j]);
 									var addModStep:Function = addModuleFn(Ids[i].id);
 									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void {modulesSelectMenu(callBack);});
+									return;
 								}
 								selIdx = i;
 								if (shipHUD!=null)
@@ -2748,11 +2754,12 @@ class MenuUI
 		var bh:Number = Math.max(tickIco.height*sc,crossIco.height*sc)+margX*2;	// ico bitmap h
 		var tickBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
 		var crossBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
-		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),new ColorTransform((colorTone>>16)/255,(colorTone>>8 & 0xFF)/255,(colorTone & 0xFF)/255),null,null,true);
-		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),new ColorTransform((colorTone>>16)/255,(colorTone>>8 & 0xFF)/255,(colorTone & 0xFF)/255),null,null,true);
+		var colorT:ColorTransform = new ColorTransform((colorTone>>16)/255,((colorTone>>8) & 0xFF)/255,(colorTone & 0xFF)/255);
+		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),colorT,null,null,true);
+		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),colorT,null,null,true);
 		var tickBtn:Sprite = createStandardButton(new Bitmap(tickBmd),closeAndRemoveFn(function():void {callBack(true);}));
 		var crossBtn:Sprite = createStandardButton(new Bitmap(crossBmd),closeAndRemoveFn(function():void {callBack(false);}));
-		var title:Bitmap = createTextBmp(titleTxt, int(1.7*fontScale*sh));
+		var title:Bitmap = createTextBmp(titleTxt, int(1.7*fontScale*sh),0,colorTone);
 
 		// ----- position buttons
 		var panelw:int = Math.max(title.width+margX*2,tickBtn.width+crossBtn.width+margX*3);
@@ -2812,9 +2819,10 @@ class MenuUI
 		var tickBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
 		var crossBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
 		var undoBmd:BitmapData = new BitmapData(bw,bh,true,0x00000000);
-		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
-		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
-		undoBmd.draw(undoIco,new Matrix(sc,0,0,sc,(bw-undoIco.width*sc)/2,(bh-undoIco.height*sc)/2),new ColorTransform(0.7,1,1),null,null,true);
+		var colorT:ColorTransform = new ColorTransform((colorTone>>16)/255,((colorTone>>8) & 0xFF)/255,(colorTone & 0xFF)/255);
+		tickBmd.draw(tickIco,new Matrix(sc,0,0,sc,(bw-tickIco.width*sc)/2,(bh-tickIco.height*sc)/2),colorT,null,null,true);
+		crossBmd.draw(crossIco,new Matrix(sc,0,0,sc,(bw-crossIco.width*sc)/2,(bh-crossIco.height*sc)/2),colorT,null,null,true);
+		undoBmd.draw(undoIco,new Matrix(sc,0,0,sc,(bw-undoIco.width*sc)/2,(bh-undoIco.height*sc)/2),colorT,null,null,true);
 		var tickBtn:Sprite = createStandardButton(new Bitmap(tickBmd),closeAndRemoveFn(function():void {callBack(true);}));
 		var crossBtn:Sprite = createStandardButton(new Bitmap(crossBmd),closeAndRemoveFn(function():void {callBack(false);}));
 		var undoBtn:Sprite = createStandardButton(new Bitmap(undoBmd),undoFn);
@@ -2947,9 +2955,9 @@ class MenuUI
 		var tf:TextField = new TextField();
 		tf.autoSize = "left";
 		tf.wordWrap = false;
-		tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
+		tf.defaultTextFormat = new TextFormat("arial bold",size,color,null,null,null,null,null,null,marg,marg);
 		tf.text = txt;
-		tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
+		tf.filters = [new GlowFilter(color, 1, borderWidth, borderWidth, 1, 1)];
 
 		var bmd:BitmapData = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x000000);
 		bmd.draw(tf, new Matrix(1, 0, 0, 1, borderWidth, borderWidth));
@@ -3210,12 +3218,20 @@ class MenuUI
 		var nameBmp:Bitmap = createTypeOutTextBmp(ship.name,1.4*fontScale*stage.stageHeight);
 		s.addChild(nameBmp);
 
-		var txt:String = "Integrity\nEnergy\nAcceleration\nMax Speed";
-		var labelsBmp:Bitmap = createTextBmp(txt,fontScale*stage.stageHeight/2,0,colorTone);
+		// ----- create stats labels
+		var labColor:uint = uint((colorTone>>16)*0.7)<<16 | uint(((colorTone>>8) & 0xFF)*0.7)<<8 | uint((colorTone & 0xFF)*0.7);
+		var fSize:Number = fontScale*stage.stageHeight/2;
+		var labelsBmp:Bitmap = createTextBmp("Integrity\nEnergy\nSpeed",fSize,0,labColor);
 		s.addChild(labelsBmp);
-		txt = ship.maxIntegrity+"\n"+ship.maxEnergy+"\n"+Math.floor(ship.accelF*100000)/100+"\n"+Math.floor(ship.maxSpeed*100000)/100;
-		var valuesBmp:Bitmap = createTextBmp(txt,fontScale*stage.stageHeight/2,0,0xFFFFFF);
-		s.addChild(valuesBmp);
+		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*100000)/100,fSize,0,labColor);
+		s.addChild(maxValuesBmp);
+
+		var curStatsTf:TextField = new TextField();
+		curStatsTf.autoSize = "left";
+		curStatsTf.wordWrap = false;
+		curStatsTf.defaultTextFormat = new TextFormat("arial bold",fSize,colorTone,null,null,null,null,null,"right",0,0);
+		curStatsTf.filters = [new GlowFilter(colorTone, 1, fSize/4, fSize/4, 1, 1)];
+		s.addChild(curStatsTf);
 
 		function drawBar(x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint):void
 		{
@@ -3250,7 +3266,7 @@ class MenuUI
 		var curH:int = 0;
 		var p1:Number=0;
 		var p2:Number=0;
-		function redraw(ev:Event=null):void
+		function update(ev:Event=null):void
 		{
 			var bw:int = Math.round(stage.stageWidth*(1-margF*2));
 			var bh:int = Math.round(stage.stageHeight*0.013);
@@ -3258,10 +3274,14 @@ class MenuUI
 			nameBmp.x = (stage.stageWidth-bw)/2;
 			nameBmp.y = bh;
 
-			valuesBmp.x = stage.stageWidth*(1-margF)-valuesBmp.width;
-			valuesBmp.y = stage.stageHeight-bh*3.5-valuesBmp.height;
-			labelsBmp.x = valuesBmp.x - labelsBmp.width;
-			labelsBmp.y = stage.stageHeight-bh*3.5-labelsBmp.height;
+			curStatsTf.text = ship.integrity+"\n"+ship.energy+"\n"+Math.floor(ship.vel.length*100000)/100;
+
+			maxValuesBmp.x = stage.stageWidth*(1-margF)-maxValuesBmp.width;
+			maxValuesBmp.y = stage.stageHeight-bh*3.5-maxValuesBmp.height;
+			curStatsTf.x = maxValuesBmp.x-curStatsTf.width;
+			curStatsTf.y = maxValuesBmp.y+fSize/4;
+			labelsBmp.x = maxValuesBmp.x - maxValuesBmp.width - labelsBmp.width;
+			labelsBmp.y = maxValuesBmp.y;
 
 			s.graphics.clear();
 			var targE:int = Math.round(ship.energy);
@@ -3287,14 +3307,14 @@ class MenuUI
 
 		function removeHandler(ev:Event=null):void
 		{
-			s.removeEventListener(Event.ENTER_FRAME, redraw);
+			s.removeEventListener(Event.ENTER_FRAME, update);
 			s.removeEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
 		}
 
-		s.addEventListener(Event.ENTER_FRAME, redraw);
+		s.addEventListener(Event.ENTER_FRAME, update);
 		s.addEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
 
-		redraw();
+		update();
 		return s;
 	}//endfunction
 }//endclass
