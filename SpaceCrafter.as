@@ -124,6 +124,7 @@
 		[Embed(source="snds/hullGroan1.mp3")] 	private var sndHullGroan1:Class;
 		[Embed(source="snds/hullGroan2.mp3")] 	private var sndHullGroan2:Class;
 		[Embed(source="snds/menuClick.mp3")] 	private var sndMenuClick:Class;
+		[Embed(source="snds/zoomOut.mp3")] 	private var sndZoomOut:Class;
 
 
 		//===============================================================================================
@@ -300,7 +301,8 @@
 									gunRailM:new sndGunRailM(),gunRailM_Af:0.6,
 									hullGroan1:new sndHullGroan1(),hullGroan1_Af:0.6,
 									hullGroan2:new sndHullGroan1(),hullGroan2_Af:0.6,
-									menuClick:new sndMenuClick(),menuClick_Af:1
+									menuClick:new sndMenuClick(),menuClick_Af:0.2,
+									zoomOut:new sndZoomOut(),zoomOut_Af:0.2
 								};
 			SndsToPlay = new Object();
 			MenuUI.clickSfx = function():void {playSound(lookPt.x,lookPt.y,lookPt.z,"menuClick");};
@@ -348,7 +350,6 @@
 			Input.init(stage);
 
 			homeBaseScene();
-
 		}//endfunction
 
 		//===============================================================================================
@@ -481,6 +482,7 @@
 		//===============================================================================================
 		private function galaxyScene(callBack:Function=null):void
 		{
+			playSound(lookPt.x,lookPt.y,lookPt.z,"zoomOut");
 			world.removeChild(sky);
 
 			// ----- remove all ships and HUD
