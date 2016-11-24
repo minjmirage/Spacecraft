@@ -203,7 +203,7 @@
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
 						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
-			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
+			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,TexTrans:new BitmapData(1,1,true,0x66666666),
 							TexPlanets:new TexPlanets().bitmapData,
 							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
 							TexSpace2:fadeVertEnds(new TexSpace2().bitmapData),
@@ -435,7 +435,7 @@
 			{
 				if (Conf.length>0)
 				{
-					if (gameTime%30==0)
+					if (gameTime%100==0)
 					{
 						addShipToScene(true,Conf.pop());		// friendly
 					}
@@ -468,7 +468,14 @@
 						(Friendlies.length==0 || Hostiles.length==0))
 				{
 					stepFns.splice(stepFns.indexOf(battleStep),1);
-					galaxyScene(homeBaseScene);
+					var title:String = "Defeat";
+					if (Friendlies.length>0)	title = "Victory";
+					MenuUI.createSummaryScreen(thisRef,title,
+							new <String>["% Hostile Fleet Destroyed","% Friendly Fleet Destroyed","Resources Gained","Tech Gained"],
+							new <int>[54,88,34,223],
+							function():void {
+								galaxyScene(homeBaseScene);
+							});
 					if (menu.parent!=null)
 						menu.parent.removeChild(menu);
 				}
@@ -2060,7 +2067,12 @@
 									for (var j:int=Models.length-1; j>-1; j--)
 										world.removeChild(Models[j]);
 									var addModStep:Function = addModuleFn(Ids[i].id);
-									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void {modulesSelectMenu(callBack);});
+									player.chassisSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
+									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void
+									{
+										player.chassisSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
+										modulesSelectMenu(callBack);
+									});
 									return;
 								}
 								selIdx = i;
@@ -2698,6 +2710,82 @@ class MenuUI
 	public static var colorTone:uint = 0x99FFFF;		// overridden externally as needed
 
 	//===============================================================================================
+	// create a generic summary screen
+	//===============================================================================================
+	public static function createSummaryScreen(targ:SpaceCrafter,titleTxt:String,labels:Vector.<String>,values:Vector.<int>,callBack:Function) : Sprite
+	{
+		var sw:Number = targ.stage.stageWidth;
+		var sh:Number = targ.stage.stageHeight;
+
+		var labColor:uint = uint((colorTone>>16)*0.7)<<16 | uint(((colorTone>>8) & 0xFF)*0.7)<<8 | uint((colorTone & 0xFF)*0.7);
+		var fSize:Number = fontScale*sh/2;
+
+		var s:Sprite = new Sprite();
+
+		var L:Array = [];
+		var V:Array = [];
+		var n:int = Math.min(labels.length,values.length);
+		for (var i:int=0; i<n; i++)
+		{
+			var lab:Bitmap = createTextBmp(labels[i],int(fontScale*sh),int(fontScale*sh),labColor);
+			lab.y = (sh - (n-1-i)*lab.height)/2;
+			lab.x = sw/2 - lab.width-margF*sw;
+			lab.alpha = 0;
+			TweenLite.to(lab, 0.3, { alpha:1, delay:0.1*i+0.1, x:sw/2 - lab.width } );
+			L.push(lab);
+			s.addChild(lab);
+
+			var tf:TextField = new TextField();
+			tf.autoSize = "left";
+			tf.wordWrap = false;
+			tf.defaultTextFormat = new TextFormat("arial bold",int(fontScale*sh),colorTone,null,null,null,null,null,"right",0,0);
+			tf.filters = [new GlowFilter(colorTone, 1, fontScale*sh/4, fontScale*sh/4, 1, 1)];
+			tf.y = lab.y+(lab.height-tf.height)/2;
+			tf.x = sw/2 + margF*sw;
+			tf.text = values[i]+"";
+			TweenLite.to(tf, 0.3, { alpha:1, delay:0.1*i+0.1, x:sw/2 } );
+			V.push(tf);
+			s.addChild(tf);
+		}
+
+		var blockH:Number = s.height;
+		var title:Bitmap = createTextBmp(titleTxt, int(1.7*fontScale*sh),0,colorTone);
+		title.x = (sw-title.width)/2;
+		title.y = ((sh-blockH)/2 - title.height)/2;
+		title.alpha = 0;
+		TweenLite.to(title, 0.3, { alpha:1} );
+		s.addChild(title);
+
+		var okBtn:Sprite = createStandardButton(createTextBmp("Ok",int(fontScale*sh),int(fontScale*sh),colorTone),closeAndRemoveFn(callBack));
+		okBtn.alpha = 0;
+		okBtn.y = okBtn.height*i;
+		okBtn.x = (sw-okBtn.width)/2;
+		okBtn.y = sh - (sh-blockH)/4 + okBtn.height/2;
+		s.addChild(okBtn);
+		TweenLite.to(okBtn, 0.3, { alpha:1, delay:0.1*n+0.1 } );
+
+		function closeAndRemoveFn(callBack:Function):Function
+		{
+			var isClosing:Boolean = false;
+			return function():void
+			{
+				if (isClosing) return;
+				isClosing = true;
+				for (var i:int=0; i<n; i++)
+				{
+					TweenLite.to(L[i], 0.3, { alpha:0, delay:0.1*i+0.1, x:sw/2-L[i].width-margF*sw } );
+					TweenLite.to(V[i], 0.3, { alpha:0, delay:0.1*i+0.1, x:sw/2+margF*sw } );
+				}
+				TweenLite.to(okBtn, 0.3, { alpha:0} );
+				TweenLite.to(title, 0.3, { alpha:0, delay:0.2, onComplete:function():void { if (s.parent != null) s.parent.removeChild(s); if (callBack!=null) callBack(); }} );
+			}
+		}//endfunction
+
+		targ.addChild(s);
+		return s;
+	}//endfunction
+
+	//===============================================================================================
 	// Generic menu creation function
 	//===============================================================================================
 	public static function createLeftStyleMenu(targ:SpaceCrafter,selectionTxts:Vector.<String>,callBacks:Vector.<Function>) : Sprite
@@ -3144,86 +3232,6 @@ class MenuUI
 	}//endfunction
 
 	//===============================================================================================
-	// draws out waveform of sound output
-	// sampInt: sample interval minimum 4
-	// mag: height/2 of the display area
-	//===============================================================================================
-	public static function createSoundOutputDisplay(sampInt:int=8,mag:int=20) : Sprite
-	{
-		sampInt = Math.max(sampInt,4);
-		var canvas:Sprite = new Sprite();
-		canvas.addEventListener(Event.ENTER_FRAME,readWaveform);
-		canvas.addEventListener(MouseEvent.CLICK,clickHandler);
-
-		// ---------------------------------------------------------------------------
-		function readWaveform(ev:Event):void
-		{
-			// ----- float on top of other movieClips ---------------
-			/*
-			if (canvas.parent!=null && canvas.parent.numChildren>canvas.parent.getChildIndex(canvas))
-			{
-				var pp = canvas.parent;
-				pp.addChild(pp.removeChild(canvas));
-			}
-			*/
-			var vol:Number = SoundMixer.soundTransform.volume;
-
-			// ----- draw bounding box ------------------------------
-			canvas.graphics.clear();
-			canvas.graphics.lineStyle(0,0xFFFFFF,0.10);
-			canvas.graphics.beginFill(0x000000,0.5);
-			canvas.graphics.drawRect(0,0,256/sampInt*4,mag*2);
-			canvas.graphics.endFill();
-
-			// ----- read waveform data -----------------------------
-			var bytes:ByteArray = new ByteArray();
-			SoundMixer.computeSpectrum(bytes);
-			bytes.position=0;
-
-			// ----- draw left channel waveform ---------------------
-			canvas.graphics.lineStyle(0,0x33FFFF,1);
-			var val:Number = bytes.readFloat();
-			canvas.graphics.moveTo(0,val*vol*mag+mag);
-			for (bytes.position=4; bytes.position<1024; bytes.position+=sampInt-4)
-			{
-				val = bytes.readFloat();
-				canvas.graphics.lineTo(bytes.position/sampInt,val*vol*mag+mag);
-			}//endFor
-
-			// ----- draw right channel waveform --------------------
-			val = bytes.readFloat();
-			canvas.graphics.moveTo(0,val*vol*mag+mag);
-			for (bytes.position=1024; bytes.position<2048; bytes.position+=sampInt-4)
-			{
-				val = bytes.readFloat();
-				canvas.graphics.lineTo((bytes.position-1024)/sampInt,val*vol*mag+mag);
-			}//endFor
-
-			// ----- draw end rectangles ----------------------------
-			canvas.graphics.lineStyle();
-			canvas.graphics.beginFill(0x999999,1);
-			canvas.graphics.drawRect(-1,(1-vol)*mag,2,vol*mag*2);
-			canvas.graphics.drawRect(256/sampInt*4-1,(1-vol)*mag,2,vol*mag*2);
-			canvas.graphics.endFill();
-
-		}//endfunction
-
-		// ---------------------------------------------------------------------------
-		function clickHandler(ev:MouseEvent):void
-		{
-			if (SoundMixer.soundTransform.volume>0.6)
-				SoundMixer.soundTransform = new SoundTransform(0.5,0);
-			else if (SoundMixer.soundTransform.volume>0)
-				SoundMixer.soundTransform = new SoundTransform(0,0);
-			else
-				SoundMixer.soundTransform = new SoundTransform(1,0);
-		}//endfunction
-
-		canvas.buttonMode = true;
-		return canvas;
-	}//endfunction
-
-	//===============================================================================================
 	// standard stats readout for a ship
 	//===============================================================================================
 	public static function createShipHUD(ship:Ship, stage:Stage) : Sprite
@@ -3331,6 +3339,87 @@ class MenuUI
 		update();
 		return s;
 	}//endfunction
+
+	//===============================================================================================
+	// draws out waveform of sound output
+	// sampInt: sample interval minimum 4
+	// mag: height/2 of the display area
+	//===============================================================================================
+	public static function createSoundOutputDisplay(sampInt:int=8,mag:int=20) : Sprite
+	{
+		sampInt = Math.max(sampInt,4);
+		var canvas:Sprite = new Sprite();
+		canvas.addEventListener(Event.ENTER_FRAME,readWaveform);
+		canvas.addEventListener(MouseEvent.CLICK,clickHandler);
+
+		// ---------------------------------------------------------------------------
+		function readWaveform(ev:Event):void
+		{
+			// ----- float on top of other movieClips ---------------
+			/*
+			if (canvas.parent!=null && canvas.parent.numChildren>canvas.parent.getChildIndex(canvas))
+			{
+				var pp = canvas.parent;
+				pp.addChild(pp.removeChild(canvas));
+			}
+			*/
+			var vol:Number = SoundMixer.soundTransform.volume;
+
+			// ----- draw bounding box ------------------------------
+			canvas.graphics.clear();
+			canvas.graphics.lineStyle(0,0xFFFFFF,0.10);
+			canvas.graphics.beginFill(0x000000,0.5);
+			canvas.graphics.drawRect(0,0,256/sampInt*4,mag*2);
+			canvas.graphics.endFill();
+
+			// ----- read waveform data -----------------------------
+			var bytes:ByteArray = new ByteArray();
+			SoundMixer.computeSpectrum(bytes);
+			bytes.position=0;
+
+			// ----- draw left channel waveform ---------------------
+			canvas.graphics.lineStyle(0,0x33FFFF,1);
+			var val:Number = bytes.readFloat();
+			canvas.graphics.moveTo(0,val*vol*mag+mag);
+			for (bytes.position=4; bytes.position<1024; bytes.position+=sampInt-4)
+			{
+				val = bytes.readFloat();
+				canvas.graphics.lineTo(bytes.position/sampInt,val*vol*mag+mag);
+			}//endFor
+
+			// ----- draw right channel waveform --------------------
+			val = bytes.readFloat();
+			canvas.graphics.moveTo(0,val*vol*mag+mag);
+			for (bytes.position=1024; bytes.position<2048; bytes.position+=sampInt-4)
+			{
+				val = bytes.readFloat();
+				canvas.graphics.lineTo((bytes.position-1024)/sampInt,val*vol*mag+mag);
+			}//endFor
+
+			// ----- draw end rectangles ----------------------------
+			canvas.graphics.lineStyle();
+			canvas.graphics.beginFill(0x999999,1);
+			canvas.graphics.drawRect(-1,(1-vol)*mag,2,vol*mag*2);
+			canvas.graphics.drawRect(256/sampInt*4-1,(1-vol)*mag,2,vol*mag*2);
+			canvas.graphics.endFill();
+
+		}//endfunction
+
+		// ---------------------------------------------------------------------------
+		function clickHandler(ev:MouseEvent):void
+		{
+			if (SoundMixer.soundTransform.volume>0.6)
+				SoundMixer.soundTransform = new SoundTransform(0.5,0);
+			else if (SoundMixer.soundTransform.volume>0)
+				SoundMixer.soundTransform = new SoundTransform(0,0);
+			else
+				SoundMixer.soundTransform = new SoundTransform(1,0);
+		}//endfunction
+
+		canvas.buttonMode = true;
+		return canvas;
+	}//endfunction
+
 }//endclass
 
 class Ship
