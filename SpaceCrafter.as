@@ -2773,8 +2773,20 @@ class MenuUI
 		crossBtn.y = tickBtn.y;
 		s.addChild(crossBtn);
 
-		s.graphics.lineStyle(0, colorTone);
-		s.graphics.drawRect(0,0,panelw,s.height+margX*2);
+		var panelh:int = s.height+margX*2;
+		var lcorn:int = int((panelw+panelh)/30);
+		var lineColor:uint = uint((colorTone>>16)*0.5)<<16 | uint(((colorTone>>8) & 0xFF)*0.5)<<8 | uint((colorTone & 0xFF)*0.5);
+		s.graphics.lineStyle(3, lineColor);
+		s.graphics.beginFill(0x000000, 0.3);
+		s.graphics.moveTo(0,lcorn);
+		s.graphics.lineTo(lcorn,0);
+		s.graphics.lineTo(panelw-lcorn,0);
+		s.graphics.lineTo(panelw,lcorn);
+		s.graphics.lineTo(panelw,panelh-lcorn);
+		s.graphics.lineTo(panelw-lcorn,panelh);
+		s.graphics.lineTo(lcorn,panelh);
+		s.graphics.lineTo(0,panelh-lcorn);
+		s.graphics.lineTo(0,lcorn);
 
 		for (var i:int=0; i<s.numChildren; i++)
 		{
@@ -2794,7 +2806,9 @@ class MenuUI
 
 		s.x = (sw-s.width)/2;
 		s.y = (sh-s.height)/2;
+		s.alpha = 0;
 		targ.addChild(s);
+		TweenLite.to(s, 0.3, { alpha:1 } );
 		return s;
 	}//endfunction
 
@@ -3210,7 +3224,7 @@ class MenuUI
 	}//endfunction
 
 	//===============================================================================================
-	//
+	// standard stats readout for a ship
 	//===============================================================================================
 	public static function createShipHUD(ship:Ship, stage:Stage) : Sprite
 	{
@@ -3223,7 +3237,7 @@ class MenuUI
 		var fSize:Number = fontScale*stage.stageHeight/2;
 		var labelsBmp:Bitmap = createTextBmp("Integrity\nEnergy\nSpeed",fSize,0,labColor);
 		s.addChild(labelsBmp);
-		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*100000)/100,fSize,0,labColor);
+		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*10000)/10,fSize,0,labColor);
 		s.addChild(maxValuesBmp);
 
 		var curStatsTf:TextField = new TextField();
@@ -3274,7 +3288,7 @@ class MenuUI
 			nameBmp.x = (stage.stageWidth-bw)/2;
 			nameBmp.y = bh;
 
-			curStatsTf.text = ship.integrity+"\n"+ship.energy+"\n"+Math.floor(ship.vel.length*100000)/100;
+			curStatsTf.text = Math.round(ship.integrity)+"\n"+Math.round(ship.energy)+"\n"+Math.round(ship.vel.length*10000)/10;
 
 			maxValuesBmp.x = stage.stageWidth*(1-margF)-maxValuesBmp.width;
 			maxValuesBmp.y = stage.stageHeight-bh*3.5-maxValuesBmp.height;
