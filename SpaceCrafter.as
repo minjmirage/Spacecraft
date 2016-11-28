@@ -3492,12 +3492,12 @@ class Ship
 		skin.addChild(modulesSkin);
 
 		if (Adj==null)
-		Adj = Vector.<Vector3D>([new Vector3D(0,0,-1),	// front
+		Adj = new <Vector3D>[new Vector3D(0,0,-1),	// front
 								 new Vector3D(1,0,0),	// right
 								 new Vector3D(0,0,1),	// back
 								 new Vector3D(-1,0,0),	// left
 								 new Vector3D(0,-1,0),	// bottom
-								 new Vector3D(0,1,0)]);	// top
+								 new Vector3D(0,1,0)];	// top
 
 		hullConfig = new Vector.<HullBlock>();
 		modulesConfig = new Vector.<Module>();
@@ -4139,6 +4139,354 @@ class Ship
 		s = s.substr(0,s.length-1)+"&";
 		for (i=0; i<modulesConfig.length; i++)
 			s+=modulesConfig[i].toString()+",";
+
+		return s.substr(0,s.length-1);
+	}//endfunction
+}//endClass
+
+class Hull
+{
+	public var name:String = "";
+
+	public var hullConfig:Vector.<HullBlock> = null;	// hull shape configuration
+
+	public var skin:Mesh = null;
+	public var chassisSkin:Mesh = null;
+
+	public var maxIntegrity:Number = 1;
+	public var integrity:Number = 1;					// health of ship
+
+	public var pivot:Vector3D = null;					// point ship rotates about
+	public var radius:Number = 0;							// radius of ship
+
+	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
+
+	//===============================================================================================
+	// constructs a ship entity
+	//===============================================================================================
+	public function Hull(hullName:String=null):void
+	{
+		if (hullName!=null)
+			name = hullName;
+
+		pivot = new Vector3D();	// point ship rotates about
+
+		skin = new Mesh();
+		chassisSkin = new Mesh();
+		chassisSkin.material.setSpecular(1);
+		skin.addChild(chassisSkin);
+		skin.addChild(modulesSkin);
+
+		if (Adj==null)
+		Adj = new <Vector3D>[new Vector3D(0,0,-1),	// front
+								 new Vector3D(1,0,0),	// right
+								 new Vector3D(0,0,1),	// back
+								 new Vector3D(-1,0,0),	// left
+								 new Vector3D(0,-1,0),	// bottom
+								 new Vector3D(0,1,0)];	// top
+
+		hullConfig = new Vector.<HullBlock>();
+
+		// ----- initializes with default hull
+		hullConfig.push(new HullBlock(0,1,-1,this));
+		hullConfig.push(new HullBlock(0,-1,-1,this));
+		hullConfig.push(new HullBlock(0,0,-1,this));
+		hullConfig.push(new HullBlock(0,0,0,this));
+		hullConfig.push(new HullBlock(0,0,1,this));
+		hullConfig.push(new HullBlock(1,0,1,this));
+		hullConfig.push(new HullBlock(-1,0,1,this));
+
+		updateHull();				// update hull look from config infos
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function setFromConfig(config:String):void
+	{
+		var H:Array = config.split(",");
+
+		// ----- replicate from hullConfig info
+		hullConfig = new Vector.<HullBlock>();
+		for (var i:int=0; i<H.length; i+=3)
+			hullConfig.push(new HullBlock(parseInt(H[i],10),parseInt(H[i+1],10),parseInt(H[i+2],10),this));
+
+		updateHull();
+	}//endfunction
+
+	//===============================================================================================
+	// updates hullblocks extPosns property to current world position
+	//===============================================================================================
+	public function updateHullBlocksWorldPosns():void
+	{
+		var t:Matrix4x4 = skin.transform;
+		for (var j:int=hullConfig.length-1; j>-1; j--)
+		{
+			var hb:HullBlock = hullConfig[j];
+			hb.extPosn.x = hb.x*t.aa+hb.y*t.ab+hb.z*t.ac+t.ad;
+			hb.extPosn.y = hb.x*t.ba+hb.y*t.bb+hb.z*t.bc+t.bd;
+			hb.extPosn.z = hb.x*t.ca+hb.y*t.cb+hb.z*t.cc+t.cd;
+		}
+	}//endfunction
+
+	//===============================================================================================
+	// randomly generates a hull shape
+	//===============================================================================================
+	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
+	{
+		if (n==0) return;
+		hullConfig = new Vector.<HullBlock>();
+		hullConfig.push(new HullBlock(0,0,0,this));
+		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
+														new Vector3D(0,1,0),new Vector3D(0,-1,0),
+														new Vector3D(1,0,0),new Vector3D(-1,0,0)]);
+		for (var i:int=1; i<n; i++)
+		{
+			do {
+				var dir:Vector3D = Adj[int(Adj.length*Math.random())];
+				var hull:HullBlock = hullConfig[int(hullConfig.length*Math.random())];
+			} while (hullIdx(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z)!=-1);
+			hullConfig.push(new HullBlock(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z,this));
+			if (symmetry && hullIdx(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z)==-1)
+			{
+				hullConfig.push(new HullBlock(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z,this));
+				i++;
+			}
+		}//endfor
+	}//endfunction
+
+	//===============================================================================================
+	// extends ship chassis adding new block at position
+	//===============================================================================================
+	public function extendChassis(px:int,py:int,pz:int) : Boolean
+	{
+		if (adjacentToHull(px,py,pz))
+		{
+			hullConfig.push(new HullBlock(px, py, pz,this));
+			return true;
+		}
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// trims ship chassis removing block at position
+	//===============================================================================================
+	public function trimChassis(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullConfig.length<=1)	return false;
+
+		if (adjacentToSpace(px,py,pz))	// posn in hull and next to skin surface
+		{
+			var idx:int = hullIdx(px,py,pz);
+			var h:HullBlock = hullConfig[idx];
+			hullConfig.splice(idx,1);
+			if (isOnePiece())
+			{
+				return true;
+			}
+			else
+			{
+				hullConfig.push(h);
+				return false;
+			}
+		}
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// creates the chassis mesh geometry from hullConfig info
+	//===============================================================================================
+	public function updateHull() : void
+	{
+		// ----- update chassis skin
+		pivot = new Vector3D();
+		var tmp:Mesh = new Mesh();
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			tmp.addChild(createChassisPart(h.x,h.y,h.z));
+			pivot.x+=h.x;
+			pivot.y+=h.y;
+			pivot.z+=h.z;
+		}
+
+		tmp = tmp.mergeTree();
+		chassisSkin.setGeometry(tmp.vertData,tmp.idxsData);
+		pivot.scaleBy(1/hullConfig.length);
+		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+	}//endfunction
+
+	//===============================================================================================
+	// returns if hull position is adjacent to empty space
+	//===============================================================================================
+	public function adjacentToSpace(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)==-1)	return false;	// chk if not in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)==-1)
+				return true;
+
+		return false;
+	}//endfunctioh
+
+	//===============================================================================================
+	// returns if empty space position is adjacent to current hull configuration
+	//===============================================================================================
+	public function adjacentToHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)!=-1)	return false;	// chk if in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				return true;
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// returns index of hullBlock occupying position, useful to check if position is within ship hull
+	//===============================================================================================
+	private function hullIdx(px:int,py:int,pz:int) : int
+	{
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			if (h.x==px && h.y==py && h.z==pz)
+				return i;
+		}
+
+		return -1;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the necessary face extensions to form the hull skin only
+	//===============================================================================================
+	private function createChassisPart(px:int,py:int,pz:int) : Mesh
+	{
+		var i:int=0;
+
+		// vertices
+		var V:Vector.<Number> = new <Number>[-0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5,
+												 -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
+												 -0.5,0,0,  0.5,0,0,	// 8left 9right
+												 0,0.5,0,  0,-0.5,0,	// 10up 11down
+												 0,0,-0.5,  0,0,0.5];	// 12front 13back
+		// tri indices
+		var I:Vector.<uint> = new <uint>[0,3,12, 3,2,12, 2,1,12, 1,0,12, 	// front 0,3,2,1
+											 1,2,9, 2,6,9, 6,5,9, 5,1,9,			// right 1,2,6,5
+											 5,6,13, 6,7,13, 7,4,13, 4,5,13,	// back 5,6,7,4
+											 4,7,8, 7,3,8, 3,0,8, 0,4,8,			// left 4,7,3,0
+											 4,0,11, 0,1,11, 1,5,11, 5,4,11,	// bottom  4,0,1,5
+											 3,7,10, 7,6,10, 6,2,10, 2,3,10];	// top  3,7,6,2
+
+		// determine which face to delete
+		for (i=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				I.splice(i*12,12);
+
+		// shrink vertice inwards if not connected to adj hull plate
+		for (var v:int=0; v<8; v++)	// for all corner points
+		{
+			var fcnt:int=0;		// if not connected, corner point must have 6 tri faces using it
+			for (i=I.length-1; i>-1; i--)
+				if (I[i]==v)
+					fcnt++;
+
+			if (fcnt==6)
+			{
+				V[v*3+0]*=0.78;
+				V[v*3+1]*=0.78;
+				V[v*3+2]*=0.78;
+			}
+		}
+
+		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
+													0,1, 1,1, 0.5,0.5,
+													1,1, 1,0, 0.5,0.5,
+													1,0, 0,0, 0.5,0.5];	// UV coords
+		var ul:uint=U.length;
+		var VData:Vector.<Number> = new Vector.<Number>();
+		for (i=0; i<I.length; i+=3)
+		VData.push(	V[I[i+0]*3+0],V[I[i+0]*3+1],V[I[i+0]*3+2],	// vertex a
+					0,0,0,	// normal a
+					U[i*2%ul+0],U[i*2%ul+1],
+					V[I[i+1]*3+0],V[I[i+1]*3+1],V[I[i+1]*3+2],	// vertex b
+					0,0,0,	// normal b
+					U[i*2%ul+2],U[i*2%ul+3],
+					V[I[i+2]*3+0],V[I[i+2]*3+1],V[I[i+2]*3+2],	// vertex c
+					0,0,0,	// normal c
+					U[i*2%ul+4],U[i*2%ul+5]);
+
+		var m:Mesh = new Mesh();
+		m.createGeometry(VData);
+		m.transform = new Matrix4x4().translate(px,py,pz);
+		return m;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the free hullBlocks to be occupied by module of given size
+	//===============================================================================================
+	public function getHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
+	{
+		if (size==0) 	size=1;
+		var V:Vector.<HullBlock> = new Vector.<HullBlock>();
+		var off:Number = (size-1)/2;
+		for (var x:int=0; x<size; x++)
+			for (var y:int=0; y<size; y++)
+				for (var z:int=0; z<size; z++)
+				{
+					var idx:int = hullIdx(Math.round(px+ x-off),Math.round(py+ y-off),Math.round(pz+ z-off));
+					if (idx!=-1) V.push(hullConfig[idx]);
+				}
+		return V;
+	}//endfunction
+
+	//===============================================================================================
+	// checks if there are disjointed hull pieces
+	//===============================================================================================
+	public function isOnePiece() : Boolean
+	{
+		if (hullConfig==null || hullConfig.length==0)	return false;
+
+		var i:int=0;
+
+		hullConfig[0].walked = true;
+		var CA:Vector.<HullBlock> = Vector.<HullBlock>([hullConfig[0]]);
+
+		while (CA.length>0)
+		{
+			var b:HullBlock = CA.shift();
+			for (i=Adj.length-1; i>=0; i--)
+			{
+				var idx:int = hullIdx(b.x+Adj[i].x,b.y+Adj[i].y,b.z+Adj[i].z);
+				if (idx!=-1 && !hullConfig[idx].walked)
+				{
+					hullConfig[idx].walked = true;
+					CA.push(hullConfig[idx]);
+				}
+			}//endfor
+		}//endwhile
+
+		var onePiece:Boolean = true;
+		for (i=hullConfig.length-1; i>=0; i--)
+		{
+			if (!hullConfig[i].walked) onePiece=false;
+			hullConfig[i].walked=false;
+		}//endfor
+
+		return onePiece;
+	}//endfunction
+
+	//===============================================================================================
+	// to represent this ship config as a string
+	//===============================================================================================
+	public function toString():String
+	{
+		var s:String = name+"&";
+		for (var i:int=0; i<hullConfig.length; i++)
+			s+= Math.round(hullConfig[i].x)+","+Math.round(hullConfig[i].y)+","+Math.round(hullConfig[i].z)+",";
 
 		return s.substr(0,s.length-1);
 	}//endfunction
