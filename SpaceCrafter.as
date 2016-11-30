@@ -20,6 +20,7 @@
 		private var Mtls:Object = null;
 
 		private var Projectiles:Vector.<Projectile> = null;
+		private var Asteroids:Vector.<Asteroid> = null;
 		private var Ships:Vector.<Ship> = null;
 		private var Hostiles:Vector.<Ship> = null;
 		private var Friendlies:Vector.<Ship> = null;
@@ -64,6 +65,10 @@
 		[Embed(source="3D/textures/SpecPanel.jpg")] 		private static var SpecPanel:Class;
 		[Embed(source="3D/textures/TexStreak.png")] 		private static var TexStreak:Class;
 		[Embed(source="3D/textures/halo.png")] 					private static var TexHalo:Class;
+
+		[Embed(source="3D/textures/texRocks.jpg")] 			private static var TexRocks:Class;
+		[Embed(source="3D/textures/specRocks.jpg")] 		private static var SpecRocks:Class;
+		[Embed(source="3D/textures/normRocks.jpg")] 		private static var NormRocks:Class;
 
 		[Embed(source="3D/textures/TexSpace1.jpg")] 		private static var TexSpace1:Class;
 		[Embed(source="3D/textures/TexSpace2.jpg")] 		private static var TexSpace2:Class;
@@ -203,7 +208,9 @@
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
 						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
-			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,TexTrans:new BitmapData(1,1,true,0x66666666),
+			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
+							TexRocks:new TexRocks().bitmapData, SpecRocks:new SpecRocks().bitmapData, NormRocks:new NormRocks().bitmapData,
+							TexTrans:new BitmapData(1,1,true,0x66666666),
 							TexPlanets:new TexPlanets().bitmapData,
 							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
 							TexSpace2:fadeVertEnds(new TexSpace2().bitmapData),
@@ -333,12 +340,12 @@
 			gridMesh.material.setSpecular(0);
 			gridMesh.material.setAmbient(1,1,1);
 
-
+			Projectiles = new Vector.<Projectile>();
+			Asteroids = new Vector.<Asteroid>();
 			Ships = new Vector.<Ship>();
 			Hostiles = new Vector.<Ship>();
 			Friendlies = new Vector.<Ship>();
 			Exploding = new Vector.<Ship>();
-			Projectiles = new Vector.<Projectile>();
 			stepFns = new Vector.<Function>();
 
 			undoStk = new Vector.<String>();
@@ -397,6 +404,7 @@
 
 			if (sky!=null) world.removeChild(sky);
 			randScenery();
+			randAsteroids(Math.floor(Math.random()*20));
 
 			// ----- auto generate and show ship HUD if not exist
 			if (shipHUD==null && player!=null)
@@ -721,6 +729,20 @@
 		}//
 
 		//===============================================================================================
+		// generate random asteroids
+		//===============================================================================================
+		private function randAsteroids(n:int):void
+		{
+			for (var i:int=0; i<n; i++)
+			{
+				var a:Asteroid = new Asteroid("a"+i,Math.floor(Math.random()*9),1+Math.floor(Math.random()*15),Mtls["TexRocks"],Mtls["SpecRocks"],Mtls["NormRocks"]);
+				a.posn = new Vector3D((Math.random()-0.5)*100,0,(Math.random()-0.5)*100);
+				Asteroids.push(a);
+				world.addChild(a.skin);
+			}
+		}//endfunction
+
+		//===============================================================================================
 		// simulate planet movements
 		//===============================================================================================
 		private function planetStep():void
@@ -857,6 +879,7 @@
 				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
 				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
 				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
+				asteroidsStep();
 
 				// ----- update mesh particles
 				var frameSShown:int = frameS_MP.update();
@@ -936,7 +959,7 @@
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
 					for (var i:int=Ships.length-1; i>-1; i--)
-						if (Ships[i]!=player && Ships[i].chassisSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
+						if (Ships[i]!=player && Ships[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
 						{
 							player = Ships[i];
 							if (shipHUD != null && shipHUD.parent != null)
@@ -979,7 +1002,7 @@
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
 					for (var i:int=Ships.length-1; i>-1; i--)
-						if (Ships[i].chassisSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
+						if (Ships[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
 							selected = Ships[i];
 				}
 			}
@@ -1068,7 +1091,7 @@
 
 						if (dx*dx+dy*dy+dz*dz<s.radius*s.radius+p.vx*p.vx+p.vy*p.vy+p.vz*p.vz)
 						{
-							var hitPt:VertexData = s.chassisSkin.lineHitsMesh(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
+							var hitPt:VertexData = s.hullSkin.lineHitsMesh(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
 							if (hitPt!=null)
 							{
 								if (posnIsOnScreen(p.px,p.py,p.pz))
@@ -1299,7 +1322,7 @@
 										tPt.extPosn.x-turX,tPt.extPosn.y-turY,tPt.extPosn.z-turZ,	// target block posn from turret
 										dvx,dvy,dvz);					// target vel from turret
 						if (iV!=null && interceptV.w>iV.w &&
-							ship.chassisSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform)==null)	// does not hit self
+							ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform)==null)	// does not hit self
 						{
 							targObj = tPt;
 							interceptV.x = iV.x;
@@ -1331,7 +1354,7 @@
 									pp.px-turX,pp.py-turY,pp.pz-turZ, 	// target block posn from turret
 									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z);	// target vel from turret
 					if (ipV!=null && interceptV.w>ipV.w &&
-						ship.chassisSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform)==null)	// does not hit self
+						ship.hullSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform)==null)	// does not hit self
 					{
 						targObj = pp;
 						interceptV.x = ipV.x;
@@ -1467,6 +1490,24 @@
 		//===============================================================================================
 		// updates turrets status, rotates/displays turrets and frames
 		//===============================================================================================
+		private function asteroidsStep() : void
+		{
+			for (var i:int=Asteroids.length-1; i>=0; i--)
+			{
+				var a:Asteroid = Asteroids[i];
+				if (a.integrity<=0)
+				{
+					Asteroids.splice(i,1);
+					world.removeChild(a.skin);
+				}
+				else
+					a.updateStep();
+			}//
+		}//endfunction
+
+		//===============================================================================================
+		// updates turrets status, rotates/displays turrets and frames
+		//===============================================================================================
 		private function shipsStep() : void
 		{
 			var i:int=0;
@@ -1568,7 +1609,7 @@
 						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(hb.x,hb.y,hb.z));
 						var dir:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
 						dir.scaleBy(10000/dir.length);
-						var hitPt:VertexData = ship.chassisSkin.lineHitsMesh(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
+						var hitPt:VertexData = ship.hullSkin.lineHitsMesh(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
 						if (hitPt!=null && posnIsOnScreen(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3))
 						{
 							(ParticlesEmitter)(EffectEMs["flash"]).emit(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3,0,0,0,Math.random()*0.5+0.5);
@@ -1580,7 +1621,7 @@
 					ship.skin.transform = ship.skin.transform.translate(-ship.posn.x,-ship.posn.y,-ship.posn.z);
 					ship.skin.transform = ship.skin.transform.rotate(ship.vel.x,ship.vel.y,ship.vel.z);
 					ship.skin.transform = ship.skin.transform.translate(ship.posn.x, ship.posn.y, ship.posn.z);
-					ship.chassisSkin.material.ambR += 0.02;
+					ship.hullSkin.material.ambR += 0.02;
 					simulateShipTurrets(ship,false);
 					ship.tte--;
 				}
@@ -1617,19 +1658,19 @@
 			Ships.push(ship);
 			if (friendly)
 			{
-				ship.chassisSkin.material.setTexMap(Mtls["TexPanel"]);
-				ship.chassisSkin.material.setSpecMap(Mtls["SpecPanel"]);
+				ship.hullSkin.material.setTexMap(Mtls["TexPanel"]);
+				ship.hullSkin.material.setSpecMap(Mtls["SpecPanel"]);
 				Friendlies.push(ship);
 				ship.targets = Hostiles;
 			}
 			else
 			{
-				ship.chassisSkin.material.setSpecMap(Mtls["TexPanel"]);
-				ship.chassisSkin.material.setTexMap(Mtls["SpecPanel"]);
+				ship.hullSkin.material.setSpecMap(Mtls["TexPanel"]);
+				ship.hullSkin.material.setTexMap(Mtls["SpecPanel"]);
 				Hostiles.push(ship);
 				ship.targets = Friendlies;
 			}
-			ship.chassisSkin.material.setSpecular(2);
+			ship.hullSkin.material.setSpecular(2);
 			jumpIn(ship,Math.sin(ang)*30,Math.cos(ang)*30,ang+Math.PI,function():void {setDumbAI(ship);});
 			return ship;
 		}//endfunction
@@ -2067,10 +2108,10 @@
 									for (var j:int=Models.length-1; j>-1; j--)
 										world.removeChild(Models[j]);
 									var addModStep:Function = addModuleFn(Ids[i].id);
-									player.chassisSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
+									player.hullSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
 									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void
 									{
-										player.chassisSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
+										player.hullSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
 										modulesSelectMenu(callBack);
 									});
 									return;
@@ -2172,7 +2213,7 @@
 						{
 							undoStk.push(player.toString());
 							if (player.addModule(localPt.x,localPt.y,localPt.z,orient,type))	// orient,type,size
-								player.updateHull();
+								player.rebuildShip();
 							else
 								undoStk.pop();		// discard undo state
 						}
@@ -2218,8 +2259,8 @@
 							if (occupyingModule!=null)
 								player.removeModule(occupyingModule);
 							else
-								player.trimChassis(localPt.x,localPt.y,localPt.z);
-							player.updateHull();
+								player.trimHull(localPt.x,localPt.y,localPt.z);
+							player.rebuildShip();
 						}
 					}
 				}
@@ -2260,8 +2301,8 @@
 						if (upPt.endT-upPt.startT<300)
 						{
 							undoStk.push(player.toString());
-							player.extendChassis(localPt.x,localPt.y,localPt.z);
-							player.updateHull();
+							player.extendHull(localPt.x,localPt.y,localPt.z);
+							player.rebuildShip();
 						}
 					}
 				}
@@ -3422,32 +3463,608 @@ class MenuUI
 
 }//endclass
 
-class Ship
+class Module		// data class
+{
+	public var x:Number=0;	// center
+	public var y:Number=0;
+	public var z:Number=0;
+
+	public var nx:Number=0;	// orientation
+	public var ny:Number=0;
+	public var nz:Number=0;
+
+	public var type:String=null;	// type of weapon
+
+	public var bearing:Number=0;	// elevation of turret (local space)
+	public var elevation:Number=0;	// bearing of turret (local space)
+
+	public var ttf:int=0;			// time to fire
+	public var fireDelay:int=3;		// delay to next shot
+	public var range:Number=10;		// range of weapon
+	public var turnRate:Number=0.05;// rotation speed of turret
+	public var speed:Number=0.1;	//
+	public var damage:Number=1;		//
+	public var muzzleLen:Number=0.3;
+
+	/**
+	 *
+	 * @param	px
+	 * @param	py
+	 * @param	pz
+	 * @param	vx
+	 * @param	vy
+	 * @param	vz
+	 * @param	kind
+	 */
+	public function Module(px:Number=0,py:Number=0,pz:Number=0,vx:Number=0,vy:Number=0,vz:Number=-1,kind:String=""):void
+	{
+		x=px;
+		y=py;
+		z=pz;
+		nx=vx;
+		ny=vy;
+		nz=vz;
+		type=kind;
+
+		if (kind=="launcherS")
+		{
+			fireDelay=1000;
+			speed=0.15;		// only initial launch speed. missiles have accel
+			damage=50;
+			range=50;
+		}
+		else if (kind=="gunAutoS")
+		{
+			fireDelay=3;
+			speed=0.5;
+			damage=2;
+			range=7;
+			turnRate=0.1;
+			muzzleLen=0.26;
+		}
+		else if (kind=="gunFlakS")
+		{
+			fireDelay=50;
+			speed=0.15;
+			damage=20;
+			range=7;
+			muzzleLen=0.3;
+		}
+		else if (kind=="gunIonS")
+		{
+			fireDelay=40;
+			speed=0.15;
+			damage=20;
+			range=15;
+			muzzleLen=0.35;
+		}
+		else if (kind=="gunPlasmaS")
+		{
+			fireDelay=40;
+			speed=0.1;
+			damage=80;
+			range=10;
+			muzzleLen=0.35;
+		}
+		else if (kind=="gunRailS")
+		{
+			fireDelay=60;
+			speed=0.2;
+			damage=20;
+			range=20;
+			muzzleLen=0.37;
+		}
+		else if (kind=="gunIonM")
+		{
+			fireDelay=80;
+			speed=0.15;
+			damage=160;
+			turnRate = 0.01;
+			range=40;
+			muzzleLen=0.7;
+		}
+		else if (kind=="gunRailM")
+		{
+			fireDelay=100;
+			speed=0.4;
+			damage=320;
+			turnRate = 0.01;
+			range=40;
+			muzzleLen=0.7;
+		}
+		else if (kind=="gunPlasmaM")
+		{
+			fireDelay=100;
+			speed=0.2;
+			damage=400;
+			turnRate = 0.01;
+			range=20;
+			muzzleLen=0.7;
+		}
+	}//endconstr
+
+	public function toString():String
+	{
+			return 	Math.round(x*10)/10+","+Math.round(y*10)/10+","+Math.round(z*10)/10+","+
+							Math.round(nx*10)/10+","+Math.round(ny*10)/10+","+Math.round(nz*10)/10+","+type;
+	}//endfunction
+}//endclass
+
+class HullBlock		// data class
+{
+	public var x:int=0;
+	public var y:int=0;
+	public var z:int=0;
+	public var integrity:Number = 0;		// used in astroid
+	public var parent:Hull = null;			// used for projectile collision resolution
+	public var extPosn:Vector3D = null;	// used for calc turret aim
+	public var module:Module=null;			// module occupying this hullBlock
+	public var walked:Boolean = false;
+
+	public function HullBlock(px:int,py:int,pz:int,hull:Hull):void
+	{
+		x=px;
+		y=py;
+		z=pz;
+		parent=hull;
+		extPosn = new Vector3D(px,py,pz);
+	}//endconstr
+}//endclass
+
+class Hull
 {
 	public var name:String = "";
 
-	public var modelAssets:Object = null;				// ref to external models assets
-
 	public var hullConfig:Vector.<HullBlock> = null;	// hull shape configuration
-	public var modulesConfig:Vector.<Module> = null;	// mounted modules configuration
 
 	public var skin:Mesh = null;
-	public var chassisSkin:Mesh = null;
+	public var hullSkin:Mesh = null;
+
+	public var pivot:Vector3D = null;					// point ship rotates about
+	public var radius:Number = 0;							// radius of ship
+
+	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
+
+	//===============================================================================================
+	// constructs a blocky hull entity
+	//===============================================================================================
+	public function Hull(hullName:String=null):void
+	{
+		if (hullName!=null)
+			name = hullName;
+
+		pivot = new Vector3D();	// CG point hull rotates about
+
+		skin = new Mesh();
+		hullSkin = new Mesh();
+		hullSkin.material.setSpecular(1);
+		skin.addChild(hullSkin);
+
+		if (Adj==null)
+		Adj = new <Vector3D>[new Vector3D(0,0,-1),	// front
+												 new Vector3D(1,0,0),	// right
+												 new Vector3D(0,0,1),	// back
+												 new Vector3D(-1,0,0),	// left
+												 new Vector3D(0,-1,0),	// bottom
+												 new Vector3D(0,1,0)];	// top
+
+		hullConfig = new Vector.<HullBlock>();
+
+		// ----- initializes with default hull
+		hullConfig.push(new HullBlock(0,0,0,this));
+
+		rebuildHull();				// update hull look from config infos
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function setFromConfig(config:String):void
+	{
+		var H:Array = config.split(",");
+
+		// ----- replicate from hullConfig info
+		hullConfig = new Vector.<HullBlock>();
+		for (var i:int=0; i<H.length; i+=3)
+			hullConfig.push(new HullBlock(parseInt(H[i],10),parseInt(H[i+1],10),parseInt(H[i+2],10),this));
+
+		rebuildHull();
+	}//endfunction
+
+	//===============================================================================================
+	// updates hullblocks extPosns property to current world position according to skin transform
+	//===============================================================================================
+	public function updateHullBlocksWorldPosns():void
+	{
+		var t:Matrix4x4 = skin.transform;
+		for (var j:int=hullConfig.length-1; j>-1; j--)
+		{
+			var hb:HullBlock = hullConfig[j];
+			hb.extPosn.x = hb.x*t.aa+hb.y*t.ab+hb.z*t.ac+t.ad;
+			hb.extPosn.y = hb.x*t.ba+hb.y*t.bb+hb.z*t.bc+t.bd;
+			hb.extPosn.z = hb.x*t.ca+hb.y*t.cb+hb.z*t.cc+t.cd;
+		}
+	}//endfunction
+
+	//===============================================================================================
+	// randomly generates a hull shape
+	//===============================================================================================
+	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
+	{
+		if (n==0) return;
+		hullConfig = new Vector.<HullBlock>();
+		hullConfig.push(new HullBlock(0,0,0,this));
+		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
+														new Vector3D(0,1,0),new Vector3D(0,-1,0),
+														new Vector3D(1,0,0),new Vector3D(-1,0,0)]);
+		for (var i:int=1; i<n; i++)
+		{
+			do {
+				var dir:Vector3D = Adj[int(Adj.length*Math.random())];
+				var hull:HullBlock = hullConfig[int(hullConfig.length*Math.random())];
+			} while (hullIdx(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z)!=-1);
+			hullConfig.push(new HullBlock(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z,this));
+			if (symmetry && hullIdx(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z)==-1)
+			{
+				hullConfig.push(new HullBlock(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z,this));
+				i++;
+			}
+		}//endfor
+	}//endfunction
+
+	//===============================================================================================
+	// extends ship chassis adding new block at position
+	//===============================================================================================
+	public function extendHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (adjacentToHull(px,py,pz))
+		{
+			hullConfig.push(new HullBlock(px, py, pz,this));
+			return true;
+		}
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// trims ship chassis removing block at position
+	//===============================================================================================
+	public function trimHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullConfig.length<=1)	return false;
+
+		if (adjacentToSpace(px,py,pz))	// posn in hull and next to skin surface
+		{
+			var idx:int = hullIdx(px,py,pz);
+			var h:HullBlock = hullConfig[idx];
+			hullConfig.splice(idx,1);
+			if (isOnePiece())
+			{
+				return true;
+			}
+			else
+			{
+				hullConfig.push(h);
+				return false;
+			}
+		}
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// creates the hull mesh geometry from hullConfig info
+	//===============================================================================================
+	public function rebuildHull() : void
+	{
+		// ----- update chassis skin
+		pivot = new Vector3D();
+		var tmp:Mesh = new Mesh();
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			tmp.addChild(createHullPart(h.x,h.y,h.z));
+			pivot.x+=h.x;
+			pivot.y+=h.y;
+			pivot.z+=h.z;
+		}
+
+		tmp = tmp.mergeTree();
+		hullSkin.setGeometry(tmp.vertData,tmp.idxsData);
+		pivot.scaleBy(1/hullConfig.length);
+		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+	}//endfunction
+
+	//===============================================================================================
+	// returns if hull position is adjacent to empty space
+	//===============================================================================================
+	public function adjacentToSpace(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)==-1)	return false;	// chk if not in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)==-1)
+				return true;
+
+		return false;
+	}//endfunctioh
+
+	//===============================================================================================
+	// returns if empty space position is adjacent to current hull configuration
+	//===============================================================================================
+	public function adjacentToHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (hullIdx(px,py,pz)!=-1)	return false;	// chk if in hull
+
+		for (var i:int=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				return true;
+
+		return false;
+	}//endfunction
+
+	//===============================================================================================
+	// returns index of hullBlock occupying position, useful to check if position is within ship hull
+	//===============================================================================================
+	protected function hullIdx(px:int,py:int,pz:int) : int
+	{
+		for (var i:int=hullConfig.length-1; i>=0; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			if (h.x==px && h.y==py && h.z==pz)
+				return i;
+		}
+
+		return -1;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the necessary face extensions to form the hull skin only
+	//===============================================================================================
+	private function createHullPart(px:int,py:int,pz:int) : Mesh
+	{
+		var i:int=0;
+
+		// vertices
+		var V:Vector.<Number> = new <Number>[-0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5,
+												 -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
+												 -0.5,0,0,  0.5,0,0,	// 8left 9right
+												 0,0.5,0,  0,-0.5,0,	// 10up 11down
+												 0,0,-0.5,  0,0,0.5];	// 12front 13back
+		// tri indices
+		var I:Vector.<uint> = new <uint>[0,3,12, 3,2,12, 2,1,12, 1,0,12, 	// front 0,3,2,1
+											 1,2,9, 2,6,9, 6,5,9, 5,1,9,			// right 1,2,6,5
+											 5,6,13, 6,7,13, 7,4,13, 4,5,13,	// back 5,6,7,4
+											 4,7,8, 7,3,8, 3,0,8, 0,4,8,			// left 4,7,3,0
+											 4,0,11, 0,1,11, 1,5,11, 5,4,11,	// bottom  4,0,1,5
+											 3,7,10, 7,6,10, 6,2,10, 2,3,10];	// top  3,7,6,2
+
+		// determine which face to delete
+		for (i=5; i>=0; i--)
+			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
+				I.splice(i*12,12);
+
+		// shrink vertice inwards if not connected to adj hull plate
+		for (var v:int=0; v<8; v++)	// for all corner points
+		{
+			var fcnt:int=0;		// if not connected, corner point must have 6 tri faces using it
+			for (i=I.length-1; i>-1; i--)
+				if (I[i]==v)
+					fcnt++;
+
+			if (fcnt==6)
+			{
+				V[v*3+0]*=0.78;
+				V[v*3+1]*=0.78;
+				V[v*3+2]*=0.78;
+			}
+		}
+
+		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
+													0,1, 1,1, 0.5,0.5,
+													1,1, 1,0, 0.5,0.5,
+													1,0, 0,0, 0.5,0.5];	// UV coords
+		var ul:uint=U.length;
+		var VData:Vector.<Number> = new Vector.<Number>();
+		for (i=0; i<I.length; i+=3)
+		VData.push(	V[I[i+0]*3+0],V[I[i+0]*3+1],V[I[i+0]*3+2],	// vertex a
+					0,0,0,	// normal a
+					U[i*2%ul+0],U[i*2%ul+1],
+					V[I[i+1]*3+0],V[I[i+1]*3+1],V[I[i+1]*3+2],	// vertex b
+					0,0,0,	// normal b
+					U[i*2%ul+2],U[i*2%ul+3],
+					V[I[i+2]*3+0],V[I[i+2]*3+1],V[I[i+2]*3+2],	// vertex c
+					0,0,0,	// normal c
+					U[i*2%ul+4],U[i*2%ul+5]);
+
+		var m:Mesh = new Mesh();
+		m.createGeometry(VData);
+		m.transform = new Matrix4x4().translate(px,py,pz);
+		return m;
+	}//endfunction
+
+	//===============================================================================================
+	// returns the free hullBlocks to be occupied by module of given size
+	//===============================================================================================
+	public function getHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
+	{
+		if (size==0) 	size=1;
+		var V:Vector.<HullBlock> = new Vector.<HullBlock>();
+		var off:Number = (size-1)/2;
+		for (var x:int=0; x<size; x++)
+			for (var y:int=0; y<size; y++)
+				for (var z:int=0; z<size; z++)
+				{
+					var idx:int = hullIdx(Math.round(px+ x-off),Math.round(py+ y-off),Math.round(pz+ z-off));
+					if (idx!=-1) V.push(hullConfig[idx]);
+				}
+		return V;
+	}//endfunction
+
+	//===============================================================================================
+	// checks if there are disjointed hull pieces
+	//===============================================================================================
+	public function isOnePiece() : Boolean
+	{
+		if (hullConfig==null || hullConfig.length==0)	return false;
+
+		var i:int=0;
+
+		hullConfig[0].walked = true;
+		var CA:Vector.<HullBlock> = Vector.<HullBlock>([hullConfig[0]]);
+
+		while (CA.length>0)
+		{
+			var b:HullBlock = CA.shift();
+			for (i=Adj.length-1; i>=0; i--)
+			{
+				var idx:int = hullIdx(b.x+Adj[i].x,b.y+Adj[i].y,b.z+Adj[i].z);
+				if (idx!=-1 && !hullConfig[idx].walked)
+				{
+					hullConfig[idx].walked = true;
+					CA.push(hullConfig[idx]);
+				}
+			}//endfor
+		}//endwhile
+
+		var onePiece:Boolean = true;
+		for (i=hullConfig.length-1; i>=0; i--)
+		{
+			if (!hullConfig[i].walked) onePiece=false;
+			hullConfig[i].walked=false;
+		}//endfor
+
+		return onePiece;
+	}//endfunction
+
+	//===============================================================================================
+	// to represent this ship config as a string
+	//===============================================================================================
+	public function toString():String
+	{
+		var s:String = name+"&";
+		for (var i:int=0; i<hullConfig.length; i++)
+			s+= Math.round(hullConfig[i].x)+","+Math.round(hullConfig[i].y)+","+Math.round(hullConfig[i].z)+",";
+
+		return s.substr(0,s.length-1);
+	}//endfunction
+}//endClass
+
+class Asteroid extends Hull
+{
+	public var slowF:Number = 0.95;						// slow down factor
+	public var posn:Vector3D = null;					// current position
+	public var vel:Vector3D = null;						// current velocity
+	public var rotPosn:Vector3D = null;				// current orientation quaternion
+	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
+
+	public var integrity:Number = 0;
+
+	public function Asteroid(name:String=null,type:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
+	{
+		// ----- create random asteroid geometry
+		super(name);
+		randomHullConfig(size,false);
+		rebuildHull();
+
+		// ----- set asteroid texture
+		for (var i:int=hullConfig.length-1; i>-1; i--)
+			hullConfig[i].integrity = 1000;
+		integrity = hullConfig.length*1000;
+		hullSkin.material.setTexMap(texMap);
+		hullSkin.material.setSpecMap(specMap);
+		hullSkin.material.setNormMap(normMap);
+		type = type%9;	// total 9 types of asteroids
+		var VD:Vector.<Number> = hullSkin.vertData;
+		var u:Number = (type%3)/3;
+		var v:Number = int(type/3)/3;
+		for (i=VD.length-11; i>-1; i-=11)
+		{	// modify uv to use correct area of texture
+			VD[i+9] = VD[i+9]/3 + u;
+			VD[i+10] = VD[i+10]/3 + v;
+		}
+
+		posn = new Vector3D(0,0,0);
+		vel =  new Vector3D(0,0,0);
+		rotPosn = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
+		rotPosn.scaleBy(Math.random()/rotPosn.length);
+		rotPosn.w = Math.sqrt(1-rotPosn.length*rotPosn.length);
+		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
+		rotVel.scaleBy(Math.random()*0.03/rotVel.length);
+		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
+	}//endConstr
+
+	//===============================================================================================
+	// update position & orientation of asteroid
+	//===============================================================================================
+	public function updateStep():void
+	{
+		// ----- move astroid with current velocity
+		posn.x += vel.x;				// update position
+		posn.y += vel.y;
+		posn.z += vel.z;
+		vel.scaleBy(slowF);			// speed slow
+		rotPosn = Matrix4x4.quatMult(rotVel,rotPosn);		// update rotation
+		//rotVel.scaleBy(slowF);	// rotation slow
+		//rotVel.w = Math.sqrt(1 - rotVel.x*rotVel.x - rotVel.y*rotVel.y - rotVel.z*rotVel.z);
+
+		// ----- update ship transform
+		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.x,rotPosn.y,rotPosn.z,rotPosn.w).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z)).translate(posn.x,posn.y,posn.z);
+		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
+	}//endfunction
+
+	//===============================================================================================
+	// records down the damage position and magnitude
+	//===============================================================================================
+	public function registerHit(hitPt:VertexData,dmg:Number):void
+	{
+		var invT:Matrix4x4 = skin.transform.inverse();
+		var nvx:Number = hitPt.vx*invT.aa + hitPt.vy*invT.ab + hitPt.vz*invT.ac + invT.ad;
+		var nvy:Number = hitPt.vx*invT.ba + hitPt.vy*invT.bb + hitPt.vz*invT.bc + invT.bd;
+		var nvz:Number = hitPt.vx*invT.ca + hitPt.vy*invT.cb + hitPt.vz*invT.cc + invT.cd;
+		var nh:HullBlock = null;
+		var ndSq:Number = Number.MAX_VALUE;
+		for (var i:int=hullConfig.length-1; i>-1; i--)
+		{
+				var h:HullBlock = hullConfig[i];
+				if (nh==null || (nvx-h.x)*(nvx-h.x)+(nvy-h.y)*(nvy-h.y)+(nvz-h.z)*(nvz-h.z)<ndSq)
+				{
+					nh=h;
+					ndSq=(nvx-h.x)*(nvx-h.x)+(nvy-h.y)*(nvy-h.y)+(nvz-h.z)*(nvz-h.z);
+				}
+		}
+		// ----- remove block if destroyed
+		if (nh!=null)
+		{
+			nh.integrity-=dmg;
+			integrity-=dmg;
+		}
+		if (nh.integrity<=0)
+		{
+			trimHull(nh.x,nh.y,nh.z);
+			rebuildHull();
+		}
+	}//endfunction
+}//endClass
+
+class Ship extends Hull
+{
+	public var modelAssets:Object = null;				// ref to external models assets
+
+	public var modulesConfig:Vector.<Module> = null;	// mounted modules configuration
+
 	public var modulesSkin:Mesh = null;
 
 	public var maxIntegrity:Number = 1;
-	public var integrity:Number = 1;					// health of ship
+	public var integrity:Number = 1;					// health of hull
 	public var maxEnergy:Number = 1;
 	public var energy:Number = 1;
 
 	public var tte:int = 90;									// time to explode
 
-	public var pivot:Vector3D = null;					// point ship rotates about
 	public var posn:Vector3D = null;					// ship position
 	public var vel:Vector3D = null;						// current velocity of ship
 	public var facing:Vector3D = null;				// current facing of ship
 	public var rotVel:Vector3D = null;				// current rotational velocity of ship
-	public var radius:Number = 0;							// radius of ship
 	public var accelF:Number = 0.001;					// ship acceleration factor
 	public var slowF:Number = 0.9;						// ship slow down factor
 	public var maxSpeed:Number = accelF/(1/slowF-1);	// ship max speed, calculated
@@ -3459,8 +4076,6 @@ class Ship
 	public var stepFn:Function = null;
 	public var damagePosns:Vector.<VertexData> = null;
 
-	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
-
 	private static var RandNames:Vector.<String> =
 	new <String>["Androsynth","Arilou","Chenjesu","Earthling","Ilwrath","Mmrnmhrm","Mycon","Shofixti","Spathi",
 	"Syreen","Umgah","Ur-Quan","Kohr-Ah","VUX","Yehat","Chmmr","Dnyarri","Druuge","Melnorme","Orz","Pkunk",
@@ -3471,33 +4086,18 @@ class Ship
 	//===============================================================================================
 	public function Ship(assets:Object,shpName:String=null):void
 	{
-		if (shpName!=null)
-			name = shpName;
-		else
-			name = RandNames[Math.floor(Math.random()*RandNames.length)];
+		if (shpName==null) shpName = RandNames[Math.floor(Math.random()*RandNames.length)];
+		super(shpName);
 
 		modelAssets = assets;
-		pivot = new Vector3D();	// point ship rotates about
 		posn = new Vector3D();
 		vel = new Vector3D();
 		facing = new Vector3D(0,0,1);	// default facing
 		rotVel = new Vector3D();
 
-		skin = new Mesh();
-		chassisSkin = new Mesh();
-		chassisSkin.material.setSpecular(1);
 		modulesSkin = new Mesh();
 		modulesSkin.material.setSpecular(0.2);
-		skin.addChild(chassisSkin);
 		skin.addChild(modulesSkin);
-
-		if (Adj==null)
-		Adj = new <Vector3D>[new Vector3D(0,0,-1),	// front
-								 new Vector3D(1,0,0),	// right
-								 new Vector3D(0,0,1),	// back
-								 new Vector3D(-1,0,0),	// left
-								 new Vector3D(0,-1,0),	// bottom
-								 new Vector3D(0,1,0)];	// top
 
 		hullConfig = new Vector.<HullBlock>();
 		modulesConfig = new Vector.<Module>();
@@ -3521,7 +4121,7 @@ class Ship
 		addModule(0, 1,-1,new Vector3D(0,0,-1),"thrusterS");		// thruster
 		addModule(0, 0,-1,new Vector3D(0,0,-1),"thrusterS");		// thruster
 
-		updateHull();				// update hull look from config infos
+		rebuildShip();				// update hull look from config infos
 	}//endfunction
 
 	//===============================================================================================
@@ -3534,7 +4134,7 @@ class Ship
 		s.randomHullConfig(hullCnt);
 		s.randomThrustersConfig(thrustersCnt);
 		s.randomModulesConfig();
-		s.updateHull();
+		s.rebuildShip();
 		return s;
 	}//endfunction
 
@@ -3543,8 +4143,14 @@ class Ship
 	//===============================================================================================
 	public static function createShipFromConfigStr(assets:Object,config:String):Ship
 	{
-		var s:Ship = new Ship(assets);
-		s.setFromConfig(config);
+		try {
+			var s:Ship = new Ship(assets);
+			s.setFromConfig(config);
+		}
+		catch (e:Error)
+		{
+			s = new Ship(assets);
+		}
 		return s;
 	}//endfunction
 
@@ -3571,9 +4177,9 @@ class Ship
 	}//endfunction
 
 	//===============================================================================================
-	//
+	// creates a ship instance from given config string
 	//===============================================================================================
-	public function setFromConfig(config:String):void
+	public override function setFromConfig(config:String):void
 	{
 		var A:Array = config.split("&");
 		name = A[0];
@@ -3591,7 +4197,7 @@ class Ship
 			addModule(parseFloat(M[i]),parseFloat(M[i+1]),parseFloat(M[i+2]),		// position
 								new Vector3D(parseFloat(M[i+3]),parseFloat(M[i+4]),parseFloat(M[i+5])),		// orientation
 								M[i+6]);		// moduleType
-		updateHull();
+		rebuildShip();
 	}//endfunction
 
 	//===============================================================================================
@@ -3644,21 +4250,6 @@ class Ship
 		banking += -rotVel.y*0.5;
 		skin.transform = new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z).rotZ(banking).rotFromTo(0,0,1,facing.x,facing.y,facing.z).translate(posn.x,posn.y,posn.z);
 		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
-	}//endfunction
-
-	//===============================================================================================
-	// updates hullblocks extPosns property to current world position
-	//===============================================================================================
-	public function updateHullBlocksWorldPosns():void
-	{
-    var t:Matrix4x4 = skin.transform;
-		for (var j:int=hullConfig.length-1; j>-1; j--)
-		{
-			var hb:HullBlock = hullConfig[j];
-			hb.extPosn.x = hb.x*t.aa+hb.y*t.ab+hb.z*t.ac+t.ad;
-			hb.extPosn.y = hb.x*t.ba+hb.y*t.bb+hb.z*t.bc+t.bd;
-			hb.extPosn.z = hb.x*t.ca+hb.y*t.cb+hb.z*t.cc+t.cd;
-		}
 	}//endfunction
 
 	//===============================================================================================
@@ -3797,95 +4388,14 @@ class Ship
 	}//endfunction
 
 	//===============================================================================================
-	// randomly generates a hull shape
-	//===============================================================================================
-	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
-	{
-		if (n==0) return;
-		hullConfig = new Vector.<HullBlock>();
-		hullConfig.push(new HullBlock(0,0,0,this));
-		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
-														new Vector3D(0,1,0),new Vector3D(0,-1,0),
-														new Vector3D(1,0,0),new Vector3D(-1,0,0)]);
-		for (var i:int=1; i<n; i++)
-		{
-			do {
-				var dir:Vector3D = Adj[int(Adj.length*Math.random())];
-				var hull:HullBlock = hullConfig[int(hullConfig.length*Math.random())];
-			} while (hullIdx(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z)!=-1);
-			hullConfig.push(new HullBlock(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z,this));
-			if (symmetry && hullIdx(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z)==-1)
-			{
-				hullConfig.push(new HullBlock(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z,this));
-				i++;
-			}
-		}//endfor
-	}//endfunction
-
-	//===============================================================================================
-	// extends ship chassis adding new block at position
-	//===============================================================================================
-	public function extendChassis(px:int,py:int,pz:int) : Boolean
-	{
-		if (adjacentToHull(px,py,pz))
-		{
-			hullConfig.push(new HullBlock(px, py, pz,this));
-			return true;
-		}
-		return false;
-	}//endfunction
-
-	//===============================================================================================
-	// trims ship chassis removing block at position
-	//===============================================================================================
-	public function trimChassis(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullConfig.length<=1)	return false;
-
-		if (adjacentToSpace(px,py,pz))	// posn in hull and next to skin surface
-		{
-			var idx:int = hullIdx(px,py,pz);
-			var h:HullBlock = hullConfig[idx];
-			hullConfig.splice(idx,1);
-			if (isOnePiece())
-			{
-				if (h.module!=null && modulesConfig.indexOf(h.module as Module)!=-1)
-					modulesConfig.splice(modulesConfig.indexOf(h.module as Module), 1);
-				return true;
-			}
-			else
-			{
-				hullConfig.push(h);
-				return false;
-			}
-		}
-
-		return false;
-	}//endfunction
-
-	//===============================================================================================
 	// creates the chassis mesh geometry from hullConfig info
 	//===============================================================================================
-	public function updateHull() : void
+	public function rebuildShip() : void
 	{
 		if (modelAssets==null) return;
 
 		// ----- update chassis skin
-		pivot = new Vector3D();
-		var tmp:Mesh = new Mesh();
-		for (var i:int=hullConfig.length-1; i>=0; i--)
-		{
-			var h:HullBlock = hullConfig[i];
-			tmp.addChild(createChassisPart(h.x,h.y,h.z));
-			pivot.x+=h.x;
-			pivot.y+=h.y;
-			pivot.z+=h.z;
-		}
-
-		tmp = tmp.mergeTree();
-		chassisSkin.setGeometry(tmp.vertData,tmp.idxsData);
-		pivot.scaleBy(1/hullConfig.length);
-		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+		super.rebuildHull();
 
 		maxIntegrity = hullConfig.length*100;
 		integrity = hullConfig.length*100;
@@ -3894,8 +4404,8 @@ class Ship
 
 		// ----- update chassis mounts
 		var thrustCnt:int = 0;
-		tmp = new Mesh();
-		for (i=modulesConfig.length-1; i>=0; i--)
+		var tmp:Mesh = new Mesh();
+		for (var i:int=modulesConfig.length-1; i>=0; i--)
 		{
 			var m:Module = modulesConfig[i];
 			var mt:Mesh = null;
@@ -3922,114 +4432,6 @@ class Ship
 	}//endfunction
 
 	//===============================================================================================
-	// returns if hull position is adjacent to empty space
-	//===============================================================================================
-	public function adjacentToSpace(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullIdx(px,py,pz)==-1)	return false;	// chk if not in hull
-
-		for (var i:int=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)==-1)
-				return true;
-
-		return false;
-	}//endfunctioh
-
-	//===============================================================================================
-	// returns if empty space position is adjacent to current hull configuration
-	//===============================================================================================
-	public function adjacentToHull(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullIdx(px,py,pz)!=-1)	return false;	// chk if in hull
-
-		for (var i:int=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
-				return true;
-
-		return false;
-	}//endfunction
-
-	//===============================================================================================
-	// returns index of hullBlock occupying position, useful to check if position is within ship hull
-	//===============================================================================================
-	private function hullIdx(px:int,py:int,pz:int) : int
-	{
-		for (var i:int=hullConfig.length-1; i>=0; i--)
-		{
-			var h:HullBlock = hullConfig[i];
-			if (h.x==px && h.y==py && h.z==pz)
-				return i;
-		}
-
-		return -1;
-	}//endfunction
-
-	//===============================================================================================
-	// returns the necessary face extensions to form the hull skin only
-	//===============================================================================================
-	private function createChassisPart(px:int,py:int,pz:int) : Mesh
-	{
-		var i:int=0;
-
-		// vertices
-		var V:Vector.<Number> = new <Number>[-0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5,
-												 -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
-												 -0.5,0,0,  0.5,0,0,	// 8left 9right
-												 0,0.5,0,  0,-0.5,0,	// 10up 11down
-												 0,0,-0.5,  0,0,0.5];	// 12front 13back
-		// tri indices
-		var I:Vector.<uint> = new <uint>[0,3,12, 3,2,12, 2,1,12, 1,0,12, 	// front 0,3,2,1
-											 1,2,9, 2,6,9, 6,5,9, 5,1,9,			// right 1,2,6,5
-											 5,6,13, 6,7,13, 7,4,13, 4,5,13,	// back 5,6,7,4
-											 4,7,8, 7,3,8, 3,0,8, 0,4,8,			// left 4,7,3,0
-											 4,0,11, 0,1,11, 1,5,11, 5,4,11,	// bottom  4,0,1,5
-											 3,7,10, 7,6,10, 6,2,10, 2,3,10];	// top  3,7,6,2
-
-		// determine which face to delete
-		for (i=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
-				I.splice(i*12,12);
-
-		// shrink vertice inwards if not connected to adj hull plate
-		for (var v:int=0; v<8; v++)	// for all corner points
-		{
-			var fcnt:int=0;		// if not connected, corner point must have 6 tri faces using it
-			for (i=I.length-1; i>-1; i--)
-				if (I[i]==v)
-					fcnt++;
-
-			if (fcnt==6)
-			{
-				V[v*3+0]*=0.78;
-				V[v*3+1]*=0.78;
-				V[v*3+2]*=0.78;
-			}
-		}
-
-		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
-													0,1, 1,1, 0.5,0.5,
-													1,1, 1,0, 0.5,0.5,
-													1,0, 0,0, 0.5,0.5];	// UV coords
-		var ul:uint=U.length;
-		var VData:Vector.<Number> = new Vector.<Number>();
-		for (i=0; i<I.length; i+=3)
-		VData.push(	V[I[i+0]*3+0],V[I[i+0]*3+1],V[I[i+0]*3+2],	// vertex a
-					0,0,0,	// normal a
-					U[i*2%ul+0],U[i*2%ul+1],
-					V[I[i+1]*3+0],V[I[i+1]*3+1],V[I[i+1]*3+2],	// vertex b
-					0,0,0,	// normal b
-					U[i*2%ul+2],U[i*2%ul+3],
-					V[I[i+2]*3+0],V[I[i+2]*3+1],V[I[i+2]*3+2],	// vertex c
-					0,0,0,	// normal c
-					U[i*2%ul+4],U[i*2%ul+5]);
-
-		var m:Mesh = new Mesh();
-		m.createGeometry(VData);
-		m.transform = new Matrix4x4().translate(px,py,pz);
-		return m;
-	}//endfunction
-
-	//===============================================================================================
 	// returns the free hullBlocks to be occupied by module of given size
 	//===============================================================================================
 	public function freeHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
@@ -4039,24 +4441,6 @@ class Ship
 			if (HB[i].module!=null)
 				HB.splice(i,1);
 		return HB;
-	}//endfunction
-
-	//===============================================================================================
-	// returns the free hullBlocks to be occupied by module of given size
-	//===============================================================================================
-	public function getHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
-	{
-		if (size==0) 	size=1;
-		var V:Vector.<HullBlock> = new Vector.<HullBlock>();
-		var off:Number = (size-1)/2;
-		for (var x:int=0; x<size; x++)
-			for (var y:int=0; y<size; y++)
-				for (var z:int=0; z<size; z++)
-				{
-					var idx:int = hullIdx(Math.round(px+ x-off),Math.round(py+ y-off),Math.round(pz+ z-off));
-					if (idx!=-1) V.push(hullConfig[idx]);
-				}
-		return V;
 	}//endfunction
 
 	//===============================================================================================
@@ -4092,553 +4476,19 @@ class Ship
 	}//endfunction
 
 	//===============================================================================================
-	// checks if there are disjointed hull pieces
-	//===============================================================================================
-	public function isOnePiece() : Boolean
-	{
-		if (hullConfig==null || hullConfig.length==0)	return false;
-
-		var i:int=0;
-
-		hullConfig[0].walked = true;
-		var CA:Vector.<HullBlock> = Vector.<HullBlock>([hullConfig[0]]);
-
-		while (CA.length>0)
-		{
-			var b:HullBlock = CA.shift();
-			for (i=Adj.length-1; i>=0; i--)
-			{
-				var idx:int = hullIdx(b.x+Adj[i].x,b.y+Adj[i].y,b.z+Adj[i].z);
-				if (idx!=-1 && !hullConfig[idx].walked)
-				{
-					hullConfig[idx].walked = true;
-					CA.push(hullConfig[idx]);
-				}
-			}//endfor
-		}//endwhile
-
-		var onePiece:Boolean = true;
-		for (i=hullConfig.length-1; i>=0; i--)
-		{
-			if (!hullConfig[i].walked) onePiece=false;
-			hullConfig[i].walked=false;
-		}//endfor
-
-		return onePiece;
-	}//endfunction
-
-	//===============================================================================================
 	// to represent this ship config as a string
 	//===============================================================================================
-	public function toString():String
+	public override function toString():String
 	{
-		var s:String = name+"&";
-		for (var i:int=0; i<hullConfig.length; i++)
-			s+= Math.round(hullConfig[i].x)+","+Math.round(hullConfig[i].y)+","+Math.round(hullConfig[i].z)+",";
+		var s:String = super.toString();
 
 		s = s.substr(0,s.length-1)+"&";
-		for (i=0; i<modulesConfig.length; i++)
+		for (var i:int=0; i<modulesConfig.length; i++)
 			s+=modulesConfig[i].toString()+",";
 
 		return s.substr(0,s.length-1);
 	}//endfunction
 }//endClass
-
-class Hull
-{
-	public var name:String = "";
-
-	public var hullConfig:Vector.<HullBlock> = null;	// hull shape configuration
-
-	public var skin:Mesh = null;
-	public var chassisSkin:Mesh = null;
-
-	public var maxIntegrity:Number = 1;
-	public var integrity:Number = 1;					// health of ship
-
-	public var pivot:Vector3D = null;					// point ship rotates about
-	public var radius:Number = 0;							// radius of ship
-
-	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
-
-	//===============================================================================================
-	// constructs a ship entity
-	//===============================================================================================
-	public function Hull(hullName:String=null):void
-	{
-		if (hullName!=null)
-			name = hullName;
-
-		pivot = new Vector3D();	// point ship rotates about
-
-		skin = new Mesh();
-		chassisSkin = new Mesh();
-		chassisSkin.material.setSpecular(1);
-		skin.addChild(chassisSkin);
-		skin.addChild(modulesSkin);
-
-		if (Adj==null)
-		Adj = new <Vector3D>[new Vector3D(0,0,-1),	// front
-								 new Vector3D(1,0,0),	// right
-								 new Vector3D(0,0,1),	// back
-								 new Vector3D(-1,0,0),	// left
-								 new Vector3D(0,-1,0),	// bottom
-								 new Vector3D(0,1,0)];	// top
-
-		hullConfig = new Vector.<HullBlock>();
-
-		// ----- initializes with default hull
-		hullConfig.push(new HullBlock(0,1,-1,this));
-		hullConfig.push(new HullBlock(0,-1,-1,this));
-		hullConfig.push(new HullBlock(0,0,-1,this));
-		hullConfig.push(new HullBlock(0,0,0,this));
-		hullConfig.push(new HullBlock(0,0,1,this));
-		hullConfig.push(new HullBlock(1,0,1,this));
-		hullConfig.push(new HullBlock(-1,0,1,this));
-
-		updateHull();				// update hull look from config infos
-	}//endfunction
-
-	//===============================================================================================
-	//
-	//===============================================================================================
-	public function setFromConfig(config:String):void
-	{
-		var H:Array = config.split(",");
-
-		// ----- replicate from hullConfig info
-		hullConfig = new Vector.<HullBlock>();
-		for (var i:int=0; i<H.length; i+=3)
-			hullConfig.push(new HullBlock(parseInt(H[i],10),parseInt(H[i+1],10),parseInt(H[i+2],10),this));
-
-		updateHull();
-	}//endfunction
-
-	//===============================================================================================
-	// updates hullblocks extPosns property to current world position
-	//===============================================================================================
-	public function updateHullBlocksWorldPosns():void
-	{
-		var t:Matrix4x4 = skin.transform;
-		for (var j:int=hullConfig.length-1; j>-1; j--)
-		{
-			var hb:HullBlock = hullConfig[j];
-			hb.extPosn.x = hb.x*t.aa+hb.y*t.ab+hb.z*t.ac+t.ad;
-			hb.extPosn.y = hb.x*t.ba+hb.y*t.bb+hb.z*t.bc+t.bd;
-			hb.extPosn.z = hb.x*t.ca+hb.y*t.cb+hb.z*t.cc+t.cd;
-		}
-	}//endfunction
-
-	//===============================================================================================
-	// randomly generates a hull shape
-	//===============================================================================================
-	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
-	{
-		if (n==0) return;
-		hullConfig = new Vector.<HullBlock>();
-		hullConfig.push(new HullBlock(0,0,0,this));
-		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
-														new Vector3D(0,1,0),new Vector3D(0,-1,0),
-														new Vector3D(1,0,0),new Vector3D(-1,0,0)]);
-		for (var i:int=1; i<n; i++)
-		{
-			do {
-				var dir:Vector3D = Adj[int(Adj.length*Math.random())];
-				var hull:HullBlock = hullConfig[int(hullConfig.length*Math.random())];
-			} while (hullIdx(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z)!=-1);
-			hullConfig.push(new HullBlock(hull.x+dir.x,hull.y+dir.y,hull.z+dir.z,this));
-			if (symmetry && hullIdx(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z)==-1)
-			{
-				hullConfig.push(new HullBlock(-hull.x-dir.x,hull.y+dir.y,hull.z+dir.z,this));
-				i++;
-			}
-		}//endfor
-	}//endfunction
-
-	//===============================================================================================
-	// extends ship chassis adding new block at position
-	//===============================================================================================
-	public function extendChassis(px:int,py:int,pz:int) : Boolean
-	{
-		if (adjacentToHull(px,py,pz))
-		{
-			hullConfig.push(new HullBlock(px, py, pz,this));
-			return true;
-		}
-		return false;
-	}//endfunction
-
-	//===============================================================================================
-	// trims ship chassis removing block at position
-	//===============================================================================================
-	public function trimChassis(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullConfig.length<=1)	return false;
-
-		if (adjacentToSpace(px,py,pz))	// posn in hull and next to skin surface
-		{
-			var idx:int = hullIdx(px,py,pz);
-			var h:HullBlock = hullConfig[idx];
-			hullConfig.splice(idx,1);
-			if (isOnePiece())
-			{
-				return true;
-			}
-			else
-			{
-				hullConfig.push(h);
-				return false;
-			}
-		}
-
-		return false;
-	}//endfunction
-
-	//===============================================================================================
-	// creates the chassis mesh geometry from hullConfig info
-	//===============================================================================================
-	public function updateHull() : void
-	{
-		// ----- update chassis skin
-		pivot = new Vector3D();
-		var tmp:Mesh = new Mesh();
-		for (var i:int=hullConfig.length-1; i>=0; i--)
-		{
-			var h:HullBlock = hullConfig[i];
-			tmp.addChild(createChassisPart(h.x,h.y,h.z));
-			pivot.x+=h.x;
-			pivot.y+=h.y;
-			pivot.z+=h.z;
-		}
-
-		tmp = tmp.mergeTree();
-		chassisSkin.setGeometry(tmp.vertData,tmp.idxsData);
-		pivot.scaleBy(1/hullConfig.length);
-		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
-	}//endfunction
-
-	//===============================================================================================
-	// returns if hull position is adjacent to empty space
-	//===============================================================================================
-	public function adjacentToSpace(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullIdx(px,py,pz)==-1)	return false;	// chk if not in hull
-
-		for (var i:int=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)==-1)
-				return true;
-
-		return false;
-	}//endfunctioh
-
-	//===============================================================================================
-	// returns if empty space position is adjacent to current hull configuration
-	//===============================================================================================
-	public function adjacentToHull(px:int,py:int,pz:int) : Boolean
-	{
-		if (hullIdx(px,py,pz)!=-1)	return false;	// chk if in hull
-
-		for (var i:int=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
-				return true;
-
-		return false;
-	}//endfunction
-
-	//===============================================================================================
-	// returns index of hullBlock occupying position, useful to check if position is within ship hull
-	//===============================================================================================
-	private function hullIdx(px:int,py:int,pz:int) : int
-	{
-		for (var i:int=hullConfig.length-1; i>=0; i--)
-		{
-			var h:HullBlock = hullConfig[i];
-			if (h.x==px && h.y==py && h.z==pz)
-				return i;
-		}
-
-		return -1;
-	}//endfunction
-
-	//===============================================================================================
-	// returns the necessary face extensions to form the hull skin only
-	//===============================================================================================
-	private function createChassisPart(px:int,py:int,pz:int) : Mesh
-	{
-		var i:int=0;
-
-		// vertices
-		var V:Vector.<Number> = new <Number>[-0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5,
-												 -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
-												 -0.5,0,0,  0.5,0,0,	// 8left 9right
-												 0,0.5,0,  0,-0.5,0,	// 10up 11down
-												 0,0,-0.5,  0,0,0.5];	// 12front 13back
-		// tri indices
-		var I:Vector.<uint> = new <uint>[0,3,12, 3,2,12, 2,1,12, 1,0,12, 	// front 0,3,2,1
-											 1,2,9, 2,6,9, 6,5,9, 5,1,9,			// right 1,2,6,5
-											 5,6,13, 6,7,13, 7,4,13, 4,5,13,	// back 5,6,7,4
-											 4,7,8, 7,3,8, 3,0,8, 0,4,8,			// left 4,7,3,0
-											 4,0,11, 0,1,11, 1,5,11, 5,4,11,	// bottom  4,0,1,5
-											 3,7,10, 7,6,10, 6,2,10, 2,3,10];	// top  3,7,6,2
-
-		// determine which face to delete
-		for (i=5; i>=0; i--)
-			if (hullIdx(px+Adj[i].x,py+Adj[i].y,pz+Adj[i].z)!=-1)
-				I.splice(i*12,12);
-
-		// shrink vertice inwards if not connected to adj hull plate
-		for (var v:int=0; v<8; v++)	// for all corner points
-		{
-			var fcnt:int=0;		// if not connected, corner point must have 6 tri faces using it
-			for (i=I.length-1; i>-1; i--)
-				if (I[i]==v)
-					fcnt++;
-
-			if (fcnt==6)
-			{
-				V[v*3+0]*=0.78;
-				V[v*3+1]*=0.78;
-				V[v*3+2]*=0.78;
-			}
-		}
-
-		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
-													0,1, 1,1, 0.5,0.5,
-													1,1, 1,0, 0.5,0.5,
-													1,0, 0,0, 0.5,0.5];	// UV coords
-		var ul:uint=U.length;
-		var VData:Vector.<Number> = new Vector.<Number>();
-		for (i=0; i<I.length; i+=3)
-		VData.push(	V[I[i+0]*3+0],V[I[i+0]*3+1],V[I[i+0]*3+2],	// vertex a
-					0,0,0,	// normal a
-					U[i*2%ul+0],U[i*2%ul+1],
-					V[I[i+1]*3+0],V[I[i+1]*3+1],V[I[i+1]*3+2],	// vertex b
-					0,0,0,	// normal b
-					U[i*2%ul+2],U[i*2%ul+3],
-					V[I[i+2]*3+0],V[I[i+2]*3+1],V[I[i+2]*3+2],	// vertex c
-					0,0,0,	// normal c
-					U[i*2%ul+4],U[i*2%ul+5]);
-
-		var m:Mesh = new Mesh();
-		m.createGeometry(VData);
-		m.transform = new Matrix4x4().translate(px,py,pz);
-		return m;
-	}//endfunction
-
-	//===============================================================================================
-	// returns the free hullBlocks to be occupied by module of given size
-	//===============================================================================================
-	public function getHullBlocks(px:Number,py:Number,pz:Number,size:uint=1) : Vector.<HullBlock>
-	{
-		if (size==0) 	size=1;
-		var V:Vector.<HullBlock> = new Vector.<HullBlock>();
-		var off:Number = (size-1)/2;
-		for (var x:int=0; x<size; x++)
-			for (var y:int=0; y<size; y++)
-				for (var z:int=0; z<size; z++)
-				{
-					var idx:int = hullIdx(Math.round(px+ x-off),Math.round(py+ y-off),Math.round(pz+ z-off));
-					if (idx!=-1) V.push(hullConfig[idx]);
-				}
-		return V;
-	}//endfunction
-
-	//===============================================================================================
-	// checks if there are disjointed hull pieces
-	//===============================================================================================
-	public function isOnePiece() : Boolean
-	{
-		if (hullConfig==null || hullConfig.length==0)	return false;
-
-		var i:int=0;
-
-		hullConfig[0].walked = true;
-		var CA:Vector.<HullBlock> = Vector.<HullBlock>([hullConfig[0]]);
-
-		while (CA.length>0)
-		{
-			var b:HullBlock = CA.shift();
-			for (i=Adj.length-1; i>=0; i--)
-			{
-				var idx:int = hullIdx(b.x+Adj[i].x,b.y+Adj[i].y,b.z+Adj[i].z);
-				if (idx!=-1 && !hullConfig[idx].walked)
-				{
-					hullConfig[idx].walked = true;
-					CA.push(hullConfig[idx]);
-				}
-			}//endfor
-		}//endwhile
-
-		var onePiece:Boolean = true;
-		for (i=hullConfig.length-1; i>=0; i--)
-		{
-			if (!hullConfig[i].walked) onePiece=false;
-			hullConfig[i].walked=false;
-		}//endfor
-
-		return onePiece;
-	}//endfunction
-
-	//===============================================================================================
-	// to represent this ship config as a string
-	//===============================================================================================
-	public function toString():String
-	{
-		var s:String = name+"&";
-		for (var i:int=0; i<hullConfig.length; i++)
-			s+= Math.round(hullConfig[i].x)+","+Math.round(hullConfig[i].y)+","+Math.round(hullConfig[i].z)+",";
-
-		return s.substr(0,s.length-1);
-	}//endfunction
-}//endClass
-
-class Module		// data class
-{
-	public var x:Number=0;	// center
-	public var y:Number=0;
-	public var z:Number=0;
-
-	public var nx:Number=0;	// orientation
-	public var ny:Number=0;
-	public var nz:Number=0;
-
-	public var type:String=null;	// type of weapon
-
-	public var bearing:Number=0;	// elevation of turret (local space)
-	public var elevation:Number=0;	// bearing of turret (local space)
-
-	public var ttf:int=0;			// time to fire
-	public var fireDelay:int=3;		// delay to next shot
-	public var range:Number=10;		// range of weapon
-	public var turnRate:Number=0.05;// rotation speed of turret
-	public var speed:Number=0.1;	//
-	public var damage:Number=1;		//
-	public var muzzleLen:Number=0.3;
-
-	/**
-	 *
-	 * @param	px
-	 * @param	py
-	 * @param	pz
-	 * @param	vx
-	 * @param	vy
-	 * @param	vz
-	 * @param	kind
-	 */
-	public function Module(px:Number=0,py:Number=0,pz:Number=0,vx:Number=0,vy:Number=0,vz:Number=-1,kind:String=""):void
-	{
-		x=px;
-		y=py;
-		z=pz;
-		nx=vx;
-		ny=vy;
-		nz=vz;
-		type=kind;
-
-		if (kind=="launcherS")
-		{
-			fireDelay=1000;
-			speed=0.15;		// only initial launch speed. missiles have accel
-			damage=50;
-			range=50;
-		}
-		else if (kind=="gunAutoS")
-		{
-			fireDelay=3;
-			speed=0.5;
-			damage=2;
-			range=7;
-			turnRate=0.1;
-			muzzleLen=0.26;
-		}
-		else if (kind=="gunFlakS")
-		{
-			fireDelay=50;
-			speed=0.15;
-			damage=20;
-			range=7;
-			muzzleLen=0.3;
-		}
-		else if (kind=="gunIonS")
-		{
-			fireDelay=40;
-			speed=0.15;
-			damage=20;
-			range=15;
-			muzzleLen=0.35;
-		}
-		else if (kind=="gunPlasmaS")
-		{
-			fireDelay=40;
-			speed=0.1;
-			damage=80;
-			range=10;
-			muzzleLen=0.35;
-		}
-		else if (kind=="gunRailS")
-		{
-			fireDelay=60;
-			speed=0.2;
-			damage=20;
-			range=20;
-			muzzleLen=0.37;
-		}
-		else if (kind=="gunIonM")
-		{
-			fireDelay=80;
-			speed=0.15;
-			damage=160;
-			turnRate = 0.01;
-			range=40;
-			muzzleLen=0.7;
-		}
-		else if (kind=="gunRailM")
-		{
-			fireDelay=100;
-			speed=0.4;
-			damage=320;
-			turnRate = 0.01;
-			range=40;
-			muzzleLen=0.7;
-		}
-		else if (kind=="gunPlasmaM")
-		{
-			fireDelay=100;
-			speed=0.2;
-			damage=400;
-			turnRate = 0.01;
-			range=20;
-			muzzleLen=0.7;
-		}
-	}//endconstr
-
-	public function toString():String
-	{
-			return 	Math.round(x*10)/10+","+Math.round(y*10)/10+","+Math.round(z*10)/10+","+
-							Math.round(nx*10)/10+","+Math.round(ny*10)/10+","+Math.round(nz*10)/10+","+type;
-	}//endfunction
-}//endclass
-
-class HullBlock		// data class
-{
-	public var x:int=0;
-	public var y:int=0;
-	public var z:int=0;
-
-	public var parent:Ship = null;			// used for projectile collision resolution
-	public var extPosn:Vector3D = null;	// used for calc turret aim
-	public var module:Module=null;			// module occupying this hullBlock
-	public var walked:Boolean = false;
-
-	public function HullBlock(px:int,py:int,pz:int,ship:Ship):void
-	{
-		x=px;
-		y=py;
-		z=pz;
-		parent=ship;
-		extPosn = new Vector3D(px,py,pz);
-	}//endconstr
-}//endclass
 
 class Projectile	// data class
 {
