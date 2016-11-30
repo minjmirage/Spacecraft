@@ -507,6 +507,11 @@
 				var shp:Ship = Ships.pop();
 				world.removeChild(shp.skin);
 			}
+			while (Asteroids.length>0)
+			{
+				var a:Asteroid = Asteroids.pop();
+				world.removeChild(a.skin);
+			}
 			while (Exploding.length>0)
 			{
 				var expl:Ship = Exploding.pop();
@@ -3989,7 +3994,7 @@ class Asteroid extends Hull
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
 		rotPosn.w = Math.sqrt(1-rotPosn.length*rotPosn.length);
 		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
-		rotVel.scaleBy(Math.random()*0.03/rotVel.length);
+		rotVel.scaleBy(Math.random()*0.01/rotVel.length);
 		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
 	}//endConstr
 
