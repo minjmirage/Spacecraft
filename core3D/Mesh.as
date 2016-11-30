@@ -529,7 +529,7 @@
 				}//endif
 			}//endfor
 
-			// ----- genertates tangents and sets geometry data to mesh -------
+			// ----- generates tangents and sets geometry data to mesh -------
 			setGeometry(calcTangentBasis(indicesData,verticesData),indicesData);
 			compressGeometry();
 		}//endfunction

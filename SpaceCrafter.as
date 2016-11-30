@@ -3965,7 +3965,7 @@ class Asteroid extends Hull
 		// ----- create random asteroid geometry
 		super(name);
 		randomHullConfig(size,false);
-		rebuildHull();
+		rebuildAsteroid();
 
 		// ----- set asteroid texture
 		for (var i:int=hullConfig.length-1; i>-1; i--)
@@ -3992,9 +3992,55 @@ class Asteroid extends Hull
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
 		rotPosn.w = Math.sqrt(1-rotPosn.length*rotPosn.length);
 		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
-		rotVel.scaleBy(Math.random()*0.01/rotVel.length);
+		rotVel.scaleBy(Math.random()*0.001/rotVel.length);
 		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
 	}//endConstr
+
+	//===============================================================================================
+	// build asteroid shape with smooth shading
+	//===============================================================================================
+	public function rebuildAsteroid():void
+	{
+		super.rebuildHull();
+		var Norms:Object = new Object();
+		var V:Vector.<Number> = hullSkin.vertData;
+		var n:int = V.length;
+		for (var i:int=0; i<n; i+=11)
+		{
+			var id:String = int(V[i+0]*100)+","+int(V[i+1]*100)+","+int(V[i+2]*100);
+			if (Norms[id]==null)
+				Norms[id] = new Vector3D(V[i+3],V[i+4],V[i+5],1);
+			else
+			{
+					var nv:Vector3D = Norms[id];
+					nv.x += V[i+3];
+					nv.y += V[i+4];
+					nv.z += V[i+5];
+					nv.w += 1;
+			}
+		}//endfor
+
+		for (id in Norms)
+		{
+			nv = Norms[id];
+			nv.scaleBy(1/nv.length);
+		}//endfor
+
+		for (var i:int=0; i<n; i+=11)
+		{
+			id = int(V[i+0]*100)+","+int(V[i+1]*100)+","+int(V[i+2]*100);
+			if (Norms[id]!=null)
+			{
+				nv = Norms[id];
+				V[i+0] += 0.5*nv.x/nv.w;
+				V[i+1] += 0.5*nv.y/nv.w;
+				V[i+2] += 0.5*nv.z/nv.w;
+				V[i+3] = nv.x;
+				V[i+4] = nv.y;
+				V[i+5] = nv.z;
+			}
+		}//endfor
+	}//endfunction
 
 	//===============================================================================================
 	// update position & orientation of asteroid
@@ -4044,7 +4090,7 @@ class Asteroid extends Hull
 		if (nh.integrity<=0)
 		{
 			trimHull(nh.x,nh.y,nh.z);
-			rebuildHull();
+			rebuildAsteroid();
 		}
 	}//endfunction
 }//endClass
