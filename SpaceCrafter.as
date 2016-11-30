@@ -2185,7 +2185,6 @@
 				for (var j:int=0; j<size; j++)
 					Mkrs.push(mmkr.clone());
 
-			world.addChild(mkr);
 			return function():void
 			{
 				var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
@@ -2193,8 +2192,6 @@
 
 				if (hit!=null)
 				{
-					mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
-
 					var shipInvT:Matrix4x4 = player.skin.transform.inverse();
 					var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx*size/2,hit.vy-hit.ny*size/2,hit.vz-hit.nz*size/2));
 					var localNorm:Vector3D = shipInvT.rotateVector(new Vector3D(hit.nx, hit.ny, hit.nz));
@@ -2228,7 +2225,6 @@
 				{
 					for (i=Mkrs.length-1; i>=0; i--)
 						world.removeChild(Mkrs[i]);
-					mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
 				}
 			}//endfunction
 		}//endfunction
@@ -3975,6 +3971,8 @@ class Asteroid extends Hull
 		for (var i:int=hullConfig.length-1; i>-1; i--)
 			hullConfig[i].integrity = 1000;
 		integrity = hullConfig.length*1000;
+		hullSkin.material.setAmbient(0,0,0);
+		hullSkin.material.setSpecular(1,1);
 		hullSkin.material.setTexMap(texMap);
 		hullSkin.material.setSpecMap(specMap);
 		hullSkin.material.setNormMap(normMap);
@@ -3984,8 +3982,8 @@ class Asteroid extends Hull
 		var v:Number = int(type/3)/3;
 		for (i=VD.length-11; i>-1; i-=11)
 		{	// modify uv to use correct area of texture
-			VD[i+9] = VD[i+9]/3 + u;
-			VD[i+10] = VD[i+10]/3 + v;
+			VD[i+9] = (VD[i+9]/3)*0.98 + u+0.01/3;
+			VD[i+10] = (VD[i+10]/3)*0.98 + v+0.01/3;
 		}
 
 		posn = new Vector3D(0,0,0);
