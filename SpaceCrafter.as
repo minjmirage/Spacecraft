@@ -20,13 +20,14 @@
 		private var Mtls:Object = null;
 
 		private var Projectiles:Vector.<Projectile> = null;
-		private var Asteroids:Vector.<Asteroid> = null;
-		private var Ships:Vector.<Ship> = null;
+		private var Entities:Vector.<Hull> = null;
 		private var Hostiles:Vector.<Ship> = null;
 		private var Friendlies:Vector.<Ship> = null;
 		private var Exploding:Vector.<Ship> = null;
 
-		private var player:Ship = null;
+		private var focusedEntity:Hull = null;
+		private var focusedShip:Ship = null;
+		private var shipHUD:Sprite = null;
 
 		private var frameS_MP:MeshParticles = null;		// small turret frames MeshParticles
 		private var frameM_MP:MeshParticles = null;		// medium turret frames MeshParticles
@@ -53,7 +54,6 @@
 
 		public var stepFns:Vector.<Function> = null;
 
-		private var shipHUD:Sprite = null;
 		private var undoStk:Vector.<String> = null;
 
 		private var viewStep:Function = focusPlayerShipViewStep;
@@ -341,8 +341,7 @@
 			gridMesh.material.setAmbient(1,1,1);
 
 			Projectiles = new Vector.<Projectile>();
-			Asteroids = new Vector.<Asteroid>();
-			Ships = new Vector.<Ship>();
+			Entities = new Vector.<Hull>();
 			Hostiles = new Vector.<Ship>();
 			Friendlies = new Vector.<Ship>();
 			Exploding = new Vector.<Ship>();
@@ -383,10 +382,35 @@
 		}//endfunction
 
 		//===============================================================================================
+		//
+		//===============================================================================================
+		private function focusOn(entity:Hull):void
+		{
+			focusedEntity = entity;
+
+			if (entity is Ship)
+				focusedShip = (Ship)(entity);
+			else
+				focusedShip = null;
+
+			if (shipHUD != null && shipHUD.parent != null)
+				shipHUD.parent.removeChild(shipHUD);
+			if (focusedShip!=null)
+			{
+				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
+				addChild(shipHUD);
+			}
+		}//endfunction
+
+		//===============================================================================================
 		// shows your Level, your ships, option to build/modify Resource Units
 		//===============================================================================================
 		private function homeBaseScene():void
 		{
+			if (sky!=null) world.removeChild(sky);
+			randScenery();
+			randAsteroids(10+Math.floor(Math.random()*10));
+
 			// ----- load user ships
 			var shipDat:String = loadShipsData();
 			if (shipDat!=null)
@@ -394,24 +418,14 @@
 				var shipStrs:Array = shipDat.split(";");
 				if (shipStrs.length>0)
 					for (var i:int=shipStrs.length-1; i>-1; i--)
-						player = addShipToScene(true,shipStrs[i]);		// adds user configured ship to scene
+						addShipToScene(true,0,shipStrs[i]);		// adds user configured ship to scene
 			}
 			else
 			{
-				player = addShipToScene(true);			// creates a new random ship for user
+				addShipToScene(true,0);			// creates a new random ship for user
 				saveShipsData(Friendlies);
 			}
-
-			if (sky!=null) world.removeChild(sky);
-			randScenery();
-			randAsteroids(Math.floor(Math.random()*20));
-
-			// ----- auto generate and show ship HUD if not exist
-			if (shipHUD==null && player!=null)
-			{
-				shipHUD = MenuUI.createShipHUD(player, stage);
-				addChild(shipHUD);
-			}
+			focusOn(Friendlies[0]);
 
 			showMainMenu();
 		}//endfunction
@@ -445,7 +459,8 @@
 				{
 					if (gameTime%100==0)
 					{
-						addShipToScene(true,Conf.pop());		// friendly
+						addShipToScene(true,0,Conf.pop());		// friendly
+						focusOn(Friendlies[0]);
 					}
 				}
 				else
@@ -456,16 +471,6 @@
 			var battleTime:int = 0;
 			var battleStep:Function = function():void
 			{
-				// ----- auto select player
-				if (player == null || Ships.indexOf(player) == -1)
-				{
-					// ----- remove previous HUD
-					if (shipHUD != null && shipHUD.parent != null)
-						shipHUD.parent.removeChild(shipHUD);
-					shipHUD = null;
-					if (Friendlies.length > 0)
-						player = Friendlies[0];
-				}
 				if (shipHUD!=null)
 					menu.y = shipHUD.getChildAt(0).height;
 
@@ -501,16 +506,11 @@
 			world.removeChild(sky);
 
 			// ----- remove all ships and HUD
-			player = null;
-			while (Ships.length>0)
+			focusOn(null);
+			while (Entities.length>0)
 			{
-				var shp:Ship = Ships.pop();
-				world.removeChild(shp.skin);
-			}
-			while (Asteroids.length>0)
-			{
-				var a:Asteroid = Asteroids.pop();
-				world.removeChild(a.skin);
+				var entity:Hull = Entities.pop();
+				world.removeChild(entity.skin);
 			}
 			while (Exploding.length>0)
 			{
@@ -520,9 +520,6 @@
 			while (Friendlies.length>0)	Friendlies.pop();
 			while (Hostiles.length>0)		Hostiles.pop();
 			while (Projectiles.length>0)	Projectiles.pop();
-			if (shipHUD!=null && shipHUD.parent!=null)
-				shipHUD.parent.removeChild(shipHUD);
-			shipHUD=null;
 
 			var oldViewStep:Function = viewStep;
 
@@ -742,7 +739,7 @@
 			{
 				var a:Asteroid = new Asteroid("a"+i,Math.floor(Math.random()*9),1+Math.floor(Math.random()*15),Mtls["TexRocks"],Mtls["SpecRocks"],Mtls["NormRocks"]);
 				a.posn = new Vector3D((Math.random()-0.5)*100,0,(Math.random()-0.5)*100);
-				Asteroids.push(a);
+				Entities.push(a);
 				world.addChild(a.skin);
 			}
 		}//endfunction
@@ -876,15 +873,15 @@
 				// ----- simulate ships
 				var time:uint = getTimer();
 				shipsStep();
-				debugTxt += "Ships:"+Ships.length+" Projectiles:"+Projectiles.length+" shipsT:"+(getTimer()-time);
+				debugTxt += "Entities:"+Entities.length+" Projectiles:"+Projectiles.length+" shipsT:"+(getTimer()-time);
 				time=getTimer();
 				var turretsCnt:int = 0;
-				for (i=Ships.length-1; i>-1; i--)
-					turretsCnt+=simulateShipTurrets(Ships[i],Ships[i].engageEnemy);
+				for (i=Entities.length-1; i>-1; i--)
+					if (Entities[i] is Ship)
+						turretsCnt+=simulateShipTurrets((Ship)(Entities[i]),(Ship)(Entities[i]).engageEnemy);
 				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
 				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
 				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
-				asteroidsStep();
 
 				// ----- update mesh particles
 				var frameSShown:int = frameS_MP.update();
@@ -963,33 +960,23 @@
 				if (upPt.endT - upPt.startT<300)
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
-					for (var i:int=Ships.length-1; i>-1; i--)
-						if (Ships[i]!=player && Ships[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
+					for (var i:int=Entities.length-1; i>-1; i--)
+						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform)!=null)
 						{
-							player = Ships[i];
-							if (shipHUD != null && shipHUD.parent != null)
-								shipHUD.parent.removeChild(shipHUD);
-							shipHUD = null;
-							velDBER.x = (player.radius*3-lookDBER.x)*(1-0.9);
+							focusOn(Entities[i]);
+							velDBER.x = (focusedEntity.radius*3-lookDBER.x)*(1-0.9);
 						}
 				}
 			}//
 
-			if (player!=null && lookDBER.x>player.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
-
-			// ----- auto generate and show ship HUD if not exist
-			if (shipHUD==null && player!=null)
-			{
-				shipHUD = MenuUI.createShipHUD(player, stage);
-				addChild(shipHUD);
-			}
+			if (focusedEntity!=null && lookDBER.x>focusedEntity.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
 
 			// ----- calculate cam lookPt easing
-			if (player!=null)
+			if (focusedEntity!=null)
 			{
-				lookVel = player.posn.subtract(lookPt);
+				lookVel = focusedEntity.posn.subtract(lookPt);
 				lookVel.scaleBy(1-0.9);
-				lookDBER.x = Math.max(player.radius*1.1, lookDBER.x);
+				lookDBER.x = Math.max(focusedEntity.radius*1.1, lookDBER.x);
 			}
 		}//endfunction
 
@@ -999,16 +986,16 @@
 		private function tacticalViewStep():void
 		{
 			// ----- enable ship selection on mouse click
-			var selected:Ship = null;
+			var selected:Hull = null;
 			if (Input.upPts.length>0)
 			{
 				var upPt:InputPt=Input.upPts[0];
 				if (upPt.endT-upPt.startT<300)
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
-					for (var i:int=Ships.length-1; i>-1; i--)
-						if (Ships[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Ships[i].skin.transform)!=null)
-							selected = Ships[i];
+					for (var i:int=Entities.length-1; i>-1; i--)
+						if (Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform)!=null)
+							selected = Entities[i];
 				}
 			}
 
@@ -1021,7 +1008,7 @@
 
 			if (selected!=null)
 			{
-				player = selected;
+				focusedEntity = selected;
 				toggleView();
 			}
 			else if (Input.zoomF<1)
@@ -1050,15 +1037,12 @@
 			{
 				world.addChild(gridMesh);
 				prevLookDBER = lookDBER;
-				if (shipHUD!=null && shipHUD.parent!=null)
-					shipHUD.parent.removeChild(shipHUD);
-				shipHUD = null;
 
 				// ----- ease to mean position of ships
 				var meanPt:Vector3D = new Vector3D();
-				for (var i:int=Ships.length-1; i>-1; i--)
-					meanPt = meanPt.add(Ships[i].posn);
-				meanPt.scaleBy(1/Ships.length);
+				for (var i:int=Entities.length-1; i>-1; i--)
+					meanPt = meanPt.add(Entities[i].posn);
+				meanPt.scaleBy(1/Entities.length);
 				lookVel = meanPt.subtract(lookPt);
 				lookVel.scaleBy(1-0.9);
 				viewStep = tacticalViewStep;
@@ -1067,7 +1051,7 @@
 			{	// restore prev view
 				world.removeChild(gridMesh);
 				viewStep = focusPlayerShipViewStep;
-				if (player!=null) prevLookDBER.x = player.radius*3;	// hack to dist cam from ship
+				if (focusedEntity!=null) prevLookDBER.x = focusedEntity.radius*3;	// hack to dist cam from ship
 				velDBER = prevLookDBER.subtract(lookDBER);
 				velDBER.scaleBy(1-0.9);
 			}
@@ -1087,9 +1071,9 @@
 				if (p.targ is HullBlock)
 				{
 					// ----- chk hit ship hull
-					for (var j:int=Ships.length-1; j>-1; j--)
+					for (var j:int=Entities.length-1; j>-1; j--)
 					{
-						var s:Ship = Ships[j];
+						var s:Hull = Entities[j];
 						var dx:Number = s.posn.x-p.px;
 						var dy:Number = s.posn.y-p.py;
 						var dz:Number = s.posn.z-p.pz;
@@ -1109,8 +1093,7 @@
 								playSound(p.px,p.py,p.pz,"hit");
 								if (p.targ.parent==s)	// if is target
 								{
-									s.integrity -= p.integrity;	// ship to take damage
-									s.registerDamagePosn(hitPt,p.integrity);
+									s.registerHit(hitPt,p.integrity);
 								}
 								p.integrity = 0;
 							}
@@ -1495,75 +1478,76 @@
 		//===============================================================================================
 		// updates turrets status, rotates/displays turrets and frames
 		//===============================================================================================
-		private function asteroidsStep() : void
+		private function shipsStep() : void
 		{
-			for (var i:int=Asteroids.length-1; i>=0; i--)
+			// ----- simulate ships movement and  ----------------------
+			for (var i:int=Entities.length-1; i>=0; i--)
 			{
-				var a:Asteroid = Asteroids[i];
-				if (a.integrity<=0)
+				var entity:Hull = Entities[i];
+				if (entity.integrity<=0)
 				{
-					Asteroids.splice(i,1);
-					world.removeChild(a.skin);
+					if (entity is Ship)
+						destroyShip((Ship)(entity));
+					else
+						Entities.splice(i,1);
 				}
 				else
-					a.updateStep();
-			}//
+				{
+					if (entity is Ship && (Ship)(entity).stepFn!=null) (Ship)(entity).stepFn();
+					entity.updateStep();
+					if (entity is Ship)
+					{
+						doShipDamageFx((Ship)(entity));
+						doShipSeparation((Ship)(entity));
+					}
+				}//
+			}
 		}//endfunction
 
 		//===============================================================================================
-		// updates turrets status, rotates/displays turrets and frames
+		// ----- do damage FX --------------------------
 		//===============================================================================================
-		private function shipsStep() : void
+		[Inline]
+		private final function doShipDamageFx(ship:Ship):void
 		{
-			var i:int=0;
-			var j:int=0;
-
-			// ----- simulate ships movement and turrets ----------------------
-			for (i=Ships.length-1; i>=0; i--)
+			var T:Matrix4x4 = ship.skin.transform;
+			for (var j:int=ship.damagePosns.length-1; j>-1; j--)
 			{
-				var ship:Ship = Ships[i];
-				if (ship.integrity<=0)
-					destroyShip(ship);
-				else
+				var pt:VertexData = ship.damagePosns[j];
+				pt.u-=pt.w;
+				if (pt.u<=0)
 				{
-					if (ship.stepFn!=null) ship.stepFn();
-
-					ship.updateStep();
-
-					ship.energy += ship.hullConfig.length/10;
-					if (ship.energy>ship.maxEnergy) ship.energy = ship.maxEnergy;
-
-					// ----- do damage FX --------------------------
-					var T:Matrix4x4 = ship.skin.transform;
-					for (j=ship.damagePosns.length-1; j>-1; j--)
+					var px:Number = T.aa*pt.vx + T.ab*pt.vy + T.ac*pt.vz + T.ad;
+					var py:Number = T.ba*pt.vx + T.bb*pt.vy + T.bc*pt.vz + T.bd;
+					var pz:Number = T.ca*pt.vx + T.cb*pt.vy + T.cc*pt.vz + T.cd;
+					var nx:Number = T.aa*pt.nx + T.ab*pt.ny + T.ac*pt.nz;
+					var ny:Number = T.ba*pt.nx + T.bb*pt.ny + T.bc*pt.nz;
+					var nz:Number = T.ca*pt.nx + T.cb*pt.ny + T.cc*pt.nz;
+					var cnt:int = Math.floor(-pt.u/50)+1;
+					if (posnIsOnScreen(px,py,pz))
 					{
-						var pt:VertexData = ship.damagePosns[j];
-						pt.u-=pt.w;
-						if (pt.u<=0)
-						{
-							var px:Number = T.aa*pt.vx + T.ab*pt.vy + T.ac*pt.vz + T.ad;
-							var py:Number = T.ba*pt.vx + T.bb*pt.vy + T.bc*pt.vz + T.bd;
-							var pz:Number = T.ca*pt.vx + T.cb*pt.vy + T.cc*pt.vz + T.cd;
-							var nx:Number = T.aa*pt.nx + T.ab*pt.ny + T.ac*pt.nz;
-							var ny:Number = T.ba*pt.nx + T.bb*pt.ny + T.bc*pt.nz;
-							var nz:Number = T.ca*pt.nx + T.cb*pt.ny + T.cc*pt.nz;
-							var cnt:int = Math.floor(-pt.u/50)+1;
-							if (posnIsOnScreen(px,py,pz))
-							{
-								var mag:Number = 0.02*Math.sqrt(pt.w);
-								(ParticlesEmitter)(EffectEMs["blast"]).emit(px+nx*0.01,py+ny*0.01,pz+nz*0.01,ship.vel.x,ship.vel.y,ship.vel.z,mag);
-								mag +=0.06;
-								(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.5,1);
-							}
-							pt.u=50;
-						}
+						var mag:Number = 0.02*Math.sqrt(pt.w);
+						(ParticlesEmitter)(EffectEMs["blast"]).emit(px+nx*0.01,py+ny*0.01,pz+nz*0.01,ship.vel.x,ship.vel.y,ship.vel.z,mag);
+						mag +=0.06;
+						(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.5,1);
 					}
-				}//endfor i
+					pt.u=50;
+				}
+			}
+		}//endfunction
 
-				// ----- ensure separation between ships ----------------------
-				for (j=i-1; j>=0; j--)
+		//===============================================================================================
+		//
+		//===============================================================================================
+		[Inline]
+		private final function doShipSeparation(ship:Ship):void
+		{
+			// ----- ensure separation between ships ----------------------
+			for (var j:int=Entities.length-1; j>=0; j--)
+			{
+				var other:Hull = Entities[j];
+				if (other!=ship)
 				{
-					var other:Ship = Ships[j];
 					var dx:Number = other.posn.x - ship.posn.x;
 					var dy:Number = other.posn.y - ship.posn.y;
 					var dz:Number = other.posn.z - ship.posn.z;
@@ -1574,12 +1558,9 @@
 						ship.vel.x -= dx*_dl*ship.accelF;	// move ship away
 						ship.vel.y -= dy*_dl*ship.accelF;
 						ship.vel.z -= dz*_dl*ship.accelF;
-						other.vel.x += dx*_dl*other.accelF;	// move ship away
-						other.vel.y += dy*_dl*other.accelF;
-						other.vel.z += dz*_dl*other.accelF;
 					}//endif
-				}//endfor
-			}//
+				}
+			}//endfor
 		}//endfunction
 
 		//===============================================================================================
@@ -1641,7 +1622,7 @@
 			ship.vel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
 			ship.vel.scaleBy(0.01/ship.vel.length);
 			Exploding.push(ship);
-			if (Ships.indexOf(ship)!=-1) 		Ships.splice(Ships.indexOf(ship),1);
+			if (Entities.indexOf(ship)!=-1) 		Entities.splice(Entities.indexOf(ship),1);
 			if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
 			if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
 			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"hullGroan"+(1+Math.round(Math.random())));
@@ -1650,7 +1631,7 @@
 		//===============================================================================================
 		// creates and adds a random ship to world
 		//===============================================================================================
-		private function addShipToScene(friendly:Boolean,config:String=null) : Ship
+		private function addShipToScene(friendly:Boolean,dist:Number=30,config:String=null) : Ship
 		{
 			var ship:Ship = null;
 			if (config!=null)
@@ -1660,7 +1641,7 @@
 			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
 			var ang:Number = Math.random()*Math.PI*2;
 			world.addChild(ship.skin);
-			Ships.push(ship);
+			Entities.push(ship);
 			if (friendly)
 			{
 				ship.hullSkin.material.setTexMap(Mtls["TexPanel"]);
@@ -1676,7 +1657,7 @@
 				ship.targets = Friendlies;
 			}
 			ship.hullSkin.material.setSpecular(2);
-			jumpIn(ship,Math.sin(ang)*30,Math.cos(ang)*30,ang+Math.PI,function():void {setDumbAI(ship);});
+			jumpIn(ship,Math.sin(ang)*dist,Math.cos(ang)*dist,ang+Math.PI,function():void {setDumbAI(ship);});
 			return ship;
 		}//endfunction
 
@@ -1743,7 +1724,7 @@
 					(ParticlesEmitter)(EffectEMs["hyperspace"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*3/100);
 					playSound(ship.posn.x,ship.posn.y,ship.posn.z,"jumpIn");
 					world.removeChild(ship.skin);
-					if (Ships.indexOf(ship)!=-1) 		Ships.splice(Ships.indexOf(ship),1);
+					if (Entities.indexOf(ship)!=-1) 		Entities.splice(Entities.indexOf(ship),1);
 					if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
 					if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
 					if (callBack!=null) callBack();
@@ -1874,7 +1855,7 @@
 			if (shipHUD!=null)
 			{
 				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = player.name+" : Home Base";
+				shipHUD.getChildAt(0).name = focusedShip.name+" : Home Base";
 			}
 		}//endfunction
 
@@ -1922,7 +1903,7 @@
 			if (shipHUD!=null)
 			{
 				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = player.name+" : Outfit StarShip";
+				shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit StarShip";
 			}
 		}//endfunction
 
@@ -1931,8 +1912,8 @@
 		//===============================================================================================
 		private function showShipEditMenu(title:String,editStepFn:Function,callBack:Function):void
 		{
-			if (player!=null)
-				velDBER.x = (player.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
+			if (focusedShip!=null)
+				velDBER.x = (focusedShip.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
 
 			var tickBmd:BitmapData = new icoTick().bitmapData;
 			var crossBmd:BitmapData = new icoCross().bitmapData;
@@ -1954,7 +1935,7 @@
 				stepFns.push(editStepFn);		// add edit interraction
 
 				if (shipHUD!=null)
-					shipHUD.getChildAt(0).name = player.name+" : "+title;
+					shipHUD.getChildAt(0).name = focusedShip.name+" : "+title;
 
 				var menu:Sprite =
 				MenuUI.createSimpleEditModeMenu(mainRef,tickBmd,crossBmd,undoBmd,
@@ -1985,7 +1966,7 @@
 							{
 								if (yes)
 								{
-									player.setFromConfig(undoStk.shift());	// restore original config
+									focusedShip.setFromConfig(undoStk.shift());	// restore original config
 									callBack();
 								}
 								else
@@ -1998,7 +1979,7 @@
 				function():void		// undo function
 				{
 					if (undoStk.length>0)
-						player.setFromConfig(undoStk.pop());	// restore last config
+						focusedShip.setFromConfig(undoStk.pop());	// restore last config
 				},
 				showBtns);
 				if (shipHUD!=null)
@@ -2088,9 +2069,9 @@
 																							Math.sin(lookDBER.z+elevOff),
 																							Math.cos(lookDBER.z+elevOff)*Math.cos(lookDBER.y));
 					if (i==selIdx)
-						m.transform = Matrix4x4.quaternionToMatrix(itmRot.w,itmRot.x,itmRot.y,itmRot.z).scale(sc,sc,sc).translate(0,0,player.radius*(2-(sc-1)/3));
+						m.transform = Matrix4x4.quaternionToMatrix(itmRot.w,itmRot.x,itmRot.y,itmRot.z).scale(sc,sc,sc).translate(0,0,focusedShip.radius*(2-(sc-1)/3));
 					else
-						m.transform = new Matrix4x4().scale(sc,sc,sc).translate(0,0,player.radius*2);
+						m.transform = new Matrix4x4().scale(sc,sc,sc).translate(0,0,focusedShip.radius*2);
 					m.transform = m.transform.rotY(i/n*Math.PI*2+rotOff+Math.PI+lookDBER.y).rotFromTo(0,1,0,tiltTo.x,tiltTo.y,tiltTo.z).translate(lookPt.x,lookPt.y,lookPt.z);
 				}
 
@@ -2113,10 +2094,10 @@
 									for (var j:int=Models.length-1; j>-1; j--)
 										world.removeChild(Models[j]);
 									var addModStep:Function = addModuleFn(Ids[i].id);
-									player.hullSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
+									focusedShip.hullSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
 									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void
 									{
-										player.hullSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
+										focusedShip.hullSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
 										modulesSelectMenu(callBack);
 									});
 									return;
@@ -2125,7 +2106,7 @@
 								if (shipHUD!=null)
 								{
 									menu.y = shipHUD.getChildAt(0).height;
-									shipHUD.getChildAt(0).name = player.name+" : Outfit "+Ids[i].name;
+									shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit "+Ids[i].name;
 								}
 							}
 						}
@@ -2142,12 +2123,12 @@
 				}
 
 				// ----- calculate cam lookPt easing
-				if (player!=null)
+				if (focusedShip!=null)
 				{
-					velDBER.x = (player.radius*4-lookDBER.x)*(1-0.8);	// fix dist to radius*4
-					lookVel = player.posn.subtract(lookPt);
+					velDBER.x = (focusedShip.radius*4-lookDBER.x)*(1-0.8);	// fix dist to radius*4
+					lookVel = focusedShip.posn.subtract(lookPt);
 					lookVel.scaleBy(1-0.9);
-					lookDBER.x = Math.max(player.radius*1.1, lookDBER.x);
+					lookDBER.x = Math.max(focusedShip.radius*1.1, lookDBER.x);
 				}
 			}//endfunction
 
@@ -2166,7 +2147,7 @@
 			if (shipHUD!=null)
 			{
 				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = player.name+" : Outfit Modules";
+				shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit Modules";
 			}
 		}//endfunction
 
@@ -2188,24 +2169,24 @@
 			return function():void
 			{
 				var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-				var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+				var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 
 				if (hit!=null)
 				{
-					var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+					var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
 					var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx*size/2,hit.vy-hit.ny*size/2,hit.vz-hit.nz*size/2));
 					var localNorm:Vector3D = shipInvT.rotateVector(new Vector3D(hit.nx, hit.ny, hit.nz));
 
 					var orient:Vector3D = new Vector3D(Math.round(localNorm.x),Math.round(localNorm.y),Math.round(localNorm.z));
-					var Pts:Vector.<Vector3D> = player.surfaceToOccupy(localPt.x,localPt.y,localPt.z,orient,size);
-					//var blocks:Vector.<HullBlock> = player.freeHullBlocks(localPt.x,localPt.y,localPt.z,size);
+					var Pts:Vector.<Vector3D> = focusedShip.surfaceToOccupy(localPt.x,localPt.y,localPt.z,orient,size);
+					//var blocks:Vector.<HullBlock> = focusedShip.freeHullBlocks(localPt.x,localPt.y,localPt.z,size);
 
 					//debugTf.text = "Pts="+Pts.length+"  blocks="+blocks.length+" orient="+orient+" hitNormal="+int(localNorm.x*100)/100+","+int(localNorm.y*100)/100+","+int(localNorm.z*100)/100;
 
 					for (i=Math.min(Pts.length,Mkrs.length)-1; i>-1; i--)
 					{
 						var pt:Vector3D = Pts[i];
-						Mkrs[i].transform =  player.skin.transform.mult(new Matrix4x4().rotFromTo(0,1,0,orient.x,orient.y,orient.z).translate(pt.x-orient.x*0.3,pt.y-orient.y*0.3,pt.z-orient.z*0.3));
+						Mkrs[i].transform =  focusedShip.skin.transform.mult(new Matrix4x4().rotFromTo(0,1,0,orient.x,orient.y,orient.z).translate(pt.x-orient.x*0.3,pt.y-orient.y*0.3,pt.z-orient.z*0.3));
 						world.addChild(Mkrs[i]);
 					}
 					if (Input.upPts.length>0)
@@ -2213,9 +2194,9 @@
 						var upPt:InputPt = Input.upPts[0];
 						if (upPt.endT-upPt.startT<300)
 						{
-							undoStk.push(player.toString());
-							if (player.addModule(localPt.x,localPt.y,localPt.z,orient,type))	// orient,type,size
-								player.rebuildShip();
+							undoStk.push(focusedShip.toString());
+							if (focusedShip.addModule(localPt.x,localPt.y,localPt.z,orient,type))	// orient,type,size
+								focusedShip.rebuildShip();
 							else
 								undoStk.pop();		// discard undo state
 						}
@@ -2236,32 +2217,32 @@
 		{
 			// ----- ray cast cursor
 			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-			var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
 				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
-				var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
 				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx/2,hit.vy-hit.ny/2,hit.vz-hit.nz/2));
 				localPt.x = Math.round(localPt.x);
 				localPt.y = Math.round(localPt.y);
 				localPt.z = Math.round(localPt.z);
 
-				if (player.adjacentToSpace(localPt.x,localPt.y,localPt.z))
+				if (focusedShip.adjacentToSpace(localPt.x,localPt.y,localPt.z))
 				{
-					buildMkr.transform = player.skin.transform.mult(new Matrix4x4().scale(1.3,1.3,1.3).translate(localPt.x,localPt.y,localPt.z));
+					buildMkr.transform = focusedShip.skin.transform.mult(new Matrix4x4().scale(1.3,1.3,1.3).translate(localPt.x,localPt.y,localPt.z));
 					world.addChild(buildMkr);
 					if (Input.upPts.length>0)
 					{
 						var upPt:InputPt = Input.upPts[0];
 						if (upPt.endT-upPt.startT<300)
 						{
-							undoStk.push(player.toString());
-							var occupyingModule:Module = player.getHullBlocks(localPt.x,localPt.y,localPt.z,1)[0].module;
+							undoStk.push(focusedShip.toString());
+							var occupyingModule:Module = focusedShip.getHullBlocks(localPt.x,localPt.y,localPt.z,1)[0].module;
 							if (occupyingModule!=null)
-								player.removeModule(occupyingModule);
+								focusedShip.removeModule(occupyingModule);
 							else
-								player.trimHull(localPt.x,localPt.y,localPt.z);
-							player.rebuildShip();
+								focusedShip.trimHull(localPt.x,localPt.y,localPt.z);
+							focusedShip.rebuildShip();
 						}
 					}
 				}
@@ -2282,18 +2263,18 @@
 		{
 			// ----- ray cast cursor
 			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-			var hit:VertexData = player.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
 				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
-				var shipInvT:Matrix4x4 = player.skin.transform.inverse();
+				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
 				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx+hit.nx/2,hit.vy+hit.ny/2,hit.vz+hit.nz/2));
 				localPt.x = Math.round(localPt.x);
 				localPt.y = Math.round(localPt.y);
 				localPt.z = Math.round(localPt.z);
-				buildMkr.transform = player.skin.transform.mult(new Matrix4x4().translate(localPt.x,localPt.y,localPt.z));
+				buildMkr.transform = focusedShip.skin.transform.mult(new Matrix4x4().translate(localPt.x,localPt.y,localPt.z));
 
-				if (player.adjacentToHull(localPt.x,localPt.y,localPt.z))
+				if (focusedShip.adjacentToHull(localPt.x,localPt.y,localPt.z))
 				{
 					world.addChild(buildMkr);
 					if (Input.upPts.length>0)
@@ -2301,9 +2282,9 @@
 						var upPt:InputPt = Input.upPts[0];
 						if (upPt.endT-upPt.startT<300)
 						{
-							undoStk.push(player.toString());
-							player.extendHull(localPt.x,localPt.y,localPt.z);
-							player.rebuildShip();
+							undoStk.push(focusedShip.toString());
+							focusedShip.extendHull(localPt.x,localPt.y,localPt.z);
+							focusedShip.rebuildShip();
 						}
 					}
 				}
@@ -3461,7 +3442,6 @@ class MenuUI
 		canvas.buttonMode = true;
 		return canvas;
 	}//endfunction
-
 }//endclass
 
 class Module		// data class
@@ -3621,8 +3601,11 @@ class Hull
 	public var skin:Mesh = null;
 	public var hullSkin:Mesh = null;
 
-	public var pivot:Vector3D = null;					// point ship rotates about
-	public var radius:Number = 0;							// radius of ship
+	public var pivot:Vector3D = null;					// point hull rotates about
+	public var radius:Number = 0;							// radius of hull
+	public var posn:Vector3D = null;					// current position
+	public var vel:Vector3D = null;						// current position
+	public var integrity:Number = 0;
 
 	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
 
@@ -3635,6 +3618,8 @@ class Hull
 			name = hullName;
 
 		pivot = new Vector3D();	// CG point hull rotates about
+		posn = new Vector3D();
+		vel = new Vector3D();
 
 		skin = new Mesh();
 		hullSkin = new Mesh();
@@ -3655,6 +3640,17 @@ class Hull
 		hullConfig.push(new HullBlock(0,0,0,this));
 
 		rebuildHull();				// update hull look from config infos
+	}//endfunction
+
+	//===============================================================================================
+	// placeholder, should be overridden
+	//===============================================================================================
+	public function updateStep():void
+	{
+		posn.x += vel.x;
+		posn.y += vel.y;
+		posn.z += vel.z;
+		skin.transform = new Matrix4x4().translate(posn.x,posn.y,posn.z);
 	}//endfunction
 
 	//===============================================================================================
@@ -3773,6 +3769,7 @@ class Hull
 		hullSkin.setGeometry(tmp.vertData,tmp.idxsData);
 		pivot.scaleBy(1/hullConfig.length);
 		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+		integrity = hullConfig.length*100;
 	}//endfunction
 
 	//===============================================================================================
@@ -3902,6 +3899,14 @@ class Hull
 	}//endfunction
 
 	//===============================================================================================
+	//
+	//===============================================================================================
+	public function registerHit(hitPt:VertexData,dmg:Number):void
+	{
+
+	}//endfunction
+
+	//===============================================================================================
 	// checks if there are disjointed hull pieces
 	//===============================================================================================
 	public function isOnePiece() : Boolean
@@ -3953,12 +3958,8 @@ class Hull
 class Asteroid extends Hull
 {
 	public var slowF:Number = 0.95;						// slow down factor
-	public var posn:Vector3D = null;					// current position
-	public var vel:Vector3D = null;						// current velocity
 	public var rotPosn:Vector3D = null;				// current orientation quaternion
 	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
-
-	public var integrity:Number = 0;
 
 	public function Asteroid(name:String=null,type:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
@@ -3986,8 +3987,6 @@ class Asteroid extends Hull
 			VD[i+10] = (VD[i+10]/3)*0.98 + v+0.01/3;
 		}
 
-		posn = new Vector3D(0,0,0);
-		vel =  new Vector3D(0,0,0);
 		rotPosn = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
 		rotPosn.w = Math.sqrt(1-rotPosn.length*rotPosn.length);
@@ -3997,7 +3996,7 @@ class Asteroid extends Hull
 	}//endConstr
 
 	//===============================================================================================
-	// build asteroid shape with smooth shading
+	// build asteroid shape with smooth shading, modifies vertex data normals
 	//===============================================================================================
 	public function rebuildAsteroid():void
 	{
@@ -4026,7 +4025,7 @@ class Asteroid extends Hull
 			nv.scaleBy(1/nv.length);
 		}//endfor
 
-		for (var i:int=0; i<n; i+=11)
+		for (i=0; i<n; i+=11)
 		{
 			id = int(V[i+0]*100)+","+int(V[i+1]*100)+","+int(V[i+2]*100);
 			if (Norms[id]!=null)
@@ -4045,7 +4044,7 @@ class Asteroid extends Hull
 	//===============================================================================================
 	// update position & orientation of asteroid
 	//===============================================================================================
-	public function updateStep():void
+	public override function updateStep():void
 	{
 		// ----- move astroid with current velocity
 		posn.x += vel.x;				// update position
@@ -4064,7 +4063,7 @@ class Asteroid extends Hull
 	//===============================================================================================
 	// records down the damage position and magnitude
 	//===============================================================================================
-	public function registerHit(hitPt:VertexData,dmg:Number):void
+	public override function registerHit(hitPt:VertexData,dmg:Number):void
 	{
 		var invT:Matrix4x4 = skin.transform.inverse();
 		var nvx:Number = hitPt.vx*invT.aa + hitPt.vy*invT.ab + hitPt.vz*invT.ac + invT.ad;
@@ -4081,12 +4080,14 @@ class Asteroid extends Hull
 					ndSq=(nvx-h.x)*(nvx-h.x)+(nvy-h.y)*(nvy-h.y)+(nvz-h.z)*(nvz-h.z);
 				}
 		}
-		// ----- remove block if destroyed
+
+		// ----- assign damage
 		if (nh!=null)
 		{
 			nh.integrity-=dmg;
 			integrity-=dmg;
 		}
+		// ----- remove block if destroyed
 		if (nh.integrity<=0)
 		{
 			trimHull(nh.x,nh.y,nh.z);
@@ -4104,14 +4105,11 @@ class Ship extends Hull
 	public var modulesSkin:Mesh = null;
 
 	public var maxIntegrity:Number = 1;
-	public var integrity:Number = 1;					// health of hull
 	public var maxEnergy:Number = 1;
 	public var energy:Number = 1;
 
 	public var tte:int = 90;									// time to explode
 
-	public var posn:Vector3D = null;					// ship position
-	public var vel:Vector3D = null;						// current velocity of ship
 	public var facing:Vector3D = null;				// current facing of ship
 	public var rotVel:Vector3D = null;				// current rotational velocity of ship
 	public var accelF:Number = 0.001;					// ship acceleration factor
@@ -4139,8 +4137,6 @@ class Ship extends Hull
 		super(shpName);
 
 		modelAssets = assets;
-		posn = new Vector3D();
-		vel = new Vector3D();
 		facing = new Vector3D(0,0,1);	// default facing
 		rotVel = new Vector3D();
 
@@ -4206,8 +4202,10 @@ class Ship extends Hull
 	//===============================================================================================
 	// records down the damage position and magnitude
 	//===============================================================================================
-	public function registerDamagePosn(hitPt:VertexData,dmg:Number):void
+	public override function registerHit(hitPt:VertexData,dmg:Number):void
 	{
+		integrity -= dmg;	// ship to take damage
+
 		var invT:Matrix4x4 = skin.transform.inverse();
 		var nvx:Number = hitPt.vx*invT.aa + hitPt.vy*invT.ab + hitPt.vz*invT.ac + invT.ad;
 		var nvy:Number = hitPt.vx*invT.ba + hitPt.vy*invT.bb + hitPt.vz*invT.bc + invT.bd;
@@ -4283,8 +4281,12 @@ class Ship extends Hull
 	//===============================================================================================
 	// update orientate ship hull according to facing, position
 	//===============================================================================================
-	public function updateStep():void
+	public override function updateStep():void
 	{
+		// ----- increment energy
+		energy += hullConfig.length/10;
+		if (energy>maxEnergy) energy = maxEnergy;
+
 		// ----- move ship with current velocity
 		posn.x += vel.x;			// update ship position
 		posn.y += vel.y;
