@@ -872,13 +872,35 @@
 
 				// ----- simulate ships
 				var time:uint = getTimer();
-				shipsStep();
+				for (i=Entities.length-1; i>=0; i--)
+				{
+					var entity:Hull = Entities[i];
+					if (entity.integrity<=0)
+					{
+						if (entity is Ship)
+							destroyShip((Ship)(entity));
+						else
+							Entities.splice(i,1);
+					}
+					else
+					{
+						if (entity is Ship && (Ship)(entity).stepFn!=null)
+							(Ship)(entity).stepFn();
+						entity.updateStep();
+						if (entity is Ship)
+							doShipDamageFx((Ship)(entity));
+					}//
+				}//endfor
+
 				debugTxt += "Entities:"+Entities.length+" Projectiles:"+Projectiles.length+" shipsT:"+(getTimer()-time);
+
+				// ----- simulate turrets
 				time=getTimer();
 				var turretsCnt:int = 0;
-				for (i=Entities.length-1; i>-1; i--)
-					if (Entities[i] is Ship)
-						turretsCnt+=simulateShipTurrets((Ship)(Entities[i]),(Ship)(Entities[i]).engageEnemy);
+				for (i=Friendlies.length-1; i>-1; i--)
+					turretsCnt+=simulateShipTurrets(Friendlies[i],Friendlies[i].engageEnemy);
+				for (i=Hostiles.length-1; i>-1; i--)
+					turretsCnt+=simulateShipTurrets(Hostiles[i],Hostiles[i].engageEnemy);
 				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
 				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
 				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
@@ -1473,35 +1495,6 @@
 				ttl--;
 			};
 			stepFns.push(flashStep);
-		}//endfunction
-
-		//===============================================================================================
-		// updates turrets status, rotates/displays turrets and frames
-		//===============================================================================================
-		private function shipsStep() : void
-		{
-			// ----- simulate ships movement and  ----------------------
-			for (var i:int=Entities.length-1; i>=0; i--)
-			{
-				var entity:Hull = Entities[i];
-				if (entity.integrity<=0)
-				{
-					if (entity is Ship)
-						destroyShip((Ship)(entity));
-					else
-						Entities.splice(i,1);
-				}
-				else
-				{
-					if (entity is Ship && (Ship)(entity).stepFn!=null) (Ship)(entity).stepFn();
-					entity.updateStep();
-					if (entity is Ship)
-					{
-						doShipDamageFx((Ship)(entity));
-						doShipSeparation((Ship)(entity));
-					}
-				}//
-			}
 		}//endfunction
 
 		//===============================================================================================
