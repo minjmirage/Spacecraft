@@ -950,7 +950,10 @@
 						if (entity is Ship)
 							destroyShip((Ship)(entity));
 						else
+						{
+							world.removeChild(entity.skin);
 							Entities.splice(i,1);
+						}
 					}
 					else
 					{
@@ -1917,7 +1920,6 @@
 					new < Function>[function():void	{
 														Friendlies[int(Friendlies.length*Math.random())].targets = new <Hull>[focusedEntity];
 														focusOn(Friendlies[int(Friendlies.length*Math.random())]);
-														stage.addChild(Mesh.debugTf);
 													},
 													function():void {focusOn(Friendlies[int(Friendlies.length*Math.random())]);}]);
 			optionsMenu.y = subTitle.y+subTitle.height;
@@ -4045,6 +4047,9 @@ class Asteroid extends Hull
 	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
 	public var type:uint = 0;
 
+	//===============================================================================================
+	//
+	//===============================================================================================
 	public function Asteroid(name:String=null,asteroidType:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
 		// ----- create random asteroid geometry
@@ -4067,7 +4072,7 @@ class Asteroid extends Hull
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
 		rotPosn.w = Math.sqrt(1-rotPosn.length*rotPosn.length);
 		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
-		rotVel.scaleBy(Math.random()*0.001/rotVel.length);
+		rotVel.scaleBy(Math.random()*0.005/rotVel.length);
 		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
 	}//endConstr
 
@@ -4076,7 +4081,19 @@ class Asteroid extends Hull
 	//===============================================================================================
 	public function rebuildAsteroid():void
 	{
+		var pivotShift:Vector3D = pivot;
 		super.rebuildHull();
+
+		// ----- adjust asteroid center shift
+		pivotShift = pivot.subtract(pivotShift);
+		pivotShift = skin.transform.rotateVector(pivotShift);
+		posn = posn.add(pivotShift);
+
+		// ----- re randomize rotation
+		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
+		rotVel.scaleBy(Math.random()*0.005/rotVel.length);
+		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
+
 		var Norms:Object = new Object();
 		var V:Vector.<Number> = hullSkin.vertData;
 		var n:int = V.length;
@@ -4119,9 +4136,6 @@ class Asteroid extends Hull
 									(V[i*11+10]/3)*0.98 + v+0.01/3);
 			}
 		}//endfor
-
-		if (Mesh.debugTf!=null)
-			Mesh.debugTf.appendText("rebuildAsteroid : "+toString()+" | radius : "+radius+"\n");
 
 		hullSkin.createGeometry(NV,hullSkin.idxsData);
 	}//endfunction
@@ -4170,13 +4184,17 @@ class Asteroid extends Hull
 		if (nh!=null)
 		{
 			nh.integrity-=dmg;
-			integrity-=dmg;
 		}
 		// ----- remove block if destroyed
 		if (nh.integrity<=0)
 		{
-			trimHull(nh.x,nh.y,nh.z);
-			rebuildAsteroid();
+			if (hullConfig.length<=1)
+				integrity = 0;
+			else
+			{
+				trimHull(nh.x,nh.y,nh.z);
+				rebuildAsteroid();
+			}
 		}
 	}//endfunction
 }//endClass
