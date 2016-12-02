@@ -4676,8 +4676,8 @@ class Missile extends Projectile
 		var dpx:Number = targ.extPosn.x-px;
 		var dpy:Number = targ.extPosn.y-py;
 		var dpz:Number = targ.extPosn.z-pz;
-		var shp:Ship = targ.parent;
-		var cv:Vector3D = SpaceCrafter.collisionVector3(speed,dpx,dpy,dpz,shp.vel.x,shp.vel.y,shp.vel.z);
+		var hull:Hull = targ.parent;
+		var cv:Vector3D = SpaceCrafter.collisionVector3(speed,dpx,dpy,dpz,hull.vel.x,hull.vel.y,hull.vel.z);
 		if (cv!=null)
 		{
 			// ----- determine rotation of missile

@@ -16,7 +16,7 @@
 	<text xml:lang="ja">Japanese App name goes here</text>
 	</name>
 -->
-<application xmlns="http://ns.adobe.com/air/application/22.0">
+<application xmlns="http://ns.adobe.com/air/application/23.0">
   <id>SpaceCrafter</id>
   <versionNumber>1.0.0</versionNumber>
   <versionLabel></versionLabel>
