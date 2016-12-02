@@ -33,6 +33,7 @@
 		private var BulletFXs:Object = null;			// projectile rendering Fns
 		private var SoundFxs:Object = null;				// dictionary of all SoundFxs
 		private var SndsToPlay:Object = null;
+		private var ambientLoop:SoundChannel = null;
 
 		private var world:Mesh = null;
 		private var sky:Mesh = null;
@@ -134,7 +135,8 @@
 		[Embed(source="snds/hullGroan2.mp3")] 		private var sndHullGroan2:Class;
 		[Embed(source="snds/menuClick.mp3")] 			private var sndMenuClick:Class;
 		[Embed(source="snds/zoomOut.mp3")] 				private var sndZoomOut:Class;
-
+		[Embed(source="snds/spaceAmbience.mp3")] 	private var sndSpaceAmbience:Class;
+		[Embed(source="snds/spaceshipHum.mp3")] 	private var sndSpaceshipHum:Class;
 
 		//===============================================================================================
 		// Constructor
@@ -313,7 +315,9 @@
 									hullGroan1:new sndHullGroan1(),hullGroan1_Af:0.6,
 									hullGroan2:new sndHullGroan1(),hullGroan2_Af:0.6,
 									menuClick:new sndMenuClick(),menuClick_Af:0.2,
-									zoomOut:new sndZoomOut(),zoomOut_Af:0.2
+									zoomOut:new sndZoomOut(),zoomOut_Af:0.2,
+									spaceAmbience:new sndSpaceAmbience(),spaceAmbience_Af:0.001,
+									spaceshipHum:new sndSpaceshipHum(),spaceshipHum_Af:0.001
 								};
 			SndsToPlay = new Object();
 			MenuUI.clickSfx = function():void {playSound(lookPt.x,lookPt.y,lookPt.z,"menuClick");};
@@ -358,6 +362,7 @@
 			stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDownHandler);
 			Input.init(stage);
 
+			playAmbientLoop("spaceAmbience",1);
 			homeBaseScene();
 		}//endfunction
 
@@ -887,6 +892,24 @@
 			m.createGeometry(S);
 			m.material.setTexMap(tex);
 			return m;
+		}//endfunction
+
+		//===============================================================================================
+		// fade in to new ambient loop
+		//===============================================================================================
+		private function playAmbientLoop(id:String,loudness:Number=1,fadeTime:Number=5):void
+		{
+				var newLoop:SoundChannel = (Sound)(SoundFxs[id]).play(0,99999,new SoundTransform(0,0));
+				var newST:SoundTransform = newLoop.soundTransform;
+				TweenLite.to(newST,fadeTime,{volume:loudness, onUpdate:function():void {newLoop.soundTransform=newST;}});
+				if (ambientLoop!=null)
+				{
+					var oldLoop:SoundChannel = ambientLoop;
+					var oldST:SoundTransform = oldLoop.soundTransform;
+					TweenLite.killTweensOf(oldST);
+					TweenLite.to(oldST,fadeTime,{volume:0, onUpdate:function():void {oldLoop.soundTransform=oldST;}, onComplete:function():void {oldLoop.stop();}});
+				}
+				ambientLoop=newLoop;
 		}//endfunction
 
 		//===============================================================================================
@@ -1990,6 +2013,21 @@
 		//===============================================================================================
 		private function showShipEditMenu(title:String,editStepFn:Function,callBack:Function):void
 		{
+			// ----- change to spaceshipHum and darken env
+			playAmbientLoop("spaceshipHum");
+			var planets:Mesh = sky.getChildAt(0);
+			planets.setLightingParameters(0.2,0.2,0.2,0,0,false,true);
+			sky.material.setAmbient(0.2,0.2,0.2);
+			var oldCallBack:Function = callBack;
+			callBack = function():void
+			{
+				playAmbientLoop("spaceAmbience");
+				planets.setLightingParameters(0,0,0,0,0,true,true);
+				sky.material.setAmbient(1,1,1);
+				if (oldCallBack!=null) oldCallBack();
+			}
+
+
 			velDBER.x = (focusedShip.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
 
 			var tickBmd:BitmapData = new icoTick().bitmapData;
@@ -2207,7 +2245,6 @@
 			{
 				planets.setLightingParameters(0,0,0,0,0,true,true);
 				sky.material.setAmbient(1,1,1);
-
 				viewStep = oldViewStep;
 				for (var i:int=Models.length-1; i>-1; i--)
 					world.removeChild(Models[i]);
