@@ -836,7 +836,7 @@
 					v.w += 0.1/Math.sqrt(dist+100);
 				}
 				else
-					v.w += 0.00002;
+					v.w += 0.0001;
 			}
 		}//endfunction
 
@@ -4042,11 +4042,13 @@ class Asteroid extends Hull
 	public var slowF:Number = 0.95;						// slow down factor
 	public var rotPosn:Vector3D = null;				// current orientation quaternion
 	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
+	public var type:uint = 0;
 
-	public function Asteroid(name:String=null,type:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
+	public function Asteroid(name:String=null,asteroidType:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
 		// ----- create random asteroid geometry
 		super(name);
+		type = asteroidType%9;	// total 9 types of asteroids, type used in rebuildAsteroid
 		randomHullConfig(size,false);
 		rebuildAsteroid();
 
@@ -4059,15 +4061,6 @@ class Asteroid extends Hull
 		hullSkin.material.setTexMap(texMap);
 		hullSkin.material.setSpecMap(specMap);
 		hullSkin.material.setNormMap(normMap);
-		type = type%9;	// total 9 types of asteroids
-		var VD:Vector.<Number> = hullSkin.vertData;
-		var u:Number = (type%3)/3;
-		var v:Number = int(type/3)/3;
-		for (i=VD.length-11; i>-1; i-=11)
-		{	// modify uv to use correct area of texture
-			VD[i+9] = (VD[i+9]/3)*0.98 + u+0.01/3;
-			VD[i+10] = (VD[i+10]/3)*0.98 + v+0.01/3;
-		}
 
 		rotPosn = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
@@ -4107,22 +4100,26 @@ class Asteroid extends Hull
 			nv.scaleBy(1/nv.length);
 		}//endfor
 
-		for (i=0; i<n; i+=11)
+		var u:Number = (type%3)/3;
+		var v:Number = int(type/3)/3;
+		var NV:Vector.<Number> = new Vector.<Number>();
+		n = V.length/11;
+		for (i=0; i<n; i++)
 		{
-			id = int(V[i+0]*100)+","+int(V[i+1]*100)+","+int(V[i+2]*100);
+			id = int(V[i*11+0]*100)+","+int(V[i*11+1]*100)+","+int(V[i*11+2]*100);
 			if (Norms[id]!=null)
 			{
 				nv = Norms[id];
-				V[i+0] += 0.3*nv.x/nv.w;
-				V[i+1] += 0.3*nv.y/nv.w;
-				V[i+2] += 0.3*nv.z/nv.w;
-				V[i+3] = nv.x;
-				V[i+4] = nv.y;
-				V[i+5] = nv.z;
+				NV.push(	V[i*11+0] + 0.3*nv.x/nv.w,				// tweak vertices to become more curvy
+									V[i*11+1] + 0.3*nv.y/nv.w,
+									V[i*11+2] + 0.3*nv.z/nv.w,
+									nv.x,nv.y,nv.z,										// use soft shading normals
+									(V[i*11+9]/3)*0.98 + u+0.01/3,		// modify uv to use correct area of texture
+									(V[i*11+10]/3)*0.98 + v+0.01/3);
 			}
 		}//endfor
 
-		hullSkin.setGeometry(V,hullSkin.idxsData);
+		hullSkin.createGeometry(NV,hullSkin.idxsData);
 	}//endfunction
 
 	//===============================================================================================
