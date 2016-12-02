@@ -21,13 +21,9 @@
 
 		private var Projectiles:Vector.<Projectile> = null;
 		private var Entities:Vector.<Hull> = null;
-		private var Hostiles:Vector.<Ship> = null;
-		private var Friendlies:Vector.<Ship> = null;
+		private var Hostiles:Vector.<Hull> = null;
+		private var Friendlies:Vector.<Hull> = null;
 		private var Exploding:Vector.<Ship> = null;
-
-		private var focusedEntity:Hull = null;
-		private var focusedShip:Ship = null;
-		private var shipHUD:Sprite = null;
 
 		private var frameS_MP:MeshParticles = null;		// small turret frames MeshParticles
 		private var frameM_MP:MeshParticles = null;		// medium turret frames MeshParticles
@@ -41,8 +37,14 @@
 		private var world:Mesh = null;
 		private var sky:Mesh = null;
 
+		private var focusedEntity:Hull = null;
+		private var focusedShip:Ship = null;
+		private var optionsMenuSelector:Function = null;
+
 		private var mainTitle:Bitmap = null;
 		private var subTitle:Bitmap = null;
+		private var optionsMenu:Sprite = null;
+		private var shipHUD:Sprite = null;
 
 		private var buildMkr:Mesh = null;
 
@@ -116,22 +118,22 @@
 		[Embed(source='3D/blasterMedium.rmf', mimeType='application/octet-stream')] 	private static var BlasterM_Rmf:Class;
 		[Embed(source='3D/laserMedium.rmf', mimeType='application/octet-stream')] 		private static var LaserM_Rmf:Class;
 
-		[Embed(source="snds/jumpIn.mp3")] 		private var sndJumpIn:Class;
-		[Embed(source="snds/hit.mp3")] 				private var sndHit:Class;
-		[Embed(source="snds/explosion.mp3")] 	private var sndExplosion:Class;
-		[Embed(source="snds/gunAutoS.mp3")] 	private var sndGunAutoS:Class;
-		[Embed(source="snds/gunFlakS.mp3")] 	private var sndGunFlakS:Class;
-		[Embed(source="snds/gunIonS.mp3")] 		private var sndGunIonS:Class;
-		[Embed(source="snds/gunPlasmaS.mp3")] private var sndGunPlasmaS:Class;
+		[Embed(source="snds/jumpIn.mp3")] 				private var sndJumpIn:Class;
+		[Embed(source="snds/hit.mp3")] 						private var sndHit:Class;
+		[Embed(source="snds/explosion.mp3")] 			private var sndExplosion:Class;
+		[Embed(source="snds/gunAutoS.mp3")] 			private var sndGunAutoS:Class;
+		[Embed(source="snds/gunFlakS.mp3")] 			private var sndGunFlakS:Class;
+		[Embed(source="snds/gunIonS.mp3")] 				private var sndGunIonS:Class;
+		[Embed(source="snds/gunPlasmaS.mp3")]			private var sndGunPlasmaS:Class;
 		[Embed(source="snds/missileLaunch.mp3")] 	private var sndLauncherS:Class;
-		[Embed(source="snds/gunRailS.mp3")] 	private var sndGunRailS:Class;
-		[Embed(source="snds/gunIonM.mp3")] 		private var sndGunIonM:Class;
-		[Embed(source="snds/gunPlasmaM.mp3")] private var sndGunPlasmaM:Class;
-		[Embed(source="snds/gunRailM.mp3")] 	private var sndGunRailM:Class;
-		[Embed(source="snds/hullGroan1.mp3")] 	private var sndHullGroan1:Class;
-		[Embed(source="snds/hullGroan2.mp3")] 	private var sndHullGroan2:Class;
-		[Embed(source="snds/menuClick.mp3")] 	private var sndMenuClick:Class;
-		[Embed(source="snds/zoomOut.mp3")] 	private var sndZoomOut:Class;
+		[Embed(source="snds/gunRailS.mp3")]				private var sndGunRailS:Class;
+		[Embed(source="snds/gunIonM.mp3")] 				private var sndGunIonM:Class;
+		[Embed(source="snds/gunPlasmaM.mp3")] 		private var sndGunPlasmaM:Class;
+		[Embed(source="snds/gunRailM.mp3")] 			private var sndGunRailM:Class;
+		[Embed(source="snds/hullGroan1.mp3")] 		private var sndHullGroan1:Class;
+		[Embed(source="snds/hullGroan2.mp3")] 		private var sndHullGroan2:Class;
+		[Embed(source="snds/menuClick.mp3")] 			private var sndMenuClick:Class;
+		[Embed(source="snds/zoomOut.mp3")] 				private var sndZoomOut:Class;
 
 
 		//===============================================================================================
@@ -343,8 +345,8 @@
 
 			Projectiles = new Vector.<Projectile>();
 			Entities = new Vector.<Hull>();
-			Hostiles = new Vector.<Ship>();
-			Friendlies = new Vector.<Ship>();
+			Hostiles = new Vector.<Hull>();
+			Friendlies = new Vector.<Hull>();
 			Exploding = new Vector.<Ship>();
 			stepFns = new Vector.<Function>();
 
@@ -362,7 +364,7 @@
 		//===============================================================================================
 		// Saves all given user ships data
 		//===============================================================================================
-		private function saveShipsData(S:Vector.<Ship>):void
+		private function saveShipsData(S:Vector.<Hull>):void
 		{
 			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
 			var s:String = "";
@@ -383,7 +385,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// zooms to entity and display controls/options menu
 		//===============================================================================================
 		private function focusOn(entity:Hull):void
 		{
@@ -408,6 +410,11 @@
 				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
 				addChild(shipHUD);
 			}
+			// ----- shows appropriate menu for different focused entity
+			if (optionsMenu!=null && optionsMenu.parent!=null)
+				optionsMenu.parent.removeChild(optionsMenu);
+			if (optionsMenuSelector!=null)
+				optionsMenuSelector(entity);
 		}//endfunction
 
 		//===============================================================================================
@@ -433,9 +440,16 @@
 				addShipToScene(true,0);			// creates a new random ship for user
 				saveShipsData(Friendlies);
 			}
-			focusOn(Friendlies[0]);
 
-			showMainMenu();
+			optionsMenuSelector = function(entity:Hull):void
+			{
+				if (entity is Ship)
+					showShipMainMenu();
+				else if (entity is Asteroid)
+					showAsteroidMineMenu();
+			}
+
+			focusOn(Friendlies[0]);
 		}//endfunction
 
 		//===============================================================================================
@@ -445,16 +459,27 @@
 		{
 			var thisRef:SpaceCrafter = this;
 			randScenery();	// random sky and planets
-			var menu:Sprite =
-			MenuUI.createLeftStyleMenu(thisRef,
-																new < String > ["End Battle"],
-																new < Function>[function():void
-																{
-																	var jumpBearing:Number = Math.random()*Math.PI*2;
-																	for (var i:int=0; i<Friendlies.length; i++)
-																		jumpOut(Friendlies[i],jumpBearing);
-																}]);
-			menu.y = subTitle.y+subTitle.height;
+
+			optionsMenuSelector = function(entity:Hull):void
+			{
+				if (entity is Ship && Friendlies.indexOf((Ship)(entity))!=-1)
+					optionsMenu =
+					MenuUI.createLeftStyleMenu(thisRef,
+																		new < String > ["Escape Battle"],
+																		new < Function>[function():void
+																		{
+																			var jumpBearing:Number = Math.random()*Math.PI*2;
+																			for (var i:int=0; i<Friendlies.length; i++)
+																				jumpOut((Ship)(Friendlies[i]),jumpBearing);
+																		}]);
+				else
+					optionsMenu =
+					MenuUI.createLeftStyleMenu(thisRef,
+																		new < String > ["Back"],
+																		new < Function>[function():void	{focusOn(Friendlies[0]);}]);
+				optionsMenu.y = subTitle.y+subTitle.height;
+			}//endfunction
+
 			// ----- default enemies
 			addShipToScene(false);	// hostile
 			addShipToScene(false);	// hostile
@@ -498,8 +523,8 @@
 							function():void {
 								galaxyScene(homeBaseScene);
 							});
-					if (menu.parent!=null)
-						menu.parent.removeChild(menu);
+					if (optionsMenu.parent!=null)
+						optionsMenu.parent.removeChild(optionsMenu);
 				}
 			};
 
@@ -513,6 +538,9 @@
 		{
 			mainTitle.name = "Scanning...";
 			subTitle.name = "Detecting other fleet signatures";
+
+			if (optionsMenu!=null && optionsMenu.parent!=null)
+				optionsMenu.parent.removeChild(optionsMenu);
 
 			playSound(lookPt.x,lookPt.y,lookPt.z,"zoomOut");
 			world.removeChild(sky);
@@ -766,12 +794,21 @@
 		//===============================================================================================
 		private function randAsteroids(n:int):void
 		{
+			var A:Vector.<Asteroid> = new Vector.<Asteroid>();
 			for (var i:int=0; i<n; i++)
 			{
 				var aTyp:int = Math.floor(Math.random()*9);
+
 				var a:Asteroid = new Asteroid("asteroid",aTyp,1+Math.floor(Math.random()*15),Mtls["TexRocks"],Mtls["SpecRocks"],Mtls["NormRocks"]);
 				a.name = i+"-"+a.hullConfig.length+"-type"+aTyp;
-				a.posn = new Vector3D((Math.random()-0.5)*500,0,(Math.random()-0.5)*500);
+				do {
+					var canPlace:Boolean = true;
+					a.posn = new Vector3D((Math.random()-0.5)*200,0,(Math.random()-0.5)*200);
+					for (var j:int=A.length-1; j>-1; j--)
+						if (A[j].posn.subtract(a.posn).length<(a.radius+A[j].radius)*2)
+							canPlace = false;
+				} while (!canPlace);
+				A.push(a);
 				Entities.push(a);
 				world.addChild(a.skin);
 			}
@@ -931,9 +968,9 @@
 				time=getTimer();
 				var turretsCnt:int = 0;
 				for (i=Friendlies.length-1; i>-1; i--)
-					turretsCnt+=simulateShipTurrets(Friendlies[i],Friendlies[i].engageEnemy);
+					turretsCnt+=simulateShipTurrets((Ship)(Friendlies[i]),(Ship)(Friendlies[i]).engageEnemy);
 				for (i=Hostiles.length-1; i>-1; i--)
-					turretsCnt+=simulateShipTurrets(Hostiles[i],Hostiles[i].engageEnemy);
+					turretsCnt+=simulateShipTurrets((Ship)(Hostiles[i]),(Ship)(Hostiles[i]).engageEnemy);
 				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
 				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
 				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
@@ -1348,7 +1385,7 @@
 
 			for (var st:int=ship.targets.length-1; st>-1; st--)
 			{
-				var targ:Ship = ship.targets[st];
+				var targ:Hull = ship.targets[st];
 				var dvx:Number = targ.vel.x - ship.vel.x;	// diff in speed between 2 ships
 				var dvy:Number = targ.vel.y - ship.vel.y;
 				var dvz:Number = targ.vel.z - ship.vel.z;
@@ -1659,6 +1696,7 @@
 		//===============================================================================================
 		private function addShipToScene(friendly:Boolean,dist:Number=30,config:String=null) : Ship
 		{
+			var i:int=0;
 			var ship:Ship = null;
 			if (config!=null)
 				ship = Ship.createShipFromConfigStr(Assets,config);
@@ -1813,13 +1851,13 @@
 			ship.stepFn = function():void
 			{
 				// ----- seek target to move towards
-				var T:Vector.<Ship> = ship.targets;
-				var targ:Ship = null;
+				var T:Vector.<Hull> = ship.targets;
+				var targ:Hull = null;
 				var dlSq:Number = Number.MAX_VALUE;
 				if (T!=null)
 				for (var j:int=T.length-1; j>=0; j--)
 				{
-					var other:Ship = T[j];
+					var other:Hull = T[j];
 					var dx:Number = other.posn.x - ship.posn.x;
 					var dy:Number = other.posn.y - ship.posn.y;
 					var dz:Number = other.posn.z - ship.posn.z;
@@ -1870,15 +1908,32 @@
 		//===============================================================================================
 		// the main menu in home scene
 		//===============================================================================================
-		private function showMainMenu():void
+		private function showAsteroidMineMenu():void
 		{
 			var thisRef:SpaceCrafter = this;
-			var menu:Sprite =
+			optionsMenu =
+			MenuUI.createLeftStyleMenu(thisRef,
+					new < String > ["Mine Asteroid","Back"],
+					new < Function>[function():void	{
+														Friendlies[int(Friendlies.length*Math.random())].targets = new <Hull>[focusedEntity];
+														focusOn(Friendlies[int(Friendlies.length*Math.random())]);
+													},
+													function():void {focusOn(Friendlies[int(Friendlies.length*Math.random())]);}]);
+			optionsMenu.y = subTitle.y+subTitle.height;
+		}//endfunction
+
+		//===============================================================================================
+		// the main menu in home scene
+		//===============================================================================================
+		private function showShipMainMenu():void
+		{
+			var thisRef:SpaceCrafter = this;
+			optionsMenu =
 			MenuUI.createLeftStyleMenu(thisRef,
 					new < String > ["Find Opponent","Configure Ship"],
 					new < Function>[function ():void	{galaxyScene(function():void {battleScene(loadShipsData());});},
 													showShipModifyMenu]);
-			menu.y = subTitle.y+subTitle.height;
+			optionsMenu.y = subTitle.y+subTitle.height;
 			mainTitle.name = focusedShip.name+" : Home Base";
 		}//endfunction
 
@@ -1888,7 +1943,7 @@
 		private function showShipModifyMenu():void
 		{
 			var thisRef:SpaceCrafter = this;
-			var menu:Sprite =
+			optionsMenu =
 			MenuUI.createLeftStyleMenu(thisRef,
 										new < String > ["Extend Hull","Place Modules","Remove Modules/Hull","Import RMF","Back"],
 										new < Function>[function():void {showShipEditMenu("Extend Hull",extendChassisStep,showShipModifyMenu);},
@@ -1922,8 +1977,8 @@
 																											showShipModifyMenu();
 																									});
 																	},
-													showMainMenu]);
-			menu.y = subTitle.y+subTitle.height;
+													showShipMainMenu]);
+			optionsMenu.y = subTitle.y+subTitle.height;
 			mainTitle.name = focusedShip.name+" : Outfit StarShip";
 		}//endfunction
 
@@ -1953,7 +2008,7 @@
 				stepFns.push(btnsShowFn);		// add dynamic show hide buttons
 				stepFns.push(editStepFn);		// add edit interraction
 
-				var menu:Sprite =
+				optionsMenu =
 				MenuUI.createSimpleEditModeMenu(mainRef,tickBmd,crossBmd,undoBmd,
 				function(confirm:Boolean):void
 				{
@@ -1998,7 +2053,7 @@
 						focusedShip.setFromConfig(undoStk.pop());	// restore last config
 				},
 				showBtns);
-				menu.y = subTitle.y+subTitle.height;
+				optionsMenu.y = subTitle.y+subTitle.height;
 				mainTitle.name = focusedShip.name+" : "+title;
 			};
 			showThisEditMenu();
@@ -2105,7 +2160,7 @@
 							{
 								if (selIdx==i)
 								{		// do addModule
-									menu.parent.removeChild(menu);
+									optionsMenu.parent.removeChild(optionsMenu);
 									viewStep = oldViewStep;
 									for (var j:int=Models.length-1; j>-1; j--)
 										world.removeChild(Models[j]);
@@ -2119,7 +2174,7 @@
 									return;
 								}
 								selIdx = i;
-								menu.y = subTitle.y+subTitle.height;
+								optionsMenu.y = subTitle.y+subTitle.height;
 								mainTitle.name = focusedShip.name+" : Outfit "+Ids[i].name;
 							}
 						}
@@ -2156,8 +2211,8 @@
 				if (callBack!=null) callBack();
 			}//endfunction
 
-			var menu:Sprite =	MenuUI.createLeftStyleMenu(this,new <String>["back"],new <Function>[cleanUp]);
-			menu.y = subTitle.y+subTitle.height;
+			optionsMenu =	MenuUI.createLeftStyleMenu(this,new <String>["back"],new <Function>[cleanUp]);
+			optionsMenu.y = subTitle.y+subTitle.height;
 			mainTitle.name = focusedShip.name+" : Outfit Modules";
 		}//endfunction
 
@@ -4066,6 +4121,8 @@ class Asteroid extends Hull
 				V[i+5] = nv.z;
 			}
 		}//endfor
+
+		hullSkin.setGeometry(V,hullSkin.idxsData);
 	}//endfunction
 
 	//===============================================================================================
@@ -4146,7 +4203,7 @@ class Ship extends Hull
 
 	public var engageEnemy:Boolean = true;
 
-	public var targets:Vector.<Ship> = null;			// list of targets for ship
+	public var targets:Vector.<Hull> = null;	// list of targets for ship
 	public var stepFn:Function = null;
 	public var damagePosns:Vector.<VertexData> = null;
 
@@ -4473,7 +4530,7 @@ class Ship extends Hull
 		if (modelAssets==null) return;
 
 		// ----- update chassis skin
-		super.rebuildHull();
+		rebuildHull();
 
 		maxIntegrity = hullConfig.length*100;
 		integrity = hullConfig.length*100;
@@ -4558,13 +4615,12 @@ class Ship extends Hull
 	//===============================================================================================
 	public override function toString():String
 	{
-		var s:String = super.toString();
-
-		s = s.substr(0,s.length-1)+"&";
+		var s:String = super.toString()+"&";
 		for (var i:int=0; i<modulesConfig.length; i++)
 			s+=modulesConfig[i].toString()+",";
-
-		return s.substr(0,s.length-1);
+		if (modulesConfig.length>0)
+			s = s.substr(0,s.length-1);
+		return s;
 	}//endfunction
 }//endClass
 
