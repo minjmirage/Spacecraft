@@ -41,7 +41,9 @@
 		private var world:Mesh = null;
 		private var sky:Mesh = null;
 
-		private var mkr:Mesh = null;
+		private var mainTitle:Bitmap = null;
+		private var subTitle:Bitmap = null;
+
 		private var buildMkr:Mesh = null;
 
 		private var lookPt:Vector3D = null;		// camera lookAt point
@@ -314,7 +316,6 @@
 			SndsToPlay = new Object();
 			MenuUI.clickSfx = function():void {playSound(lookPt.x,lookPt.y,lookPt.z,"menuClick");};
 
-			mkr = Mesh.createSphere(0.2,16,8,null,true);
 			buildMkr = Assets["buildMkr"];
 			buildMkr.setLightingParameters(1,1,1,0,0,false);
 
@@ -393,10 +394,17 @@
 			else
 				focusedShip = null;
 
+			if (entity is Asteroid)
+				mainTitle.name = "Asteroid : "+entity.name;
+
 			if (shipHUD != null && shipHUD.parent != null)
 				shipHUD.parent.removeChild(shipHUD);
 			if (focusedShip!=null)
 			{
+				if (Friendlies.indexOf(focusedShip)!=-1)
+					mainTitle.name = focusedShip.name;
+				else
+					mainTitle.name = "Hostile : " + focusedShip.name;
 				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
 				addChild(shipHUD);
 			}
@@ -446,18 +454,23 @@
 																	for (var i:int=0; i<Friendlies.length; i++)
 																		jumpOut(Friendlies[i],jumpBearing);
 																}]);
-
+			menu.y = subTitle.y+subTitle.height;
 			// ----- default enemies
 			addShipToScene(false);	// hostile
 			addShipToScene(false);	// hostile
 			addShipToScene(false);	// hostile
 
+			var battleTime:int = 0;
 			var Conf:Array = shipsConf.split(";");
 			var friendlySpawn:Function = function():void
 			{
 				if (Conf.length>0)
 				{
-					if (gameTime%100==0)
+					if (battleTime%100==40)
+						mainTitle.name = "ETA 2s";
+					else if (battleTime%100==70)
+						mainTitle.name = "ETA 1s";
+					else if (battleTime%100==0)
 					{
 						addShipToScene(true,0,Conf.pop());		// friendly
 						focusOn(Friendlies[0]);
@@ -468,12 +481,8 @@
 			};
 			stepFns.push(friendlySpawn);
 
-			var battleTime:int = 0;
 			var battleStep:Function = function():void
 			{
-				if (shipHUD!=null)
-					menu.y = shipHUD.getChildAt(0).height;
-
 				battleTime++;
 
 				if (battleTime>100 &&
@@ -502,6 +511,9 @@
 		//===============================================================================================
 		private function galaxyScene(callBack:Function=null):void
 		{
+			mainTitle.name = "Scanning...";
+			subTitle.name = "Detecting other fleet signatures";
+
 			playSound(lookPt.x,lookPt.y,lookPt.z,"zoomOut");
 			world.removeChild(sky);
 
@@ -660,6 +672,9 @@
 			// ----- zoom in view and do callback
 			function zoomInAndCallBack():void
 			{
+				mainTitle.name = "";
+				subTitle.name = "";
+
 				var slowF:Number = 0.9;
 				velDBER.x = (8-lookDBER.x)*(1-slowF);		// set dist to 1
 				velDBER.y += 0.01;												// spin
@@ -727,6 +742,22 @@
 				}
 			}//endfor
 			sky.addChild(planet);
+
+			// ----- create main and sub title
+			var sw:int = stage.stageWidth;
+			var sh:int = stage.stageHeight;
+			if (mainTitle!=null && mainTitle.parent!=null)
+				mainTitle.parent.removeChild(mainTitle);
+			mainTitle = MenuUI.createTypeOutTextBmp("Jumping In",sh*MenuUI.fontScale*2);
+			mainTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*2*0.35+sh*MenuUI.margF*0.3;
+			mainTitle.y = MenuUI.margF*sh;
+			addChild(mainTitle);
+			if (subTitle!=null && subTitle.parent!=null)
+				subTitle.parent.removeChild(subTitle);
+			subTitle = MenuUI.createTypeOutTextBmp("Location : "+MenuUI.randomPlanetName(),sh*MenuUI.fontScale);
+			subTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*0.35+sh*MenuUI.margF*0.3;
+			subTitle.y = mainTitle.y+mainTitle.height*0.8;
+			addChild(subTitle);
 			return sky;
 		}//
 
@@ -737,8 +768,10 @@
 		{
 			for (var i:int=0; i<n; i++)
 			{
-				var a:Asteroid = new Asteroid("a"+i,Math.floor(Math.random()*9),1+Math.floor(Math.random()*15),Mtls["TexRocks"],Mtls["SpecRocks"],Mtls["NormRocks"]);
-				a.posn = new Vector3D((Math.random()-0.5)*100,0,(Math.random()-0.5)*100);
+				var aTyp:int = Math.floor(Math.random()*9);
+				var a:Asteroid = new Asteroid("asteroid",aTyp,1+Math.floor(Math.random()*15),Mtls["TexRocks"],Mtls["SpecRocks"],Mtls["NormRocks"]);
+				a.name = i+"-"+a.hullConfig.length+"-type"+aTyp;
+				a.posn = new Vector3D((Math.random()-0.5)*500,0,(Math.random()-0.5)*500);
 				Entities.push(a);
 				world.addChild(a.skin);
 			}
@@ -766,7 +799,7 @@
 					v.w += 0.1/Math.sqrt(dist+100);
 				}
 				else
-					v.w += 0.0001;
+					v.w += 0.00002;
 			}
 		}//endfunction
 
@@ -1845,11 +1878,8 @@
 					new < String > ["Find Opponent","Configure Ship"],
 					new < Function>[function ():void	{galaxyScene(function():void {battleScene(loadShipsData());});},
 													showShipModifyMenu]);
-			if (shipHUD!=null)
-			{
-				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = focusedShip.name+" : Home Base";
-			}
+			menu.y = subTitle.y+subTitle.height;
+			mainTitle.name = focusedShip.name+" : Home Base";
 		}//endfunction
 
 		//===============================================================================================
@@ -1893,11 +1923,8 @@
 																									});
 																	},
 													showMainMenu]);
-			if (shipHUD!=null)
-			{
-				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit StarShip";
-			}
+			menu.y = subTitle.y+subTitle.height;
+			mainTitle.name = focusedShip.name+" : Outfit StarShip";
 		}//endfunction
 
 		//===============================================================================================
@@ -1905,8 +1932,7 @@
 		//===============================================================================================
 		private function showShipEditMenu(title:String,editStepFn:Function,callBack:Function):void
 		{
-			if (focusedShip!=null)
-				velDBER.x = (focusedShip.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
+			velDBER.x = (focusedShip.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
 
 			var tickBmd:BitmapData = new icoTick().bitmapData;
 			var crossBmd:BitmapData = new icoCross().bitmapData;
@@ -1926,9 +1952,6 @@
 			{
 				stepFns.push(btnsShowFn);		// add dynamic show hide buttons
 				stepFns.push(editStepFn);		// add edit interraction
-
-				if (shipHUD!=null)
-					shipHUD.getChildAt(0).name = focusedShip.name+" : "+title;
 
 				var menu:Sprite =
 				MenuUI.createSimpleEditModeMenu(mainRef,tickBmd,crossBmd,undoBmd,
@@ -1975,8 +1998,8 @@
 						focusedShip.setFromConfig(undoStk.pop());	// restore last config
 				},
 				showBtns);
-				if (shipHUD!=null)
-					menu.y = shipHUD.getChildAt(0).height;
+				menu.y = subTitle.y+subTitle.height;
+				mainTitle.name = focusedShip.name+" : "+title;
 			};
 			showThisEditMenu();
 		}//endfunction
@@ -2096,11 +2119,8 @@
 									return;
 								}
 								selIdx = i;
-								if (shipHUD!=null)
-								{
-									menu.y = shipHUD.getChildAt(0).height;
-									shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit "+Ids[i].name;
-								}
+								menu.y = subTitle.y+subTitle.height;
+								mainTitle.name = focusedShip.name+" : Outfit "+Ids[i].name;
 							}
 						}
 					}
@@ -2137,11 +2157,8 @@
 			}//endfunction
 
 			var menu:Sprite =	MenuUI.createLeftStyleMenu(this,new <String>["back"],new <Function>[cleanUp]);
-			if (shipHUD!=null)
-			{
-				menu.y = shipHUD.getChildAt(0).height;
-				shipHUD.getChildAt(0).name = focusedShip.name+" : Outfit Modules";
-			}
+			menu.y = subTitle.y+subTitle.height;
+			mainTitle.name = focusedShip.name+" : Outfit Modules";
 		}//endfunction
 
 		//===============================================================================================
@@ -2213,7 +2230,6 @@
 			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
-				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
 				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
 				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx-hit.nx/2,hit.vy-hit.ny/2,hit.vz-hit.nz/2));
 				localPt.x = Math.round(localPt.x);
@@ -2245,7 +2261,6 @@
 			else
 			{
 				world.removeChild(buildMkr);
-				mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
 			}
 		}//endfunction
 
@@ -2259,7 +2274,6 @@
 			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
-				mkr.transform = new Matrix4x4().translate(hit.vx,hit.vy,hit.vz);
 				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
 				var localPt:Vector3D = shipInvT.transform(new Vector3D(hit.vx+hit.nx/2,hit.vy+hit.ny/2,hit.vz+hit.nz/2));
 				localPt.x = Math.round(localPt.x);
@@ -2287,7 +2301,6 @@
 			else
 			{
 				world.removeChild(buildMkr);
-				mkr.transform = new Matrix4x4().translate(ray.vx+ray.nx,ray.vy+ray.ny,ray.vz+ray.nz);
 			}
 		}//endfunction
 
@@ -2720,10 +2733,37 @@ class InputPt
 
 class MenuUI
 {
-	private static var margF:Number = 0.01;
-	private static var fontScale:Number = 30/700;
+	public static var fontScale:Number = 30/700;
+	public static var margF:Number = 0.01;
 	public static var clickSfx:Function = null;
 	public static var colorTone:uint = 0x99FFFF;		// overridden externally as needed
+
+	public static var starPrefix:Vector.<String> =
+	Vector.<String>([	"Alpha","Beta","Gamma","Delta","Epsilon","Zeta","Eta","Theta","Iota","Kappa","Lambda","Mu","Nu",
+										"Xi","Omicron","Pi","Rho","Sigma","Tau","Upsilon","Phi","Chi","Psi","Omega"]);
+	public static var constellation:Vector.<String> =
+	Vector.<String>([	"Andromedae","Antliae","Apodis","Aquarii","Aquilae","Arae","Arietis","Aurigae","Boötis","Caeli",
+										"Camelopardalis","Cancri","Canum Venaticorum","Canis Majoris","Canis Minoris","Capricorni",
+										"Carinae","Cassiopeiae","Centauri","Cephei","Ceti","Chamaeleontis","Circini","Columbae","Corvi",
+										"Crateris","Crucis","Cygni","Delphini","Doradus","","Draconis","Equulei","Eridani","Fornacis","Gemini",
+										"Pollux","Gruis","Herculis","Horologii","Hydrae","Hydri","Indi","Lacertae","Leonis","Leonis Minoris",
+										"Leporis","Librae","Lupi","Lyncis","Lyrae","Mensae","Microscopii","Monocerotis","Muscae","Normae",
+										"Octantis","Ophiuchi","Orionis","Pavonis","Pegasi","Persei","Phoenicis","Pictoris","Piscium","Puppis",
+										"Pyxidis","Reticuli","Sagittae","Sagittarii","Scorpii","Sculptoris","Scuti","Serpentis","Sextantis",
+										"Tauri","Telescopii","Trianguli","Tucanae","Ursae Majoris","Ursae Minoris","Velorum","Virginis",
+										"Volantis","Vulpeculae"]);
+	public static var planetSuffix:Vector.<String> =
+	Vector.<String>(["I","II","III","IV","V","VI","VII","VIII","IX","X"]);
+
+	//===============================================================================================
+	// generate cool spacey planet names
+	//===============================================================================================
+	public static function randomPlanetName():String
+	{
+		return 	starPrefix[int(Math.random()*starPrefix.length)]+" "+
+						constellation[int(Math.random()*constellation.length)]+" "+
+						planetSuffix[int(Math.random()*planetSuffix.length)];
+	}//endfunction
 
 	//===============================================================================================
 	// create a generic summary screen
@@ -3100,8 +3140,8 @@ class MenuUI
 		var bmp:Bitmap = new Bitmap(bmd);
 		var mat:Matrix = new Matrix(1, 0, 0, 1, borderWidth, borderWidth);
 		var rect:Rectangle = new Rectangle(0,0,bmd.width,bmd.height);
-		bmp.name = s;
 
+		bmp.name = s;
 		var targTxt:String = "";
 
 		function enterFrameHandler(ev:Event):void
@@ -3112,42 +3152,41 @@ class MenuUI
 				targTxt = bmp.name;
 				var otxt:String = tf.text;
 				tf.text = targTxt;
-				bmd = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x00000000);
+				bmd = new BitmapData(tf.width+borderWidth*2,tf.height+borderWidth*2,true,0x99000000);
+				tf.text = otxt;
+			}
+
+			if (bmp.bitmapData!=bmd && tf.width<=bmd.width)
+			{	// not yet swapped to new sized bmd
+				bmp.bitmapData.dispose();
+				bmp.bitmapData = bmd;
 				rect.width = bmd.width;
 				rect.height = bmd.height;
-				tf.text = otxt;
 			}
 
 			var txt:String = tf.text;
 
-			if (bmp.bitmapData!=bmd && txt.length<=targTxt.length)
-			{	// not yet swapped to new sized bmd
-				bmp.bitmapData.dispose();
-				bmp.bitmapData = bmd;
-			}
-
-			// ----- type text out
 			if (txt.length>targTxt.length || targTxt.substr(0,txt.length)!=txt)
-			{
+			{	// ----- delete chars from behind
 				tf.text = txt.substr(0,txt.length-1);
-				bmd.fillRect(rect,0x00000000);
-				bmd.draw(tf, mat);	// draw textField on bmd
+				bmp.bitmapData.fillRect(rect,0);
+				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
 			}
 			else if (txt.length<targTxt.length)
-			{
+			{	// ----- type chars out
 				tf.text = targTxt.substr(0,txt.length+1);
-				bmd.fillRect(rect,0x00000000);
-				bmd.draw(tf, mat);	// draw textField on bmd
+				bmp.bitmapData.fillRect(rect,0);
+				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
 			}
 		}//endfunction
-		tf.addEventListener(Event.ENTER_FRAME,enterFrameHandler);
+		bmp.addEventListener(Event.ENTER_FRAME,enterFrameHandler);
 
 		function removeHandler(ev:Event):void
 		{
-			tf.removeEventListener(Event.ENTER_FRAME, enterFrameHandler);
-			tf.removeEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+			bmp.removeEventListener(Event.ENTER_FRAME, enterFrameHandler);
+			bmp.removeEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
 		}//endfunction
-		tf.addEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
+		bmp.addEventListener(Event.REMOVED_FROM_STAGE, removeHandler);
 
 		return bmp;
 	}//endfunction
@@ -3253,8 +3292,6 @@ class MenuUI
 	public static function createShipHUD(ship:Ship, stage:Stage) : Sprite
 	{
 		var s:Sprite = new Sprite();
-		var nameBmp:Bitmap = createTypeOutTextBmp(ship.name,1.4*fontScale*stage.stageHeight);
-		s.addChild(nameBmp);
 
 		// ----- create stats labels
 		var labColor:uint = uint((colorTone>>16)*0.7)<<16 | uint(((colorTone>>8) & 0xFF)*0.7)<<8 | uint((colorTone & 0xFF)*0.7);
@@ -3308,9 +3345,6 @@ class MenuUI
 		{
 			var bw:int = Math.round(stage.stageWidth*(1-margF*2));
 			var bh:int = Math.round(stage.stageHeight*0.013);
-
-			nameBmp.x = (stage.stageWidth-bw)/2;
-			nameBmp.y = bh;
 
 			curStatsTf.text = Math.round(ship.integrity)+"\n"+Math.round(ship.energy)+"\n"+Math.round(ship.vel.length*10000)/10;
 
@@ -4024,9 +4058,9 @@ class Asteroid extends Hull
 			if (Norms[id]!=null)
 			{
 				nv = Norms[id];
-				V[i+0] += 0.5*nv.x/nv.w;
-				V[i+1] += 0.5*nv.y/nv.w;
-				V[i+2] += 0.5*nv.z/nv.w;
+				V[i+0] += 0.3*nv.x/nv.w;
+				V[i+1] += 0.3*nv.y/nv.w;
+				V[i+2] += 0.3*nv.z/nv.w;
 				V[i+3] = nv.x;
 				V[i+4] = nv.y;
 				V[i+5] = nv.z;
