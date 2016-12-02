@@ -1917,6 +1917,7 @@
 					new < Function>[function():void	{
 														Friendlies[int(Friendlies.length*Math.random())].targets = new <Hull>[focusedEntity];
 														focusOn(Friendlies[int(Friendlies.length*Math.random())]);
+														stage.addChild(Mesh.debugTf);
 													},
 													function():void {focusOn(Friendlies[int(Friendlies.length*Math.random())]);}]);
 			optionsMenu.y = subTitle.y+subTitle.height;
@@ -4118,6 +4119,9 @@ class Asteroid extends Hull
 									(V[i*11+10]/3)*0.98 + v+0.01/3);
 			}
 		}//endfor
+
+		if (Mesh.debugTf!=null)
+			Mesh.debugTf.appendText("rebuildAsteroid : "+toString()+" | radius : "+radius+"\n");
 
 		hullSkin.createGeometry(NV,hullSkin.idxsData);
 	}//endfunction

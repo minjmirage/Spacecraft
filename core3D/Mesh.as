@@ -562,8 +562,8 @@
 			dataType = _typeV;
 
 			// ----- derive collision geometry ----------------------------------------
-			if (collisionGeom==null || !overwrite) collisionGeom = new CollisionGeometry(vertData,idxsData);
-
+			collisionGeom = new CollisionGeometry(vertData,idxsData);
+			
 			if (context3d==null)	return;
 
 			// ----- set context vertices data ----------------------------------------
