@@ -3612,7 +3612,7 @@ class Module		// data class
 		if (kind=="launcherS")
 		{
 			fireDelay=1000;
-			speed=0.15;		// only initial launch speed. missiles have accel
+			speed=0.2;		// only initial launch speed. missiles have accel
 			damage=50;
 			range=50;
 		}
@@ -3628,7 +3628,7 @@ class Module		// data class
 		else if (kind=="gunFlakS")
 		{
 			fireDelay=50;
-			speed=0.15;
+			speed=0.3;
 			damage=20;
 			range=7;
 			muzzleLen=0.3;
@@ -3636,7 +3636,7 @@ class Module		// data class
 		else if (kind=="gunIonS")
 		{
 			fireDelay=40;
-			speed=0.15;
+			speed=0.3;
 			damage=20;
 			range=15;
 			muzzleLen=0.35;
@@ -3644,7 +3644,7 @@ class Module		// data class
 		else if (kind=="gunPlasmaS")
 		{
 			fireDelay=40;
-			speed=0.1;
+			speed=0.2;
 			damage=80;
 			range=10;
 			muzzleLen=0.35;
@@ -3652,7 +3652,7 @@ class Module		// data class
 		else if (kind=="gunRailS")
 		{
 			fireDelay=60;
-			speed=0.2;
+			speed=0.6;
 			damage=20;
 			range=20;
 			muzzleLen=0.37;
@@ -3660,17 +3660,17 @@ class Module		// data class
 		else if (kind=="gunIonM")
 		{
 			fireDelay=80;
-			speed=0.15;
+			speed=0.3;
 			damage=160;
 			turnRate = 0.01;
-			range=40;
+			range=30;
 			muzzleLen=0.7;
 		}
 		else if (kind=="gunRailM")
 		{
 			fireDelay=100;
-			speed=0.4;
-			damage=320;
+			speed=0.6;
+			damage=200;
 			turnRate = 0.01;
 			range=40;
 			muzzleLen=0.7;
@@ -3678,7 +3678,7 @@ class Module		// data class
 		else if (kind=="gunPlasmaM")
 		{
 			fireDelay=100;
-			speed=0.2;
+			speed=0.3;
 			damage=400;
 			turnRate = 0.01;
 			range=20;
@@ -4229,7 +4229,7 @@ class Asteroid extends Hull
 				integrity = 0;
 			else
 			{
-				trimHull(nh.x,nh.y,nh.z);
+				hullConfig.splice(hullConfig.indexOf(nh),1);
 				rebuildAsteroid();
 			}
 		}
@@ -4253,6 +4253,7 @@ class Ship extends Hull
 	public var facing:Vector3D = null;				// current facing of ship
 	public var rotVel:Vector3D = null;				// current rotational velocity of ship
 	public var accelF:Number = 0.001;					// ship acceleration factor
+	public var rotAccelF:Number = 0.001;			// ship rotational acceleration
 	public var slowF:Number = 0.9;						// ship slow down factor
 	public var maxSpeed:Number = accelF/(1/slowF-1);	// ship max speed, calculated
 	public var banking:Number = 0;
@@ -4264,9 +4265,9 @@ class Ship extends Hull
 	public var damagePosns:Vector.<VertexData> = null;
 
 	private static var RandNames:Vector.<String> =
-	new <String>["Androsynth","Arilou","Chenjesu","Earthling","Ilwrath","Mmrnmhrm","Mycon","Shofixti","Spathi",
-	"Syreen","Umgah","Ur-Quan","Kohr-Ah","VUX","Yehat","Chmmr","Dnyarri","Druuge","Melnorme","Orz","Pkunk",
-	"Slylandro","Supox","Thraddash","Utwig","Zoq-Fot-Pik","Taalo"];
+	new <String>["Androsynth Comet","Arilou Skiff","Chenjesu Brood Wing","Earthling Cruiser","Ilwrath Avenger","Mmrnmhrm X Form","Mycon Podship","Shofixti Scout","Spathi Eluder",
+	"Syreen Penetrator","Umgah Drone","Ur-Quan Dreadnought","Kohr-Ah Marauder","VUX Intruder","Yehat","Chmmr","Dnyarri Talking Pet","Druuge Mauler","Melnorme Trader","Orz","Pkunk Fury",
+	"Slylandro Probe","Supox Blade","Thraddash Torch","Utwig Jugger","Zoq-Fot-Pik","Taalo Shield"];
 
 	//===============================================================================================
 	// constructs a ship entity
@@ -4588,8 +4589,8 @@ class Ship extends Hull
 		// ----- update chassis skin
 		rebuildHull();
 
-		maxIntegrity = hullConfig.length*100;
-		integrity = hullConfig.length*100;
+		maxIntegrity = hullConfig.length*200;
+		integrity = hullConfig.length*200;
 		maxEnergy = hullConfig.length*100;
 		energy = hullConfig.length*100;
 
@@ -4615,7 +4616,7 @@ class Ship extends Hull
 			tmp.addChild(mt);
 		}
 
-		accelF = thrustCnt/hullConfig.length*0.01;
+		accelF = thrustCnt/hullConfig.length*0.015;
 		maxSpeed = accelF/(1/slowF-1);
 
 		tmp = tmp.mergeTree();
@@ -4717,7 +4718,7 @@ class Projectile	// data class
 
 class Missile extends Projectile
 {
-	var accel:Number = 0.02;
+	var accel:Number = 0.025;
 	var damp:Number = 0.9;
 	var turnRate:Number = 0.3;
 
