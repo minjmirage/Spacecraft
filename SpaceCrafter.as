@@ -67,6 +67,7 @@
 
 		[Embed(source="3D/textures/tex.jpg")] 					private static var Tex:Class;
 		[Embed(source="3D/textures/TexPanel.jpg")] 			private static var TexPanel:Class;
+		[Embed(source="3D/textures/TexTransPanel.png")] private static var TexTransPanel:Class;
 		[Embed(source="3D/textures/SpecPanel.jpg")] 		private static var SpecPanel:Class;
 		[Embed(source="3D/textures/TexStreak.png")] 		private static var TexStreak:Class;
 		[Embed(source="3D/textures/halo.png")] 					private static var TexHalo:Class;
@@ -216,7 +217,7 @@
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
 			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
 							TexRocks:new TexRocks().bitmapData, SpecRocks:new SpecRocks().bitmapData, NormRocks:new NormRocks().bitmapData,
-							TexTrans:new BitmapData(1,1,true,0x66666666),
+							TexTrans:new TexTransPanel().bitmapData,
 							TexPlanets:new TexPlanets().bitmapData,
 							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
 							TexSpace2:fadeVertEnds(new TexSpace2().bitmapData),
@@ -973,10 +974,7 @@
 						if (entity is Ship)
 							destroyShip((Ship)(entity));
 						else
-						{
-							world.removeChild(entity.skin);
-							Entities.splice(i,1);
-						}
+							removeEntity(entity);
 					}
 					else
 					{
@@ -1381,14 +1379,14 @@
 							{
 								Tlocal = new Matrix4x4().translate(0,-1.57,0).rotX(-m.elevation*0.001).rotY(m.bearing);
 								var MTg:Matrix4x4 = T.mult(Tlocal);
-								if (Mesh.viewT.ca*MTg.ab + Mesh.viewT.cb*MTg.bb + Mesh.viewT.cc*MTg.cb<0.5)	// if frameS not facing away from camera, render
+								if (Mesh.viewT.ca*MTg.ab + Mesh.viewT.cb*MTg.bb + Mesh.viewT.cc*MTg.cb<0.6)	// if frameS not facing away from camera, render
 									frameM_MP.nextLocRotScale(MTg);
 							}
 							else
 							{
 								Tlocal = new Matrix4x4().translate(0,-0.71,0).rotX(-m.elevation*0.001).rotY(m.bearing);
 								var STg:Matrix4x4 = T.mult(Tlocal);
-								if (Mesh.viewT.ca*STg.ab + Mesh.viewT.cb*STg.bb + Mesh.viewT.cc*STg.cb<0.5)	// if frameS not facing away from camera, render
+								if (Mesh.viewT.ca*STg.ab + Mesh.viewT.cb*STg.bb + Mesh.viewT.cc*STg.cb<0.6)	// if frameS not facing away from camera, render
 									frameS_MP.nextLocRotScale(STg);
 							}
 						}
@@ -1615,9 +1613,9 @@
 					var cnt:int = Math.floor(-pt.u/50)+1;
 					if (posnIsOnScreen(px,py,pz))
 					{
-						var mag:Number = 0.02*Math.sqrt(pt.w);
-						(ParticlesEmitter)(EffectEMs["blast"]).emit(px+nx*0.01,py+ny*0.01,pz+nz*0.01,ship.vel.x,ship.vel.y,ship.vel.z,mag);
-						mag +=0.06;
+						var mag:Number = 0.003*Math.sqrt(pt.w);
+						(ParticlesEmitter)(EffectEMs["blast"]).emit(px,py,pz,ship.vel.x+nx*mag,ship.vel.y+ny*mag,ship.vel.z+nz*mag,mag*5);
+						mag *=3;
 						(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.5,1);
 					}
 					pt.u=50;
@@ -1653,7 +1651,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// simulate ships distruction
+		// simulate ships destruction
 		//===============================================================================================
 		private function explodingStep() : void
 		{
@@ -1711,10 +1709,26 @@
 			ship.vel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
 			ship.vel.scaleBy(0.01/ship.vel.length);
 			Exploding.push(ship);
-			if (Entities.indexOf(ship)!=-1) 		Entities.splice(Entities.indexOf(ship),1);
-			if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
-			if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
 			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"hullGroan"+(1+Math.round(Math.random())));
+			removeEntity(ship);
+			world.addChild(ship.skin);	// add back ship skin for explosion fx
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function removeEntity(e:Hull):void
+		{
+			for (var i:int=Entities.length-1; i>-1; i--)
+				if (Entities[i] is Ship)
+				{
+					var T:Vector.<Hull> = (Ship)(Entities[i]).targets;
+					if (T.indexOf(e)!=-1)	T.splice(T.indexOf(e),1);
+				}
+			if (Entities.indexOf(e)!=-1) 		Entities.splice(Entities.indexOf(e),1);
+			if (Friendlies.indexOf(e)!=-1) 	Friendlies.splice(Friendlies.indexOf(e),1);
+			if (Hostiles.indexOf(e)!=-1) 		Hostiles.splice(Hostiles.indexOf(e),1);
+			world.removeChild(e.skin);
 		}//endfunction
 
 		//===============================================================================================
@@ -2416,6 +2430,8 @@
 		private function deactivateHandler(ev:Event):void
 		{
 			simulationPaused = true;
+			var st:SoundTransform = ambientLoop.soundTransform;
+			TweenLite.to(st,1,{volume:0, onUpdate:function():void {ambientLoop.soundTransform=st;}});
 		}//endfunction
 
 		//===============================================================================================
@@ -2424,6 +2440,8 @@
 		private function activateHandler(ev:Event):void
 		{
 			simulationPaused = false;
+			var st:SoundTransform = ambientLoop.soundTransform;
+			TweenLite.to(st,1,{volume:1, onUpdate:function():void {ambientLoop.soundTransform=st;}});
 		}//endfunction
 
 		//===============================================================================================
@@ -3745,7 +3763,7 @@ class Hull
 
 		skin = new Mesh();
 		hullSkin = new Mesh();
-		hullSkin.material.setSpecular(1);
+		hullSkin.material.setSpecular(1,0.5);
 		skin.addChild(hullSkin);
 
 		if (Adj==null)
@@ -4265,9 +4283,9 @@ class Ship extends Hull
 	public var damagePosns:Vector.<VertexData> = null;
 
 	private static var RandNames:Vector.<String> =
-	new <String>["Androsynth Comet","Arilou Skiff","Chenjesu Brood Wing","Earthling Cruiser","Ilwrath Avenger","Mmrnmhrm X Form","Mycon Podship","Shofixti Scout","Spathi Eluder",
-	"Syreen Penetrator","Umgah Drone","Ur-Quan Dreadnought","Kohr-Ah Marauder","VUX Intruder","Yehat","Chmmr","Dnyarri Talking Pet","Druuge Mauler","Melnorme Trader","Orz","Pkunk Fury",
-	"Slylandro Probe","Supox Blade","Thraddash Torch","Utwig Jugger","Zoq-Fot-Pik","Taalo Shield"];
+	new <String>["Androsynth Guardian","Arilou Skiff","Chenjesu Broodhome","Earthling Cruiser","Ilwrath Avenger","Mmrnmhrm X Form","Mycon Podship","Shofixti Scout","Spathi Eluder",
+	"Syreen Penetrator","Umgah Drone","Ur-Quan Dreadnought","Kohr-Ah Marauder","VUX Intruder","Chmmr Avatar","Dnyarri Talking Pet","Druuge Mauler","Melnorme Trader","Orz Nemesis","Pkunk Fury",
+	"Slylandro Probe","Supox Blade","Thraddash Torch","Utwig Jugger","Yehat Terminator","Zoq-Fot-Pik Stinger","Taalo Shield"];
 
 	//===============================================================================================
 	// constructs a ship entity
@@ -4281,6 +4299,7 @@ class Ship extends Hull
 		facing = new Vector3D(0,0,1);	// default facing
 		rotVel = new Vector3D();
 
+		hullSkin.material.setSpecular(2,0.5);
 		modulesSkin = new Mesh();
 		modulesSkin.material.setSpecular(0.2);
 		skin.addChild(modulesSkin);
