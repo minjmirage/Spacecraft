@@ -4196,6 +4196,41 @@ class Asteroid extends Hull
 	}//endfunction
 
 	//===============================================================================================
+	//
+	//===============================================================================================
+	private function disintegrateFx():void
+	{
+		// ----- randomize fragment centers
+		var P:Vector.<Vector3D> = new Vector.<Vector3D>();
+		for (var i:int=5 + Math.random()*10; i>0; i--)
+			P.push(new Vector3D(int(Math.random()*10),int(Math.random()*10),int(Math.random()*10)));
+
+		// ----- determine fragment shapes
+		var C:Vector.<String> = new Vector.<String>();
+		for (i=P.length-1; i>-1; i--)	C.push("");
+
+		for (var x:int=0; x<10; x++)
+			for (var y:int=0; y<10; y++)
+				for (var z:int=0; z<10; z++)
+				{
+					var nDsq:Number = Number.MAX_VALUE;
+					var nIdx:int = 0;
+					for (i=P.length-1; i>-1; i--)
+					{
+						var p:Vector3D = P[i];
+						var dSq:Number = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y)+(p.z-z)*(p.z-z);
+						if (dSq<nDsq)
+						{
+							nDsq = dSq;
+							nIdx = i;
+						}
+
+					}//endfor i
+				}
+
+	}//endfunction
+
+	//===============================================================================================
 	// update position & orientation of asteroid
 	//===============================================================================================
 	public override function updateStep():void
@@ -4284,7 +4319,7 @@ class Ship extends Hull
 
 	private static var RandNames:Vector.<String> =
 	new <String>["Androsynth Guardian","Arilou Skiff","Chenjesu Broodhome","Earthling Cruiser","Ilwrath Avenger","Mmrnmhrm X Form","Mycon Podship","Shofixti Scout","Spathi Eluder",
-	"Syreen Penetrator","Umgah Drone","Ur-Quan Dreadnought","Kohr-Ah Marauder","VUX Intruder","Chmmr Avatar","Dnyarri Talking Pet","Druuge Mauler","Melnorme Trader","Orz Nemesis","Pkunk Fury",
+	"Syreen Penetrator","Umgah Drone","Ur-Quan Dreadnought","Kohr-Ah Marauder","VUX Intruder","Chmmr Avatar","Dnyarri Overmind","Druuge Mauler","Melnorme Trader","Orz Nemesis","Pkunk Fury",
 	"Slylandro Probe","Supox Blade","Thraddash Torch","Utwig Jugger","Yehat Terminator","Zoq-Fot-Pik Stinger","Taalo Shield"];
 
 	//===============================================================================================
