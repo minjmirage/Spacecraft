@@ -3790,7 +3790,7 @@ class Hull
 		posn.x += vel.x;
 		posn.y += vel.y;
 		posn.z += vel.z;
-		skin.transform = new Matrix4x4().translate(posn.x,posn.y,posn.z);
+		skin.transform = new Matrix4x4().translate(posn.x-pivot.x,posn.y-pivot.y,posn.z-pivot.z);
 	}//endfunction
 
 	//===============================================================================================
@@ -3828,8 +3828,8 @@ class Hull
 	//===============================================================================================
 	public function randomHullConfig(n:uint=10,symmetry:Boolean=true) : void
 	{
-		if (n==0) return;
 		hullConfig = new Vector.<HullBlock>();
+		if (n==0) return;
 		hullConfig.push(new HullBlock(0,0,0,this));
 		var Adj:Vector.<Vector3D> = Vector.<Vector3D>([	new Vector3D(0,0,1),new Vector3D(0,0,-1),
 														new Vector3D(0,1,0),new Vector3D(0,-1,0),
@@ -3894,6 +3894,7 @@ class Hull
 	public function rebuildHull() : void
 	{
 		// ----- update chassis skin
+		radius = 0;
 		pivot = new Vector3D();
 		var tmp:Mesh = new Mesh();
 		for (var i:int=hullConfig.length-1; i>=0; i--)
@@ -3904,11 +3905,13 @@ class Hull
 			pivot.y+=h.y;
 			pivot.z+=h.z;
 		}
-
 		tmp = tmp.mergeTree();
-		hullSkin.setGeometry(tmp.vertData,tmp.idxsData);
-		pivot.scaleBy(1/hullConfig.length);
-		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+		if (hullConfig.length>0)
+		{
+			hullSkin.setGeometry(tmp.vertData,tmp.idxsData);
+			pivot.scaleBy(1/hullConfig.length);
+			radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
+		}
 		integrity = hullConfig.length*100;
 	}//endfunction
 
@@ -4102,6 +4105,8 @@ class Asteroid extends Hull
 	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
 	public var type:uint = 0;
 
+	private var stepFns:Vector.<Function> = null;
+
 	//===============================================================================================
 	//
 	//===============================================================================================
@@ -4115,8 +4120,8 @@ class Asteroid extends Hull
 
 		// ----- set asteroid texture
 		for (var i:int=hullConfig.length-1; i>-1; i--)
-			hullConfig[i].integrity = 1000;
-		integrity = hullConfig.length*1000;
+			hullConfig[i].integrity = 100;
+		integrity = hullConfig.length*100;
 		hullSkin.material.setAmbient(0,0,0);
 		hullSkin.material.setSpecular(1,1);
 		hullSkin.material.setTexMap(texMap);
@@ -4129,6 +4134,8 @@ class Asteroid extends Hull
 		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
 		rotVel.scaleBy(Math.random()*0.005/rotVel.length);
 		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
+
+		stepFns = new Vector.<Function>();
 	}//endConstr
 
 	//===============================================================================================
@@ -4198,20 +4205,26 @@ class Asteroid extends Hull
 	//===============================================================================================
 	//
 	//===============================================================================================
-	private function disintegrateFx():void
+	private function disintegrateFx(localx:int,localy:int,localz:int,callBack:Function):void
 	{
+		var div:int = 5;
+
 		// ----- randomize fragment centers
 		var P:Vector.<Vector3D> = new Vector.<Vector3D>();
-		for (var i:int=5 + Math.random()*10; i>0; i--)
-			P.push(new Vector3D(int(Math.random()*10),int(Math.random()*10),int(Math.random()*10)));
+		for (var i:int=10; i>0; i--)
+		{
+			var j:int = int(Math.random()*div*div*div);
+			P.push(new Vector3D(j%div,int(j/div)%div,int(j/(div*div))));
+		}
 
 		// ----- determine fragment shapes
-		var C:Vector.<String> = new Vector.<String>();
-		for (i=P.length-1; i>-1; i--)	C.push("");
+		var Fragments:Vector.<Asteroid> = new Vector.<Asteroid>();
+		for (i=P.length-1; i>-1; i--)
+			Fragments.push(new Asteroid(name+"_frag"+i,type,0,hullSkin.material.texMap,hullSkin.material.specMap,hullSkin.material.normMap));
 
-		for (var x:int=0; x<10; x++)
-			for (var y:int=0; y<10; y++)
-				for (var z:int=0; z<10; z++)
+		for (var x:int=0; x<div; x++)
+			for (var y:int=0; y<div; y++)
+				for (var z:int=0; z<div; z++)
 				{
 					var nDsq:Number = Number.MAX_VALUE;
 					var nIdx:int = 0;
@@ -4224,10 +4237,57 @@ class Asteroid extends Hull
 							nDsq = dSq;
 							nIdx = i;
 						}
-
 					}//endfor i
-				}
+					Fragments[nIdx].hullConfig.push(new HullBlock(x,y,z,Fragments[nIdx]));
+				}//endfor xyz
 
+		// ----- construct fragments in put in skin
+		var con:Mesh = new Mesh;
+		var sc:Number = 0.8/div;
+		con.transform = con.transform.scale(sc,sc,sc).translate(localx,localy,localz);
+		skin.addChild(con);
+		for (i=Fragments.length-1; i>-1; i--)
+		{
+			var frag:Asteroid = Fragments[i];
+			frag.rebuildAsteroid();
+			frag.posn.x = frag.pivot.x-(div-1)*0.5;
+			frag.posn.y = frag.pivot.y-(div-1)*0.5;
+			frag.posn.z = frag.pivot.z-(div-1)*0.5;
+			frag.vel.x = frag.posn.x/5;
+			frag.vel.y = frag.posn.y/5;
+			frag.vel.z = frag.posn.z/5;
+			frag.rotPosn = new Vector3D(0,0,0,1);
+			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
+			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
+			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
+			con.addChild(frag.skin);
+		}
+
+		// ----- fragments simulation
+		var ttl:int = 90;
+		var fn:Function = function():void
+		{
+			if (ttl<0)
+			{
+				skin.removeChild(con);
+				stepFns.splice(stepFns.indexOf(fn),1);
+				if (callBack!=null) callBack();
+			}
+			else
+			{
+				var sc:Number = ttl/90;
+				for (var i:int=Fragments.length-1; i>-1; i--)
+				{
+					var frag:Asteroid = Fragments[i];
+					var pv:Vector3D = frag.pivot;
+					frag.hullSkin.transform = new Matrix4x4().translate(-pv.x,-pv.y,-pv.z).scale(sc,sc,sc).translate(pv.x,pv.y,pv.z);
+					frag.updateStep();
+				}
+				ttl--;
+			}
+		};
+		fn();
+		stepFns.push(fn);
 	}//endfunction
 
 	//===============================================================================================
@@ -4245,8 +4305,11 @@ class Asteroid extends Hull
 		//rotVel.w = Math.sqrt(1 - rotVel.x*rotVel.x - rotVel.y*rotVel.y - rotVel.z*rotVel.z);
 
 		// ----- update ship transform
-		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.x,rotPosn.y,rotPosn.z,rotPosn.w).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z)).translate(posn.x,posn.y,posn.z);
+		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.w,rotPosn.x,rotPosn.y,rotPosn.z).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z)).translate(posn.x,posn.y,posn.z);
 		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
+
+		for (var i:int=stepFns.length-1; i>-1; i--)
+			stepFns[i]();
 	}//endfunction
 
 	//===============================================================================================
@@ -4278,13 +4341,9 @@ class Asteroid extends Hull
 		// ----- remove block if destroyed
 		if (nh.integrity<=0)
 		{
-			if (hullConfig.length<=1)
-				integrity = 0;
-			else
-			{
-				hullConfig.splice(hullConfig.indexOf(nh),1);
-				rebuildAsteroid();
-			}
+			hullConfig.splice(hullConfig.indexOf(nh),1);
+			disintegrateFx(nh.x,nh.y,nh.z,function():void {if (hullConfig.length<=0)	integrity=0;});
+			rebuildAsteroid();
 		}
 	}//endfunction
 }//endClass
