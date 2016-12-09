@@ -543,7 +543,6 @@
 		public function setGeometry(verticesData:Vector.<Number>=null,indicesData:Vector.<uint>=null,overwrite:Boolean=false) : void
 		{
 			//debugTrace("setGeometry vertData:"+vertData.length+"  idxsData:"+idxsData.length+" ");
-
 			vertData = verticesData;
 			idxsData = indicesData;
 
@@ -551,19 +550,21 @@
 			if (!overwrite && vertexBuffer!=null) /*vertexBuffer.dispose();*/	vertexBuffer=null;
 			if (!overwrite && indexBuffer!=null) /*indexBuffer.dispose();*/	indexBuffer=null;
 
-			var numVertices:int = vertData.length/11;
-			trisCnt = idxsData.length/3;		// sets number of triangles to render
-
-			if (idxsData.length<3)
+			if (vertData==null || idxsData==null || idxsData.length<3)
 			{
-				vertData=null; idxsData=null; dataType=-1; return;		// null dataset!!
+				vertData=null;
+				idxsData=null;
+				dataType=-1;
+				return;		// null dataset!!
 			}
 
+			var numVertices:int = vertData.length/11;
+			trisCnt = idxsData.length/3;		// sets number of triangles to render
 			dataType = _typeV;
 
 			// ----- derive collision geometry ----------------------------------------
 			collisionGeom = new CollisionGeometry(vertData,idxsData);
-			
+
 			if (context3d==null)	return;
 
 			// ----- set context vertices data ----------------------------------------

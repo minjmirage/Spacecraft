@@ -165,7 +165,6 @@
 				stage.align = StageAlign.TOP_LEFT;
 
 				init();
-
 			}
 			ppp.addEventListener(Event.ENTER_FRAME,initHandler);
 		}//endfunction
@@ -1085,7 +1084,7 @@
 				}
 			}//
 
-			if (focusedEntity!=null && lookDBER.x>focusedEntity.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
+			if (focusedEntity!=null && Math.max(2,lookDBER.x)>focusedEntity.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
 
 			// ----- calculate cam lookPt easing
 			if (focusedEntity!=null)
@@ -1715,7 +1714,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// cleanly remove entity from world
 		//===============================================================================================
 		private function removeEntity(e:Hull):void
 		{
@@ -1729,6 +1728,8 @@
 			if (Friendlies.indexOf(e)!=-1) 	Friendlies.splice(Friendlies.indexOf(e),1);
 			if (Hostiles.indexOf(e)!=-1) 		Hostiles.splice(Hostiles.indexOf(e),1);
 			world.removeChild(e.skin);
+			if (focusedEntity==e && Friendlies.length>0)
+				focusOn(Friendlies[0]);
 		}//endfunction
 
 		//===============================================================================================
@@ -3897,7 +3898,7 @@ class Hull
 		radius = 0;
 		pivot = new Vector3D();
 		var tmp:Mesh = new Mesh();
-		for (var i:int=hullConfig.length-1; i>=0; i--)
+		for (var i:int=hullConfig.length-1; i>-1; i--)
 		{
 			var h:HullBlock = hullConfig[i];
 			tmp.addChild(createHullPart(h.x,h.y,h.z));
@@ -3961,7 +3962,7 @@ class Hull
 	//===============================================================================================
 	// returns the necessary face extensions to form the hull skin only
 	//===============================================================================================
-	private function createHullPart(px:int,py:int,pz:int) : Mesh
+	protected function createHullPart(px:int,py:int,pz:int) : Mesh
 	{
 		var i:int=0;
 
@@ -4117,11 +4118,11 @@ class Asteroid extends Hull
 		type = asteroidType%9;	// total 9 types of asteroids, type used in rebuildAsteroid
 		randomHullConfig(size,false);
 		rebuildAsteroid();
+		integrity = 1;
 
 		// ----- set asteroid texture
 		for (var i:int=hullConfig.length-1; i>-1; i--)
 			hullConfig[i].integrity = 100;
-		integrity = hullConfig.length*100;
 		hullSkin.material.setAmbient(0,0,0);
 		hullSkin.material.setSpecular(1,1);
 		hullSkin.material.setTexMap(texMap);
@@ -4143,23 +4144,35 @@ class Asteroid extends Hull
 	//===============================================================================================
 	public function rebuildAsteroid():void
 	{
+		// ----- update chassis skin
+		radius = 0;
+		pivot = new Vector3D();
+
+		if (hullConfig.length==0)
+		{
+			hullSkin.setGeometry();	// set as empty mesh
+			return;
+		}
+
 		var pivotShift:Vector3D = pivot;
-		super.rebuildHull();
+		var tmp:Mesh = new Mesh();
+		for (var i:int=hullConfig.length-1; i>-1; i--)
+		{
+			var h:HullBlock = hullConfig[i];
+			tmp.addChild(createHullPart(h.x,h.y,h.z));
+			pivot.x+=h.x;
+			pivot.y+=h.y;
+			pivot.z+=h.z;
+		}
+		tmp = tmp.mergeTree();
 
-		// ----- adjust asteroid center shift
-		pivotShift = pivot.subtract(pivotShift);
-		pivotShift = skin.transform.rotateVector(pivotShift);
-		posn = posn.add(pivotShift);
+		pivot.scaleBy(1/hullConfig.length);
+		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
 
-		// ----- re randomize rotation
-		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
-		rotVel.scaleBy(Math.random()*0.005/rotVel.length);
-		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
-
+		// ----- calculate smooth shaded normals
 		var Norms:Object = new Object();
-		var V:Vector.<Number> = hullSkin.vertData;
-		var n:int = V.length;
-		for (var i:int=0; i<n; i+=11)
+		var V:Vector.<Number> = tmp.vertData;
+		for (i=V.length-11; i>-1; i-=11)
 		{
 			var id:String = int(V[i+0]*100)+","+int(V[i+1]*100)+","+int(V[i+2]*100);
 			if (Norms[id]==null)
@@ -4173,39 +4186,42 @@ class Asteroid extends Hull
 					nv.w += 1;
 			}
 		}//endfor
+		for (id in Norms)	Norms[id].normalize();
 
-		for (id in Norms)
-		{
-			nv = Norms[id];
-			nv.scaleBy(1/nv.length);
-		}//endfor
-
+		// ----- override normals to smooth normals
 		var u:Number = (type%3)/3;
 		var v:Number = int(type/3)/3;
 		var NV:Vector.<Number> = new Vector.<Number>();
-		n = V.length/11;
+		var n:int = V.length/11;
 		for (i=0; i<n; i++)
 		{
-			id = int(V[i*11+0]*100)+","+int(V[i*11+1]*100)+","+int(V[i*11+2]*100);
-			if (Norms[id]!=null)
-			{
-				nv = Norms[id];
-				NV.push(	V[i*11+0] + 0.3*nv.x/nv.w,				// tweak vertices to become more curvy
-									V[i*11+1] + 0.3*nv.y/nv.w,
-									V[i*11+2] + 0.3*nv.z/nv.w,
-									nv.x,nv.y,nv.z,										// use soft shading normals
-									(V[i*11+9]/3)*0.98 + u+0.01/3,		// modify uv to use correct area of texture
-									(V[i*11+10]/3)*0.98 + v+0.01/3);
-			}
+			var ii:int = i*11;
+			nv = Norms[int(V[ii+0]*100)+","+int(V[ii+1]*100)+","+int(V[ii+2]*100)];
+			NV.push(	V[ii+0] + 0.3*nv.x/nv.w,				// tweak vertices to become more curvy
+								V[ii+1] + 0.3*nv.y/nv.w,
+								V[ii+2] + 0.3*nv.z/nv.w,
+								nv.x,nv.y,nv.z,									// use soft shading normals
+								(V[ii+9]/3)*0.98 + u+0.0033,		// modify uv to use correct area of texture
+								(V[ii+10]/3)*0.98 + v+0.0033);
 		}//endfor
 
-		hullSkin.createGeometry(NV,hullSkin.idxsData);
+		// ----- adjust asteroid center shift
+		pivotShift = pivot.subtract(pivotShift);
+		pivotShift = skin.transform.rotateVector(pivotShift);
+		posn = posn.add(pivotShift);
+
+		hullSkin.createGeometry(NV,tmp.idxsData);		// calculates tangent basis
+
+		// ----- re randomize rotation
+		rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
+		rotVel.scaleBy(Math.random()*0.005/rotVel.length);
+		rotVel.w = Math.sqrt(1-rotVel.length*rotVel.length);
 	}//endfunction
 
 	//===============================================================================================
 	//
 	//===============================================================================================
-	private function disintegrateFx(localx:int,localy:int,localz:int,callBack:Function):void
+	private function disintegrateFx(localx:int,localy:int,localz:int,callBack:Function=null):void
 	{
 		var div:int = 5;
 
@@ -4342,7 +4358,10 @@ class Asteroid extends Hull
 		if (nh.integrity<=0)
 		{
 			hullConfig.splice(hullConfig.indexOf(nh),1);
-			disintegrateFx(nh.x,nh.y,nh.z,function():void {if (hullConfig.length<=0)	integrity=0;});
+			if (hullConfig.length==0)
+				disintegrateFx(nh.x,nh.y,nh.z,function():void {integrity=0;});
+			else
+				disintegrateFx(nh.x,nh.y,nh.z);
 			rebuildAsteroid();
 		}
 	}//endfunction
