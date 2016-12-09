@@ -4353,16 +4353,17 @@ class Asteroid extends Hull
 		if (nh!=null)
 		{
 			nh.integrity-=dmg;
-		}
-		// ----- remove block if destroyed
-		if (nh.integrity<=0)
-		{
-			hullConfig.splice(hullConfig.indexOf(nh),1);
-			if (hullConfig.length==0)
-				disintegrateFx(nh.x,nh.y,nh.z,function():void {integrity=0;});
-			else
-				disintegrateFx(nh.x,nh.y,nh.z);
-			rebuildAsteroid();
+
+			// ----- remove block if destroyed
+			if (nh.integrity<=0)
+			{
+				hullConfig.splice(hullConfig.indexOf(nh),1);
+				if (hullConfig.length==0)
+					disintegrateFx(nh.x,nh.y,nh.z,function():void {integrity=0;});
+				else
+					disintegrateFx(nh.x,nh.y,nh.z);
+				rebuildAsteroid();
+			}
 		}
 	}//endfunction
 }//endClass
