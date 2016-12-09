@@ -4145,16 +4145,15 @@ class Asteroid extends Hull
 	public function rebuildAsteroid():void
 	{
 		// ----- update chassis skin
-		radius = 0;
-		pivot = new Vector3D();
-
 		if (hullConfig.length==0)
 		{
+			radius = 0;
 			hullSkin.setGeometry();	// set as empty mesh
 			return;
 		}
 
-		var pivotShift:Vector3D = pivot;
+		var pivotShift:Vector3D = pivot;	// old pivot
+		pivot = new Vector3D();
 		var tmp:Mesh = new Mesh();
 		for (var i:int=hullConfig.length-1; i>-1; i--)
 		{
@@ -4164,9 +4163,8 @@ class Asteroid extends Hull
 			pivot.y+=h.y;
 			pivot.z+=h.z;
 		}
+		pivot.scaleBy(1/hullConfig.length);		// new pivot
 		tmp = tmp.mergeTree();
-
-		pivot.scaleBy(1/hullConfig.length);
 		radius = tmp.maxXYZ().subtract(tmp.minXYZ()).length/2;
 
 		// ----- calculate smooth shaded normals
@@ -4273,9 +4271,9 @@ class Asteroid extends Hull
 			frag.vel.y = frag.posn.y/5;
 			frag.vel.z = frag.posn.z/5;
 			frag.rotPosn = new Vector3D(0,0,0,1);
-			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
-			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
-			frag.rotVel = Matrix4x4.quatMult(frag.rotVel,frag.rotVel);
+			frag.rotVel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
+			frag.rotVel.scaleBy(Math.random()*0.1/frag.rotVel.length);
+			frag.rotVel.w = Math.sqrt(1-frag.rotVel.length*frag.rotVel.length);
 			con.addChild(frag.skin);
 		}
 
