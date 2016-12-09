@@ -1737,31 +1737,26 @@
 		//===============================================================================================
 		private function addShipToScene(friendly:Boolean,dist:Number=30,config:String=null) : Ship
 		{
-			var i:int=0;
 			var ship:Ship = null;
-			if (config!=null)
-				ship = Ship.createShipFromConfigStr(Assets,config);
-			else
-				ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1);
-			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
-			var ang:Number = Math.random()*Math.PI*2;
-			world.addChild(ship.skin);
-			Entities.push(ship);
 			if (friendly)
 			{
-				ship.hullSkin.material.setTexMap(Mtls["TexPanel"]);
-				ship.hullSkin.material.setSpecMap(Mtls["SpecPanel"]);
+				if (config!=null)	ship = Ship.createShipFromConfigStr(Assets,config,Mtls["TexPanel"],Mtls["SpecPanel"]);
+				else							ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1,Mtls["TexPanel"],Mtls["SpecPanel"]);
 				Friendlies.push(ship);
 				ship.targets = Hostiles;
 			}
 			else
 			{
-				ship.hullSkin.material.setSpecMap(Mtls["TexPanel"]);
-				ship.hullSkin.material.setTexMap(Mtls["SpecPanel"]);
+				if (config!=null)	ship = Ship.createShipFromConfigStr(Assets,config,Mtls["SpecPanel"],Mtls["TexPanel"]);
+				else							ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1,Mtls["SpecPanel"],Mtls["TexPanel"]);
 				Hostiles.push(ship);
 				ship.targets = Friendlies;
 			}
+			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
 			ship.hullSkin.material.setSpecular(2);
+			world.addChild(ship.skin);
+			Entities.push(ship);
+			var ang:Number = Math.random()*Math.PI*2;
 			jumpIn(ship,Math.sin(ang)*dist,Math.cos(ang)*dist,ang+Math.PI,function():void {setDumbAI(ship);});
 			return ship;
 		}//endfunction
@@ -3746,6 +3741,8 @@ class Hull
 	public var radius:Number = 0;							// radius of hull
 	public var posn:Vector3D = null;					// current position
 	public var vel:Vector3D = null;						// current position
+	public var rotPosn:Vector3D = null;				// current orientation quaternion
+	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
 	public var integrity:Number = 0;
 
 	private static var Adj:Vector.<Vector3D> = null;	// convenient for adjacent blocks chks
@@ -3753,7 +3750,7 @@ class Hull
 	//===============================================================================================
 	// constructs a blocky hull entity
 	//===============================================================================================
-	public function Hull(hullName:String=null):void
+	public function Hull(hullName:String=null,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
 		if (hullName!=null)
 			name = hullName;
@@ -3765,6 +3762,9 @@ class Hull
 		skin = new Mesh();
 		hullSkin = new Mesh();
 		hullSkin.material.setSpecular(1,0.5);
+		hullSkin.material.setTexMap(texMap);
+		hullSkin.material.setSpecMap(specMap);
+		hullSkin.material.setNormMap(normMap);
 		skin.addChild(hullSkin);
 
 		if (Adj==null)
@@ -3791,7 +3791,11 @@ class Hull
 		posn.x += vel.x;
 		posn.y += vel.y;
 		posn.z += vel.z;
-		skin.transform = new Matrix4x4().translate(posn.x-pivot.x,posn.y-pivot.y,posn.z-pivot.z);
+		rotPosn = Matrix4x4.quatMult(rotVel,rotPosn);		// update rotation
+
+		// ----- update transform
+		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.w,rotPosn.x,rotPosn.y,rotPosn.z).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z)).translate(posn.x,posn.y,posn.z);
+		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
 	}//endfunction
 
 	//===============================================================================================
@@ -3892,7 +3896,7 @@ class Hull
 	//===============================================================================================
 	// creates the hull mesh geometry from hullConfig info
 	//===============================================================================================
-	public function rebuildHull() : void
+	public function rebuildHull(uMin:Number=0,uMax:Number=1,vMin:Number=0,vMax:Number=1) : void
 	{
 		// ----- update chassis skin
 		radius = 0;
@@ -3901,7 +3905,7 @@ class Hull
 		for (var i:int=hullConfig.length-1; i>-1; i--)
 		{
 			var h:HullBlock = hullConfig[i];
-			tmp.addChild(createHullPart(h.x,h.y,h.z));
+			tmp.addChild(createHullPart(h.x,h.y,h.z,uMin,uMax,vMin,vMax));
 			pivot.x+=h.x;
 			pivot.y+=h.y;
 			pivot.z+=h.z;
@@ -3962,7 +3966,7 @@ class Hull
 	//===============================================================================================
 	// returns the necessary face extensions to form the hull skin only
 	//===============================================================================================
-	protected function createHullPart(px:int,py:int,pz:int) : Mesh
+	protected function createHullPart(px:int,py:int,pz:int,uMin:Number=0,uMax:Number=1,vMin:Number=0,vMax:Number=1) : Mesh
 	{
 		var i:int=0;
 
@@ -4001,10 +4005,13 @@ class Hull
 			}
 		}
 
-		var U:Vector.<Number> = new <Number>[	0,0, 0,1, 0.5,0.5,
-													0,1, 1,1, 0.5,0.5,
-													1,1, 1,0, 0.5,0.5,
-													1,0, 0,0, 0.5,0.5];	// UV coords
+		var uMid:Number = (uMin+uMax)/2;
+		var vMid:Number = (vMin+vMax)/2;
+		var U:Vector.<Number> =
+		new <Number>[	uMin,vMin, uMin,vMax, uMid,vMid,
+									uMin,vMax, uMax,vMax, uMid,vMid,
+									uMax,vMax, uMax,vMin, uMid,vMid,
+									uMax,vMin, uMin,vMin, uMid,vMid];	// UV coords
 		var ul:uint=U.length;
 		var VData:Vector.<Number> = new Vector.<Number>();
 		for (i=0; i<I.length; i+=3)
@@ -4102,8 +4109,6 @@ class Hull
 class Asteroid extends Hull
 {
 	public var slowF:Number = 0.95;						// slow down factor
-	public var rotPosn:Vector3D = null;				// current orientation quaternion
-	public var rotVel:Vector3D = null;				// current rotational velocity quaternion
 	public var type:uint = 0;
 
 	private var stepFns:Vector.<Function> = null;
@@ -4114,7 +4119,7 @@ class Asteroid extends Hull
 	public function Asteroid(name:String=null,asteroidType:uint=0,size:uint=1,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
 		// ----- create random asteroid geometry
-		super(name);
+		super(name,texMap,specMap,normMap);
 		type = asteroidType%9;	// total 9 types of asteroids, type used in rebuildAsteroid
 		randomHullConfig(size,false);
 		rebuildAsteroid();
@@ -4125,9 +4130,6 @@ class Asteroid extends Hull
 			hullConfig[i].integrity = 100;
 		hullSkin.material.setAmbient(0,0,0);
 		hullSkin.material.setSpecular(1,1);
-		hullSkin.material.setTexMap(texMap);
-		hullSkin.material.setSpecMap(specMap);
-		hullSkin.material.setNormMap(normMap);
 
 		rotPosn = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5,0);
 		rotPosn.scaleBy(Math.random()/rotPosn.length);
@@ -4152,13 +4154,17 @@ class Asteroid extends Hull
 			return;
 		}
 
+		var uMin:Number = (type%3)/3+0.001;
+		var vMin:Number = int(type/3)/3+0.001;
+		var uMax:Number = uMin+1/3 - 0.002;
+		var vMax:Number = vMin+1/3 - 0.002;
 		var pivotShift:Vector3D = pivot;	// old pivot
 		pivot = new Vector3D();
 		var tmp:Mesh = new Mesh();
 		for (var i:int=hullConfig.length-1; i>-1; i--)
 		{
 			var h:HullBlock = hullConfig[i];
-			tmp.addChild(createHullPart(h.x,h.y,h.z));
+			tmp.addChild(createHullPart(h.x,h.y,h.z,uMin,uMax,vMin,vMax));			// uv to use correct area of texture
 			pivot.x+=h.x;
 			pivot.y+=h.y;
 			pivot.z+=h.z;
@@ -4199,8 +4205,7 @@ class Asteroid extends Hull
 								V[ii+1] + 0.3*nv.y/nv.w,
 								V[ii+2] + 0.3*nv.z/nv.w,
 								nv.x,nv.y,nv.z,									// use soft shading normals
-								(V[ii+9]/3)*0.98 + u+0.0033,		// modify uv to use correct area of texture
-								(V[ii+10]/3)*0.98 + v+0.0033);
+								V[ii+9],V[ii+10]);							// UVs
 		}//endfor
 
 		// ----- adjust asteroid center shift
@@ -4232,9 +4237,9 @@ class Asteroid extends Hull
 		}
 
 		// ----- determine fragment shapes
-		var Fragments:Vector.<Asteroid> = new Vector.<Asteroid>();
+		var Fragments:Vector.<Hull> = new Vector.<Hull>();
 		for (i=P.length-1; i>-1; i--)
-			Fragments.push(new Asteroid(name+"_frag"+i,type,0,hullSkin.material.texMap,hullSkin.material.specMap,hullSkin.material.normMap));
+			Fragments.push(new Hull(name+"_frag"+i,hullSkin.material.texMap,hullSkin.material.specMap,hullSkin.material.normMap));
 
 		for (var x:int=0; x<div; x++)
 			for (var y:int=0; y<div; y++)
@@ -4256,14 +4261,18 @@ class Asteroid extends Hull
 				}//endfor xyz
 
 		// ----- construct fragments in put in skin
+		var uMin:Number = (type%3)/3+0.001;
+		var vMin:Number = int(type/3)/3+0.001;
+		var uMax:Number = uMin+1/3 - 0.002;
+		var vMax:Number = vMin+1/3 - 0.002;
 		var con:Mesh = new Mesh;
 		var sc:Number = 0.8/div;
 		con.transform = con.transform.scale(sc,sc,sc).translate(localx,localy,localz);
 		skin.addChild(con);
 		for (i=Fragments.length-1; i>-1; i--)
 		{
-			var frag:Asteroid = Fragments[i];
-			frag.rebuildAsteroid();
+			var frag:Hull = Fragments[i];
+			frag.rebuildHull(uMin,uMax,vMin,vMax);
 			frag.posn.x = frag.pivot.x-(div-1)*0.5;
 			frag.posn.y = frag.pivot.y-(div-1)*0.5;
 			frag.posn.z = frag.pivot.z-(div-1)*0.5;
@@ -4292,7 +4301,7 @@ class Asteroid extends Hull
 				var sc:Number = ttl/90;
 				for (var i:int=Fragments.length-1; i>-1; i--)
 				{
-					var frag:Asteroid = Fragments[i];
+					var frag:Hull = Fragments[i];
 					var pv:Vector3D = frag.pivot;
 					frag.hullSkin.transform = new Matrix4x4().translate(-pv.x,-pv.y,-pv.z).scale(sc,sc,sc).translate(pv.x,pv.y,pv.z);
 					frag.updateStep();
@@ -4310,17 +4319,10 @@ class Asteroid extends Hull
 	public override function updateStep():void
 	{
 		// ----- move astroid with current velocity
-		posn.x += vel.x;				// update position
-		posn.y += vel.y;
-		posn.z += vel.z;
+		super.updateStep();
 		vel.scaleBy(slowF);			// speed slow
-		rotPosn = Matrix4x4.quatMult(rotVel,rotPosn);		// update rotation
 		//rotVel.scaleBy(slowF);	// rotation slow
 		//rotVel.w = Math.sqrt(1 - rotVel.x*rotVel.x - rotVel.y*rotVel.y - rotVel.z*rotVel.z);
-
-		// ----- update ship transform
-		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.w,rotPosn.x,rotPosn.y,rotPosn.z).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z)).translate(posn.x,posn.y,posn.z);
-		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
 
 		for (var i:int=stepFns.length-1; i>-1; i--)
 			stepFns[i]();
@@ -4380,7 +4382,6 @@ class Ship extends Hull
 	public var tte:int = 90;									// time to explode
 
 	public var facing:Vector3D = null;				// current facing of ship
-	public var rotVel:Vector3D = null;				// current rotational velocity of ship
 	public var accelF:Number = 0.001;					// ship acceleration factor
 	public var rotAccelF:Number = 0.001;			// ship rotational acceleration
 	public var slowF:Number = 0.9;						// ship slow down factor
@@ -4401,10 +4402,10 @@ class Ship extends Hull
 	//===============================================================================================
 	// constructs a ship entity
 	//===============================================================================================
-	public function Ship(assets:Object,shpName:String=null):void
+	public function Ship(assets:Object,shpName:String=null,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):void
 	{
 		if (shpName==null) shpName = RandNames[Math.floor(Math.random()*RandNames.length)];
-		super(shpName);
+		super(shpName,texMap,specMap,normMap);
 
 		modelAssets = assets;
 		facing = new Vector3D(0,0,1);	// default facing
@@ -4443,9 +4444,9 @@ class Ship extends Hull
 	//===============================================================================================
 	//
 	//===============================================================================================
-	public static function createRandomShip(assets:Object,hullCnt:uint=10,thrustersCnt:uint=4):Ship
+	public static function createRandomShip(assets:Object,hullCnt:uint=10,thrustersCnt:uint=4,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):Ship
 	{
-		var s:Ship = new Ship(assets);
+		var s:Ship = new Ship(assets,null,texMap,specMap,normMap);
 		s.modulesConfig = new Vector.<Module>();
 		s.randomHullConfig(hullCnt);
 		s.randomThrustersConfig(thrustersCnt);
@@ -4457,10 +4458,10 @@ class Ship extends Hull
 	//===============================================================================================
 	//
 	//===============================================================================================
-	public static function createShipFromConfigStr(assets:Object,config:String):Ship
+	public static function createShipFromConfigStr(assets:Object,config:String,texMap:BitmapData=null,specMap:BitmapData=null,normMap:BitmapData=null):Ship
 	{
 		try {
-			var s:Ship = new Ship(assets);
+			var s:Ship = new Ship(assets,null,texMap,specMap,normMap);
 			s.setFromConfig(config);
 		}
 		catch (e:Error)
