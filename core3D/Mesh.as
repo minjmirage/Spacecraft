@@ -232,6 +232,8 @@
 				if (material.texMap==null)	material.texMap = c.material.texMap;
 				if (material.normMap==null)	material.normMap = c.material.normMap;
 				if (material.specMap==null)	material.specMap = c.material.specMap;
+				material.blendSrc = c.material.blendSrc;
+				material.blendDest = c.material.blendDest;
 				var cT:Matrix4x4 = c.transform;
 				var vD:Vector.<Number> = c.vertData;
 				var iD:Vector.<uint> = c.idxsData;

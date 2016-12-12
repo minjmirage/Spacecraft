@@ -455,6 +455,22 @@
 			}
 
 			focusOn(Friendlies[0]);
+
+			// ----- spin view around focused ship
+			var ttl:int = 576;
+			var rotAroundShip:Function = function():void
+			{
+				if (Input.downPts.length>0)	ttl=0;	// stop immediately on interraction
+				if (ttl>0)
+				{
+					ttl--;
+					velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);
+					velDBER.y = Math.PI*2/576;
+				}
+				else
+					stepFns.splice(stepFns.indexOf(rotAroundShip),1);
+			}//endfunction
+			stepFns.push(rotAroundShip);
 		}//endfunction
 
 		//===============================================================================================
@@ -486,9 +502,30 @@
 			}//endfunction
 
 			// ----- default enemies
-			addShipToScene(false);	// hostile
-			addShipToScene(false);	// hostile
-			addShipToScene(false);	// hostile
+			for (var i:int=0; i<3; i++)
+				addShipToScene(false);	// hostile
+
+			// ----- face ship jump in direction
+			var slowF:Number = 0.9;
+			lookVel = new Vector3D((0-lookPt.x)*(1-slowF),(0-lookPt.y)*(1-slowF),(-1-lookPt.z)*(1-slowF));
+			velDBER.x = (10-lookDBER.x)*(1-slowF);								// set dist to 8
+			lookDBER.y = Math.PI;
+			velDBER.y = 0;
+
+			// ----- align view to ship fn
+			var alignViewToShip:Function = function():void
+			{
+				var shp:Ship = (Ship)(Friendlies[0]);
+				var sinB:Number = Math.sin(lookDBER.y);
+				var cosB:Number = Math.cos(lookDBER.y);
+				var bDiff:Number = Math.acos(Math.max(-1,Math.min(1,shp.facing.x*sinB + shp.facing.z*cosB)));
+				if (shp.facing.x*cosB - shp.facing.z*sinB<0)
+					bDiff *=-1;			// bDiff is the difference in bearing
+				var bearingCorrection:Number = Math.max(-0.002,Math.min(0.002,bDiff*(1-0.9)-velDBER.y));
+				velDBER.y += bearingCorrection;
+				if (Input.downPts.length>0 && stepFns.indexOf(alignViewToShip)!=-1)
+					stepFns.splice(stepFns.indexOf(alignViewToShip),1);
+			}//endfunction
 
 			var battleTime:int = 0;
 			var Conf:Array = shipsConf.split(";");
@@ -503,6 +540,7 @@
 					else if (battleTime%100==0)
 					{
 						addShipToScene(true,0,Conf.pop());		// friendly
+						jumpIn((Ship)(Friendlies[0]),0,0,0,function():void {stepFns.push(alignViewToShip);});
 						focusOn(Friendlies[0]);
 					}
 				}
@@ -748,11 +786,11 @@
 			sky.setLightingParameters(1,1,1,0,0,false);
 			world.addChild(sky);
 
+			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
 			planet.transform = planet.transform.rotFromTo(0,1,0,Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).translate(0,-100,0);
-
 			planetsDat = new Vector.<Vector3D>();
-			planet.removeAllChildren();
+			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
 				R.splice(Math.floor(Math.random()*R.length),0,i);
@@ -772,9 +810,32 @@
 					p.material.setAmbient(0,0,0);
 					planet.addChild(p);
 					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
+					ringsGap.push(rad-75/(i*2+1),rad+75/(i*2+1));
 				}
 			}//endfor
 			sky.addChild(planet);
+
+			// ----- create planetary rings
+			ringsGap.shift();
+			ringsGap.pop();
+			var ringBmd:BitmapData = new BitmapData(1,1,true,0x33000000);
+			var rings:Mesh = new Mesh();
+			rings.transform = new Matrix4x4().rotX(Math.PI/2);
+			for (i=0; i<ringsGap.length; i+=2)
+			{
+				var a:Number = Math.random()*0.9;
+				var b:Number = 0.1 + Math.random()*0.9;
+				if (a<b)
+				{
+					a = ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]);
+					b = ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i]);
+					rings.addChild(Mesh.createCylinder(a,b,0,0,128,ringBmd));
+					rings.addChild(Mesh.createCylinder(b,a,0,0,128,ringBmd));
+				}
+			}
+			rings = rings.mergeTree();
+			planet.addChild(rings);
+			rings.setLightingParameters(0,0,0,1,1,true,true);
 
 			// ----- create main and sub title
 			var sw:int = stage.stageWidth;
@@ -1559,7 +1620,7 @@
 			if (posnIsOnScreen(pt.x,pt.y,pt.z))
 			{
 				var dir:Vector3D = ship.skin.transform.rotateVector(new Vector3D(m.nx,m.ny,m.nz));
-				var thrustSc:Number = Math.min(2,ship.vel.length/ship.maxSpeed);
+				var thrustSc:Number = Math.min(2,ship.vel.length/ship.maxSpeed*0.8 + 0.2);
 				(MeshParticles)(EffectMPs["thrustConeW"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
 				(MeshParticles)(EffectMPs["thrustConeM"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
 				(MeshParticles)(EffectMPs["thrustConeN"]).nextLocDirScale(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,thrustSc*(1+Math.random()*0.1));
@@ -1759,7 +1820,10 @@
 			world.addChild(ship.skin);
 			Entities.push(ship);
 			var ang:Number = Math.random()*Math.PI*2;
-			jumpIn(ship,Math.sin(ang)*dist,Math.cos(ang)*dist,ang+Math.PI,function():void {setDumbAI(ship);});
+			ship.posn.x = Math.sin(ang)*dist;
+			ship.posn.z = Math.cos(ang)*dist;
+			ship.facing = new Vector3D(Math.sin(ang),0,Math.cos(ang));
+			setDumbAI(ship);
 			return ship;
 		}//endfunction
 
@@ -1834,10 +1898,10 @@
 		//===============================================================================================
 		// hyper jump in ship given x,y,z position and w=bearing
 		//===============================================================================================
-		private function jumpIn(ship:Ship,px:Number,pz:Number,bearing:Number,callBack:Function) : void
+		private function jumpIn(ship:Ship,px:Number,pz:Number,bearing:Number,callBack:Function=null) : void
 		{
 			var initialSpeed:Number = 5;
-			var dist:Number = initialSpeed/(1-ship.slowF*ship.slowF);
+			var dist:Number = initialSpeed/(1-ship.slowF);
 			var sinB:Number = Math.sin(bearing);
 			var cosB:Number = Math.cos(bearing);
 			ship.posn.x = px-dist*sinB;
@@ -1850,6 +1914,8 @@
 			(ParticlesEmitter)(EffectEMs["hyperspace"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*3/100);
 			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"jumpIn");
 			ship.updateStep();
+
+			var oldStep:Function = ship.stepFn;
 
 			ship.stepFn = function():void
 			{
@@ -1871,10 +1937,11 @@
 						}
 					}
 				}//endfor
-				ship.vel.x*=ship.slowF;
-				ship.vel.y*=ship.slowF;
-				ship.vel.z*=ship.slowF;
-				if (ship.vel.length<0.01)	callBack();
+				if (ship.vel.length<0.01)
+				{
+					ship.stepFn = oldStep;
+					if (callBack!=null) callBack();
+				}
 			}//endfunction
 		}//endfunction
 
