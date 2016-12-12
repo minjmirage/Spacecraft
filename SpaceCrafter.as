@@ -4478,6 +4478,7 @@ class Ship extends Hull
 		rotVel = new Vector3D();
 		rotAccel = new Vector3D();
 
+		hullSkin.material.setAmbient(0.2,0.2,0.2);
 		hullSkin.material.setSpecular(2,0.5);
 		modulesSkin = new Mesh();
 		modulesSkin.material.setSpecular(0.2);
