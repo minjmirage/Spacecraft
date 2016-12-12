@@ -977,11 +977,13 @@
 					}
 					else
 					{
-						if (entity is Ship && (Ship)(entity).stepFn!=null)
-							(Ship)(entity).stepFn();
-						entity.updateStep();
 						if (entity is Ship)
+						{
+							if ((Ship)(entity).stepFn!=null)	(Ship)(entity).stepFn();
 							doShipDamageFx((Ship)(entity));
+							doShipSeparation((Ship)(entity));
+						}
+						entity.updateStep();
 					}//
 				}//endfor
 
@@ -1641,9 +1643,9 @@
 					if (dlSq<(ship.radius+other.radius)*(ship.radius+other.radius))
 					{
 						var _dl:Number = 1/Math.sqrt(dlSq);
-						ship.vel.x -= dx*_dl*ship.accelF;	// move ship away
-						ship.vel.y -= dy*_dl*ship.accelF;
-						ship.vel.z -= dz*_dl*ship.accelF;
+						ship.vel.x -= dx*_dl*ship.maxAccel;	// move ship away
+						ship.vel.y -= dy*_dl*ship.maxAccel;
+						ship.vel.z -= dz*_dl*ship.maxAccel;
 					}//endif
 				}
 			}//endfor
@@ -1823,10 +1825,7 @@
 				{
 					(ParticlesEmitter)(EffectEMs["hyperspace"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*3/100);
 					playSound(ship.posn.x,ship.posn.y,ship.posn.z,"jumpIn");
-					world.removeChild(ship.skin);
-					if (Entities.indexOf(ship)!=-1) 		Entities.splice(Entities.indexOf(ship),1);
-					if (Friendlies.indexOf(ship)!=-1) 	Friendlies.splice(Friendlies.indexOf(ship),1);
-					if (Hostiles.indexOf(ship)!=-1) 	Hostiles.splice(Hostiles.indexOf(ship),1);
+					removeEntity(ship);
 					if (callBack!=null) callBack();
 				}
 			};//endfunction
@@ -3405,9 +3404,9 @@ class MenuUI
 		// ----- create stats labels
 		var labColor:uint = uint((colorTone>>16)*0.7)<<16 | uint(((colorTone>>8) & 0xFF)*0.7)<<8 | uint((colorTone & 0xFF)*0.7);
 		var fSize:Number = fontScale*stage.stageHeight/2;
-		var labelsBmp:Bitmap = createTextBmp("Integrity\nEnergy\nSpeed",fSize,0,labColor);
+		var labelsBmp:Bitmap = createTextBmp("Integrity\nEnergy\nSpeed\nAccel\nTurnRate",fSize,0,labColor);
 		s.addChild(labelsBmp);
-		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*10000)/10,fSize,0,labColor);
+		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*10000)/10+"\n/ "+Math.floor(ship.maxAccel*10000)/10+"\n/ "+Math.floor(ship.maxRotAccel*10000)/10,fSize,0,labColor);
 		s.addChild(maxValuesBmp);
 
 		var curStatsTf:TextField = new TextField();
@@ -3455,7 +3454,7 @@ class MenuUI
 			var bw:int = Math.round(stage.stageWidth*(1-margF*2));
 			var bh:int = Math.round(stage.stageHeight*0.013);
 
-			curStatsTf.text = Math.round(ship.integrity)+"\n"+Math.round(ship.energy)+"\n"+Math.round(ship.vel.length*10000)/10;
+			curStatsTf.text = Math.round(ship.integrity)+"\n"+Math.round(ship.energy)+"\n"+Math.round(ship.vel.length*10000)/10+"\n"+Math.round(ship.accel*10000)/10+"\n"+Math.round(ship.rotAccel.length*10000)/10;
 
 			maxValuesBmp.x = stage.stageWidth*(1-margF)-maxValuesBmp.width;
 			maxValuesBmp.y = stage.stageHeight-bh*3.5-maxValuesBmp.height;
@@ -4127,7 +4126,7 @@ class Asteroid extends Hull
 
 		// ----- set asteroid texture
 		for (var i:int=hullConfig.length-1; i>-1; i--)
-			hullConfig[i].integrity = 100;
+			hullConfig[i].integrity = 500+type*50;
 		hullSkin.material.setAmbient(0,0,0);
 		hullSkin.material.setSpecular(1,1);
 
@@ -4380,18 +4379,21 @@ class Ship extends Hull
 	public var maxEnergy:Number = 1;
 	public var energy:Number = 1;
 
-	public var tte:int = 90;									// time to explode
+	public var tte:int = 90;										// time to explode
 
-	public var facing:Vector3D = null;				// current facing of ship
-	public var accelF:Number = 0.001;					// ship acceleration factor
-	public var rotAccelF:Number = 0.001;			// ship rotational acceleration
-	public var slowF:Number = 0.9;						// ship slow down factor
-	public var maxSpeed:Number = accelF/(1/slowF-1);	// ship max speed, calculated
-	public var banking:Number = 0;
+	public var facing:Vector3D = null;					// current facing of ship
+	public var banking:Number = 0;							// current ship roll
+	public var accel:Number = 0;								// current acceleration
+	public var rotAccel:Vector3D = null;				// current rota acceleration
+
+	public var slowF:Number = 0.9;							// ship slow down factor
+	public var maxAccel:Number = 0.001;					// ship acceleration factor
+	public var maxRotAccel:Number = 0.001;			// ship rotational acceleration
+	public var maxSpeed:Number = maxAccel/(1/slowF-1);	// ship max speed, calculated
 
 	public var engageEnemy:Boolean = true;
 
-	public var targets:Vector.<Hull> = null;	// list of targets for ship
+	public var targets:Vector.<Hull> = null;		// list of targets for ship
 	public var stepFn:Function = null;
 	public var damagePosns:Vector.<VertexData> = null;
 
@@ -4411,6 +4413,7 @@ class Ship extends Hull
 		modelAssets = assets;
 		facing = new Vector3D(0,0,1);	// default facing
 		rotVel = new Vector3D();
+		rotAccel = new Vector3D();
 
 		hullSkin.material.setSpecular(2,0.5);
 		modulesSkin = new Mesh();
@@ -4531,10 +4534,10 @@ class Ship extends Hull
 		var turn:Vector3D = facing.crossProduct(targV);		// rotation needed to face target
 
 		var targTurnVel:Vector3D = turn.clone();
-		targTurnVel.scaleBy(1-slowF);							// target turning vel
-		var rotAccel:Vector3D = targTurnVel.subtract(rotVel);	// diff actual rotVel to target turn vel
-		if (rotAccel.length>accelF*0.4)						// limit rot accel
-			rotAccel.scaleBy(accelF*0.4/rotAccel.length);
+		targTurnVel.scaleBy(1-slowF);								// target turning vel
+		rotAccel = targTurnVel.subtract(rotVel);		// diff actual rotVel to target turn vel
+		if (rotAccel.length>maxRotAccel)						// limit rot accel
+			rotAccel.scaleBy(maxRotAccel/rotAccel.length);
 
 		rotVel.x += rotAccel.x;				// increment rotational Vel
 		rotVel.y += rotAccel.y;
@@ -4544,10 +4547,10 @@ class Ship extends Hull
 		var thrustTresh:Number = Math.PI*0.5;
 		if (ang<thrustTresh)
 		{
-			var thrustF:Number = (thrustTresh-ang)/(thrustTresh)*accelF;
-			vel.x += facing.x*thrustF;	// increment vel
-			vel.y += facing.y*thrustF;
-			vel.z += facing.z*thrustF;
+			accel = (thrustTresh-ang)/(thrustTresh)*maxAccel;
+			vel.x += facing.x*accel;	// increment vel
+			vel.y += facing.y*accel;
+			vel.z += facing.z*accel;
 		}
 	}//endfunction
 
@@ -4728,6 +4731,7 @@ class Ship extends Hull
 
 		// ----- update chassis mounts
 		var thrustCnt:int = 0;
+		var rotMoment:Number = 0;
 		var tmp:Mesh = new Mesh();
 		for (var i:int=modulesConfig.length-1; i>=0; i--)
 		{
@@ -4737,6 +4741,7 @@ class Ship extends Hull
 			{
 				mt = modelAssets[m.type].clone();
 				thrustCnt++;
+				rotMoment += Math.sqrt((m.x-pivot.x)*(m.x-pivot.x) + (m.y-pivot.y)*(m.y-pivot.y) + (m.z-pivot.z)*(m.z-pivot.z));
 			}
 			else if (m.type.indexOf("launcher")!=-1)	// missile luncher
 				mt = modelAssets[m.type].clone();
@@ -4748,8 +4753,9 @@ class Ship extends Hull
 			tmp.addChild(mt);
 		}
 
-		accelF = thrustCnt/hullConfig.length*0.015;
-		maxSpeed = accelF/(1/slowF-1);
+		maxRotAccel = thrustCnt/rotMoment*0.001;
+		maxAccel = thrustCnt/hullConfig.length*0.015;
+		maxSpeed = maxAccel/(1/slowF-1);
 
 		tmp = tmp.mergeTree();
 		modulesSkin.setGeometry(tmp.vertData, tmp.idxsData);
