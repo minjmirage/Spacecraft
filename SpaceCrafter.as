@@ -457,17 +457,12 @@
 			focusOn(Friendlies[0]);
 
 			// ----- spin view around focused ship
-			var ttl:int = 576;
 			var rotAroundShip:Function = function():void
 			{
-				if (Input.downPts.length>0)	ttl=0;	// stop immediately on interraction
-				if (ttl>0)
-				{
-					ttl--;
-					velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);
-					velDBER.y = Math.PI*2/576;
-				}
-				else
+				velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);
+				velDBER.y = Math.PI/288;
+				// stop immediately on interraction
+				if (Input.downPts.length>0)
 					stepFns.splice(stepFns.indexOf(rotAroundShip),1);
 			}//endfunction
 			stepFns.push(rotAroundShip);
@@ -483,7 +478,9 @@
 
 			optionsMenuSelector = function(entity:Hull):void
 			{
-				if (entity is Ship && Friendlies.indexOf((Ship)(entity))!=-1)
+				if (Friendlies.length==0 || Hostiles.length==0)
+					return;
+				else if (entity is Ship && Friendlies.indexOf((Ship)(entity))!=-1)
 					optionsMenu =
 					MenuUI.createLeftStyleMenu(thisRef,
 																		new < String > ["Escape Battle"],
@@ -1000,9 +997,9 @@
 					var dz:Number = v.pop()-pz;
 					var dy:Number = v.pop()-py;
 					var dx:Number = v.pop()-px;
-					loudness += 2/((Number)(SoundFxs[id+"_Af"])*Math.sqrt(dx*dx+dy*dy+dz*dz));
+					loudness += 4/((Number)(SoundFxs[id+"_Af"])*Math.sqrt(dx*dx+dy*dy+dz*dz));
 				}
-				if (loudness>3) loudness=3;
+				if (loudness>2) loudness=2;
 				if (loudness>0.01)
 					(Sound)(SoundFxs[id]).play(0,0,new SoundTransform(loudness,0));
 			}
@@ -1139,7 +1136,7 @@
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
 					for (var i:int=Entities.length-1; i>-1; i--)
-						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform)!=null)
+						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
 						{
 							focusOn(Entities[i]);
 							velDBER.x = (focusedEntity.radius*3-lookDBER.x)*(1-0.9);
@@ -1172,7 +1169,7 @@
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
 					for (var i:int=Entities.length-1; i>-1; i--)
-						if (Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform)!=null)
+						if (Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
 							selected = Entities[i];
 				}
 			}
@@ -1258,7 +1255,7 @@
 
 						if (dx*dx+dy*dy+dz*dz<s.radius*s.radius+p.vx*p.vx+p.vy*p.vy+p.vz*p.vz)
 						{
-							var hitPt:VertexData = s.hullSkin.lineHitsMesh(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
+							var hitPt:VertexData = s.hullSkin.lineMeshIntersection(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
 							if (hitPt!=null)
 							{
 								if (posnIsOnScreen(p.px,p.py,p.pz))
@@ -1488,7 +1485,7 @@
 										tPt.extPosn.x-turX,tPt.extPosn.y-turY,tPt.extPosn.z-turZ,	// target block posn from turret
 										dvx,dvy,dvz);					// target vel from turret
 						if (iV!=null && interceptV.w>iV.w &&
-							ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform)==null)	// does not hit self
+							!ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform))	// does not hit self
 						{
 							targObj = tPt;
 							interceptV.x = iV.x;
@@ -1520,7 +1517,7 @@
 									pp.px-turX,pp.py-turY,pp.pz-turZ, 	// target block posn from turret
 									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z);	// target vel from turret
 					if (ipV!=null && interceptV.w>ipV.w &&
-						ship.hullSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform)==null)	// does not hit self
+						!ship.hullSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform))	// does not hit self
 					{
 						targObj = pp;
 						interceptV.x = ipV.x;
@@ -1557,6 +1554,7 @@
 					var vy:Number = shp.vel.y+T.bb*m.speed;
 					var vz:Number = shp.vel.z+T.cb*m.speed;
 					var mp:Missile = new Missile(tpx, tpy, tpz,	vx,vy,vz, targObj, BulletFXs[m.type], m.damage, m.range/m.speed, m.type);
+					muzzleFlash(tpx,tpy,tpz, vx,vy,vz,0,m.damage);
 					Projectiles.push(mp);
 				}
 				if (delay==0)
@@ -1744,7 +1742,7 @@
 						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(hb.x,hb.y,hb.z));
 						var dir:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
 						dir.scaleBy(10000/dir.length);
-						var hitPt:VertexData = ship.hullSkin.lineHitsMesh(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
+						var hitPt:VertexData = ship.hullSkin.lineMeshIntersection(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
 						if (hitPt!=null && posnIsOnScreen(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3))
 						{
 							(ParticlesEmitter)(EffectEMs["flash"]).emit(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3,0,0,0,Math.random()*0.5+0.5);
@@ -2272,8 +2270,7 @@
 						var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
 						for (i=n-1; i>-1; i--)
 						{
-							var hit:VertexData = Models[i].lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
-							if (hit!=null)
+							if (Models[i].lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz))
 							{
 								if (selIdx==i)
 								{		// do addModule
@@ -2350,8 +2347,7 @@
 			return function():void
 			{
 				var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-				var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
-
+				var hit:VertexData = focusedShip.skin.lineMeshIntersection(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 				if (hit!=null)
 				{
 					var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
@@ -2398,7 +2394,7 @@
 		{
 			// ----- ray cast cursor
 			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			var hit:VertexData = focusedShip.skin.lineMeshIntersection(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
 				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();
@@ -2442,7 +2438,7 @@
 		{
 			// ----- ray cast cursor
 			var ray:VertexData = Mesh.cursorRay(stage.mouseX,stage.mouseY,0.01,100);
-			var hit:VertexData = focusedShip.skin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
+			var hit:VertexData = focusedShip.skin.lineMeshIntersection(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz);
 			if (hit!=null)
 			{
 				var shipInvT:Matrix4x4 = focusedShip.skin.transform.inverse();

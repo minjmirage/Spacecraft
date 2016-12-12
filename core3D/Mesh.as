@@ -865,7 +865,7 @@
 		* given line start posn (lox,loy,loz) and line vector (lvx,lvy,lvz)
 		* returns {vx,vy,vz,nx,ny,nz} the 3D position and surface normal where line hits this mesh (optionally after applying transform T), or null
 		*/
-		public function lineHitsMesh(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,T:Matrix4x4=null) : VertexData
+		public function lineMeshIntersection(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,T:Matrix4x4=null) : VertexData
 		{
 			if (transform==null) 	transform = new Matrix4x4();
 			if (T==null)	T = transform;
@@ -884,7 +884,7 @@
 				var vz:Number = invT.ca*lvx + invT.cb*lvy + invT.cc*lvz;
 
 				if (collisionGeom.lineHitsBounds(ox,oy,oz,vx,vy,vz))
-					hpt = collisionGeom.lineHitsGeometry(ox,oy,oz,vx,vy,vz);
+					hpt = collisionGeom.lineIntersection(ox,oy,oz,vx,vy,vz);
 
 				if (hpt!=null)
 				{
@@ -906,7 +906,7 @@
 			// ----- search submeshes for line hit ------------------
 			for (var i:int=childMeshes.length-1; i>-1; i--)
 			{
-				var npt:VertexData = childMeshes[i].lineHitsMesh(lox,loy,loz,lvx,lvy,lvz,T);
+				var npt:VertexData = childMeshes[i].lineMeshIntersection(lox,loy,loz,lvx,lvy,lvz,T);
 				if (hpt==null ||
 					npt!=null &&
 					(npt.vx-lox)*(npt.vx-lox)+(npt.vy-loy)*(npt.vy-loy)+(npt.vz-loz)*(npt.vz-loz) <
@@ -915,6 +915,43 @@
 			}
 
 			return hpt;
+		}//endfunction
+
+		/**
+		* given line start posn (lox,loy,loz) and line vector (lvx,lvy,lvz)
+		* returns whether line hits mesh geometry
+		*/
+		public function lineHitsMesh(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,T:Matrix4x4=null) : Boolean
+		{
+			if (transform==null) 	transform = new Matrix4x4();
+			if (T==null)	T = transform;
+			else			T = T.mult(transform);	// concat transform with self transform
+
+			if (collisionGeom!=null)
+			{
+				// ----- inverse transform line to object space ---------
+				var invT:Matrix4x4 = T.inverse();
+				var ox:Number = invT.aa*lox + invT.ab*loy + invT.ac*loz + invT.ad;	// transform point
+				var oy:Number = invT.ba*lox + invT.bb*loy + invT.bc*loz + invT.bd;
+				var oz:Number = invT.ca*lox + invT.cb*loy + invT.cc*loz + invT.cd;
+				var vx:Number = invT.aa*lvx + invT.ab*lvy + invT.ac*lvz;			// rotate line vector
+				var vy:Number = invT.ba*lvx + invT.bb*lvy + invT.bc*lvz;
+				var vz:Number = invT.ca*lvx + invT.cb*lvy + invT.cc*lvz;
+
+			 	if (collisionGeom.lineHitsGeometry(ox,oy,oz,vx,vy,vz))
+					return true;
+			}
+
+			if (childMeshes==null) return false;
+
+			// ----- search submeshes for line hit ------------------
+			for (var i:int=childMeshes.length-1; i>-1; i--)
+			{
+				if (childMeshes[i].lineHitsMesh(lox,loy,loz,lvx,lvy,lvz,T))
+					return true;
+			}
+
+			return false;
 		}//endfunction
 
 		/**
@@ -4256,23 +4293,103 @@ class CollisionGeometry
 			oy>=minXYZ.y && oy<=maxXYZ.y &&
 			oz>=minXYZ.z && oz<=maxXYZ.z)		return true;
 
-		return _lineHitsGeometry(ox,oy,oz,vx,vy,vz,BoundingTris)!=null;
+		return _lineHitsTris(ox,oy,oz,vx,vy,vz,BoundingTris);
 	}//endfunction
 
 	/**
-	* returns point where line pt:(lox,loy,loz) vect:(lvx,lvy,lvz) hits this geometry
-	* returns {vx,vy,vz, nx,ny,nz}	where (vx,vy,vz) is hit point and (nx,ny,nz) is triangle normal
+	* returns if line hits any part of this geometry mesh (more expensive test)
 	*/
-	public function lineHitsGeometry(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number) : VertexData
+	public function lineHitsGeometry(ox:Number,oy:Number,oz:Number,vx:Number,vy:Number,vz:Number) : Boolean
 	{
-		return _lineHitsGeometry(lox,loy,loz,lvx,lvy,lvz,Tris);
+		return lineHitsBounds(ox,oy,oz,vx,vy,vz) && _lineHitsTris(ox,oy,oz,vx,vy,vz,Tris);
+	}//endfunction
+
+	/**
+	* returns whether line intersects any of given Tris
+	*/
+	private function _lineHitsTris(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,Tris:Vector.<TriData>) : Boolean
+	{
+		for (var i:int=Tris.length-1; i>-1; i--)
+		{
+			var tri:TriData = Tris[i];
+
+			// ***** Optimization ***********************************
+			var ax:Number = tri.ax;
+			var ay:Number = tri.ay;
+			var az:Number = tri.az;
+			var bx:Number = tri.bx;
+			var by:Number = tri.by;
+			var bz:Number = tri.bz;
+			var cx:Number = tri.cx;
+			var cy:Number = tri.cy;
+			var cz:Number = tri.cz;
+
+			// ----- chk line hits this triangle --------------------
+			var nx:Number = tri.nx;	//	normal x for the triangle
+			var ny:Number = tri.ny;	//	normal y for the triangle
+			var nz:Number = tri.nz;	//	normal z for the triangle
+
+			// let X be the intersection point, then equation of triangle plane Tn.(X-Ta) = 0
+			// but X = Lo+Lv*k   =>   Tn.(Lo+Lv*k-Ta) = 0    =>   Tn.Lv*k + Tn.(Lo-Ta) = 0
+			// k = (Ta-Lo).Tn/Lv.Tn
+			// denom!=0 => there is intersection in the plane of tri
+
+			var denom:Number = lvx*nx+lvy*ny+lvz*nz;
+			if (denom!=0)		// has intersection
+			{
+				var num:Number = (nx*(ax-lox) + ny*(ay-loy) + nz*(az-loz));
+				var k:Number = num/denom;
+				if (k>=0 && k<=1)	// has segment intersection
+				{
+					var ix:Number = lox+lvx*k - ax;		// vector to segment intersection on triangle plane
+					var iy:Number = loy+lvy*k - ay;		// vector to segment intersection on triangle plane
+					var iz:Number = loz+lvz*k - az;		// vector to segment intersection on triangle plane
+
+					var px:Number = bx - ax;		// tri side vector from a to b
+					var py:Number = by - ay;		// tri side vector from a to b
+					var pz:Number = bz - az;		// tri side vector from a to b
+
+					var qx:Number = cx - ax;		// tri side vector from a to c
+					var qy:Number = cy - ay;		// tri side vector from a to c
+					var qz:Number = cz - az;		// tri side vector from a to c
+
+					// find scalars along triangle sides P and Q s.t. sP+tQ = I
+					// s = (p.q)(w.q)-(q.q)(w.p)/(p.q)(p.q)-(p.p)(q.q)
+					// t = (p.q)(w.p)-(p.p)(w.q)/(p.q)(p.q)-(p.p)(q.q)
+					var p_p:Number = px*px+py*py+pz*pz;
+					var q_q:Number = qx*qx+qy*qy+qz*qz;
+					var p_q:Number = px*qx+py*qy+pz*qz;
+					var w_p:Number = ix*px+iy*py+iz*pz;
+					var w_q:Number = ix*qx+iy*qy+iz*qz;
+
+					denom = p_q*p_q - p_p*q_q;
+					var s:Number = (p_q*w_q - q_q*w_p)/denom;
+					var t:Number = (p_q*w_p - p_p*w_q)/denom;
+
+					if (!(s<0 || t<0 || s+t>1)) // intersection inside triangle
+						return true;
+				}
+			}
+		}//endfor
+
+		return false;
+	}//endFunction
+
+	/**
+	* returns point where line pt:(lox,loy,loz) vect:(lvx,lvy,lvz) hits this geometry
+	* returns {vx,vy,vz, nx,ny,nz}	where (vx,vy,vz) is hit point and (nx,ny,nz) is triangle normal
+	*/
+	public function lineIntersection(ox:Number,oy:Number,oz:Number,vx:Number,vy:Number,vz:Number) : VertexData
+	{
+		if (!lineHitsBounds(ox,oy,oz,vx,vy,vz))	return null;
+		return _lineTrisIntersection(ox,oy,oz,vx,vy,vz,Tris);
 	}//endfunction
 
 	/**
 	* returns point where line pt:(lox,loy,loz) vect:(lvx,lvy,lvz) hits this geometry
 	* returns {vx,vy,vz, nx,ny,nz}	where (vx,vy,vz) is hit point and (nx,ny,nz) is triangle normal
 	*/
-	private function _lineHitsGeometry(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,Tris:Vector.<TriData>) : VertexData
+	private function _lineTrisIntersection(lox:Number,loy:Number,loz:Number,lvx:Number,lvy:Number,lvz:Number,Tris:Vector.<TriData>) : VertexData
 	{
 		var hit:VertexData = null;
 		for (var i:int=Tris.length-1; i>-1; i--)
@@ -4363,7 +4480,7 @@ class CollisionGeometry
 		}//endfor
 
 		return hit;
-	}//endFunction
+	}//endfunction
 
 	/**
 	* returns if line pt:(ox,oy,oz) vect:(vx,vy,vz) hits or is in the Bounding Box of this geometry
