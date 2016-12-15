@@ -286,18 +286,57 @@
 			for (key in EffectEMs)
 				world.addChild(EffectEMs[key].skin);
 
+			var rv:Vector3D = new Vector3D();
+
 			// ----- initialize projectile FXs
 			BulletFXs = new Object();
-			BulletFXs["launcherS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["missileS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["missileTrail"]).emit(p.px,p.py,p.pz,0,0,0,0.65);};
-			BulletFXs["gunAutoS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunAutoS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
-			BulletFXs["gunFlakS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunFlakS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
-			BulletFXs["gunIonS"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04); };
-			BulletFXs["gunPlasmaS"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareYellow"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04); };
-			BulletFXs["gunFlakS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunFlakS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); };
-			BulletFXs["gunRailS"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunRailS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.6); (ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.5);};
-			BulletFXs["gunIonM"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08); };
-			BulletFXs["gunPlasmaM"] = function(p:Projectile):void { (ParticlesEmitter)(EffectEMs["flareWhite"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08); };
-			BulletFXs["gunRailM"] = function(p:Projectile):void { (MeshParticles)(EffectMPs["gunRailM"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1); (ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.9); (ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.8);};
+			BulletFXs["launcherS"] = function(p:Projectile):void
+			{
+				(MeshParticles)(EffectMPs["missileS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1);
+				(ParticlesEmitter)(EffectEMs["missileTrail"]).emit(p.px,p.py,p.pz,0,0,0,0.65);
+			};
+			BulletFXs["gunAutoS"] = function(p:Projectile):void
+			{
+				(MeshParticles)(EffectMPs["gunAutoS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1);
+			};
+			BulletFXs["gunFlakS"] = function(p:Projectile):void
+			{
+				(MeshParticles)(EffectMPs["gunFlakS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1);
+				randV3values(0.01,rv); (ParticlesEmitter)(EffectEMs["bit"]).emit(p.px,p.py,p.pz,rv.x,rv.y,rv.z,1);
+			};
+			BulletFXs["gunIonS"] = function(p:Projectile):void
+			{
+				(ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04);
+				randV3values(0.01,rv); (ParticlesEmitter)(EffectEMs["bit"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,1);
+			};
+			BulletFXs["gunPlasmaS"] = function(p:Projectile):void
+			{
+				(ParticlesEmitter)(EffectEMs["flareYellow"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04);
+				randV3values(0.02,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,0.15);
+			};
+			BulletFXs["gunRailS"] = function(p:Projectile):void
+			{
+				(MeshParticles)(EffectMPs["gunRailS"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1);
+				(ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.6);
+				(ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.5);
+			};
+			BulletFXs["gunIonM"] = function(p:Projectile):void
+			{
+				(ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08);
+				randV3values(0.03,rv); (ParticlesEmitter)(EffectEMs["bit"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,1);
+				randV3values(0.03,rv); (ParticlesEmitter)(EffectEMs["bit"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,1);
+			};
+			BulletFXs["gunPlasmaM"] = function(p:Projectile):void
+			{
+				(ParticlesEmitter)(EffectEMs["flareWhite"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08);
+				randV3values(0.04,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,0.3);
+			};
+			BulletFXs["gunRailM"] = function(p:Projectile):void
+			{
+				(MeshParticles)(EffectMPs["gunRailM"]).nextLocDirScale(p.px,p.py,p.pz,p.vx,p.vy,p.vz,1);
+				(ParticlesEmitter)(EffectEMs["halo"]).emit(p.px,p.py,p.pz,0,0,0,0.9);
+				(ParticlesEmitter)(EffectEMs["ring"]).emit(p.px,p.py,p.pz,0,0,0,0.8);
+			};
 
 			// ----- initialize sounds
 			SoundFxs = {jumpIn:new sndJumpIn(),jumpIn_Af:0.3,
@@ -499,7 +538,7 @@
 			}//endfunction
 
 			// ----- default enemies
-			for (var i:int=0; i<3; i++)
+			for (var i:int=4; i>-1; i--)
 				addShipToScene(false);	// hostile
 
 			// ----- face ship jump in direction
@@ -1324,8 +1363,7 @@
 				var A:Vector.<Vector3D> = new Vector.<Vector3D>();
 				for (var i:int=0; i<n; i++)
 				{
-					var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-					v.scaleBy(0.01*(1+n)*(Math.random()*0.5+0.5)/v.length);
+					var v:Vector3D = randV3values(0.01*(1+n)*(Math.random()*0.5+0.5));
 					var dp:Number = v.x*nx + v.y*ny + v.z*nz;
 					if (dp<0)	// reflect if against normal
 					{
@@ -1335,7 +1373,9 @@
 					}
 					A.push(v);
 				}
+
 				var ttl:int = 30;
+				var rv:Vector3D = new Vector3D();
 				var streamersFn:Function = function():void
 				{
 					for (var i:int=A.length-1; i>-1; i--)
@@ -1344,14 +1384,8 @@
 						var ptx:Number = px+(v.x+vx)*v.w;
 						var pty:Number = py+(v.y+vy)*v.w;
 						var ptz:Number = pz+(v.z+vz)*v.w;
-						var rx:Number = Math.random()-0.5;
-						var ry:Number = Math.random()-0.5;
-						var rz:Number = Math.random()-0.5;
-						var rl:Number  = Math.sqrt(rx*rx+ry*ry+rz*rz);
-						rx *= 0.015/rl;
-						ry *= 0.015/rl;
-						rz *= 0.015/rl;
-						(ParticlesEmitter)(EffectEMs["blast"]).emit(ptx,pty,ptz, vx+rx,vy+ry,vz+rz,0.1*(ttl/30));
+						randV3values(0.015,rv);
+						(ParticlesEmitter)(EffectEMs["blast"]).emit(ptx,pty,ptz, vx+rv.x,vy+rv.y,vz+rv.z,0.1*(ttl/30));
 						v.w+=1;
 						v.x*=0.99;
 						v.y*=0.99;
@@ -1785,12 +1819,12 @@
 				}
 				else
 				{	// ----- do multiple hull explosions
+					var dir:Vector3D = new Vector3D();
 					for (var i:int=ship.hullConfig.length-1; i>=0; i--)
 					{
 						hb = ship.hullConfig[i];
 						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(hb.x,hb.y,hb.z));
-						var dir:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-						dir.scaleBy(10000/dir.length);
+						randV3values(10000,dir);
 						var hitPt:VertexData = ship.hullSkin.lineMeshIntersection(pt.x,pt.y,pt.z,dir.x,dir.y,dir.z,ship.skin.transform);
 						if (hitPt!=null && posnIsOnScreen(hitPt.vx+hitPt.nx*0.3,hitPt.vy+hitPt.ny*0.3,hitPt.vz+hitPt.nz*0.3))
 						{
@@ -1815,8 +1849,7 @@
 		//===============================================================================================
 		private function destroyShip(ship:Ship):void
 		{
-			ship.vel = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-			ship.vel.scaleBy(0.01/ship.vel.length);
+			ship.vel = randV3values(0.01);
 			Exploding.push(ship);
 			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"hullGroan"+(1+Math.round(Math.random())));
 			removeEntity(ship);
@@ -2757,6 +2790,19 @@
 			r.transform = new Matrix4x4().scale(-1,1,1);
 			cone.addChild(r);
 			return cone.mergeTree();
+		}//endfunction
+
+		//===============================================================================================
+		// convenience fn to return a random vector of given length, override given vector v
+		//===============================================================================================
+		private static function randV3values(len:Number,v:Vector3D=null):Vector3D
+		{
+			if (v==null) v=new Vector3D(0,0,0);
+			v.x = Math.random()-0.5;
+			v.y = Math.random()-0.5;
+			v.z = Math.random()-0.5;
+			v.scaleBy(len/v.length);
+			return v;
 		}//endfunction
 
 	}//endClass
@@ -3768,10 +3814,10 @@ class Module		// data class
 		}
 		else if (kind=="gunPlasmaS")
 		{
-			fireDelay=40;
+			fireDelay=80;
 			speed=0.2;
 			damage=80;
-			range=10;
+			range=15;
 			muzzleLen=0.35;
 		}
 		else if (kind=="gunRailS")
