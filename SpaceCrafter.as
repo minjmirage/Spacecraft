@@ -1259,18 +1259,12 @@
 							if (hitPt!=null)
 							{
 								if (posnIsOnScreen(p.px,p.py,p.pz))
-								{
-									var _vl:Number = 0.1/Math.sqrt(p.vx*p.vx+p.vy*p.vy+p.vz*p.vz);
-									(ParticlesEmitter)(EffectEMs["flash"]).emit(hitPt.vx-p.vx*_vl,hitPt.vy-p.vy*_vl,hitPt.vz-p.vz*_vl,s.vel.x-p.vx/2,s.vel.y-p.vy/2,s.vel.z-p.vz/2,Math.sqrt(p.integrity)/10);
-									(ParticlesEmitter)(EffectEMs["bit"]).batchEmit(Math.sqrt(p.integrity), hitPt.vx, hitPt.vy, hitPt.vz, -p.vx * _vl + s.vel.x, -p.vy * _vl + s.vel.y, -p.vz * _vl + s.vel.z, Math.sqrt(p.vx*p.vx+p.vy*p.vy+p.vz*p.vz)/3);
-								}
-								p.ttl=0;
+									projectileHitFx(hitPt.vx,hitPt.vy,hitPt.vz, hitPt.nx,hitPt.ny,hitPt.nz, s.vel.x,s.vel.y,s.vel.z, p.integrity);
 								playSound(p.px,p.py,p.pz,"hit");
 								if (p.targ.parent==s)	// if is target
-								{
 									s.registerHit(hitPt,p.integrity);
-								}
 								p.integrity = 0;
+								p.ttl=0;
 							}
 						}//endif
 					}//endfor
@@ -1315,6 +1309,61 @@
 						p.renderFn(p);
 				}
 			}//endfor
+		}//endfunction
+
+		//===============================================================================================
+		//
+		//===============================================================================================
+		private function projectileHitFx(px:Number,py:Number,pz:Number,nx:Number,ny:Number,nz:Number,vx:Number,vy:Number,vz:Number,dmg:Number):void
+		{
+			(ParticlesEmitter)(EffectEMs["bit"]).batchEmit(Math.sqrt(dmg), px,py,pz, vx+nx*0.1,vy+ny*0.1,vz+nz*0.1, 0.2);
+
+			var n:int = Math.sqrt(dmg);
+			if (n>0)
+			{
+				var A:Vector.<Vector3D> = new Vector.<Vector3D>();
+				for (var i:int=0; i<n; i++)
+				{
+					var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+					v.scaleBy(0.01*(1+n)*(Math.random()*0.5+0.5)/v.length);
+					var dp:Number = v.x*nx + v.y*ny + v.z*nz;
+					if (dp<0)	// reflect if against normal
+					{
+						v.x -= nx*dp*2;
+						v.y -= ny*dp*2;
+						v.z -= nz*dp*2;
+					}
+					A.push(v);
+				}
+				var ttl:int = 30;
+				var streamersFn:Function = function():void
+				{
+					for (var i:int=A.length-1; i>-1; i--)
+					{
+						var v:Vector3D = A[i];
+						var ptx:Number = px+(v.x+vx)*v.w;
+						var pty:Number = py+(v.y+vy)*v.w;
+						var ptz:Number = pz+(v.z+vz)*v.w;
+						var rx:Number = Math.random()-0.5;
+						var ry:Number = Math.random()-0.5;
+						var rz:Number = Math.random()-0.5;
+						var rl:Number  = Math.sqrt(rx*rx+ry*ry+rz*rz);
+						rx *= 0.015/rl;
+						ry *= 0.015/rl;
+						rz *= 0.015/rl;
+						(ParticlesEmitter)(EffectEMs["blast"]).emit(ptx,pty,ptz, vx+rx,vy+ry,vz+rz,0.1*(ttl/30));
+						v.w+=1;
+						v.x*=0.99;
+						v.y*=0.99;
+						v.z*=0.99;
+					}
+					ttl--;
+					if (ttl<0)
+						stepFns.splice(stepFns.indexOf(streamersFn),1);
+				};
+				stepFns.push(streamersFn);
+			}
+
 		}//endfunction
 
 		//===============================================================================================
@@ -1554,7 +1603,7 @@
 					var vy:Number = shp.vel.y+T.bb*m.speed;
 					var vz:Number = shp.vel.z+T.cb*m.speed;
 					var mp:Missile = new Missile(tpx, tpy, tpz,	vx,vy,vz, targObj, BulletFXs[m.type], m.damage, m.range/m.speed, m.type);
-					muzzleFlash(tpx,tpy,tpz, vx,vy,vz,0,m.damage);
+					muzzleFlash(tpx,tpy,tpz, vx,vy,vz,0.1,m.damage);
 					Projectiles.push(mp);
 				}
 				if (delay==0)
