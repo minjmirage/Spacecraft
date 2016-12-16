@@ -306,13 +306,14 @@
 			};
 			BulletFXs["gunIonS"] = function(p:Projectile):void
 			{
-				(ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04);
+				(ParticlesEmitter)(EffectEMs["flareRed"]).emit(p.px,p.py,p.pz,0,0,0,0.5+Math.sin(p.ttl)*0.05);
 				randV3values(0.01,rv); (ParticlesEmitter)(EffectEMs["bit"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,1);
 			};
 			BulletFXs["gunPlasmaS"] = function(p:Projectile):void
 			{
-				(ParticlesEmitter)(EffectEMs["flareYellow"]).emit(p.px,p.py,p.pz,0,0,0,0.4+Math.sin(p.ttl)*0.04);
-				randV3values(0.02,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,0.15);
+				(ParticlesEmitter)(EffectEMs["flareYellow"]).emit(p.px,p.py,p.pz,0,0,0,0.5+Math.sin(p.ttl)*0.05);
+				randV3values(0.02,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x*6+p.vx,p.py+rv.y*6+p.vy,p.pz+rv.z*6+p.vz,-rv.x,-rv.y,-rv.z,0.2);
+				randV3values(0.02,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x*6+p.vx,p.py+rv.y*6+p.vy,p.pz+rv.z*6+p.vz,-rv.x,-rv.y,-rv.z,0.2);
 			};
 			BulletFXs["gunRailS"] = function(p:Projectile):void
 			{
@@ -329,7 +330,9 @@
 			BulletFXs["gunPlasmaM"] = function(p:Projectile):void
 			{
 				(ParticlesEmitter)(EffectEMs["flareWhite"]).emit(p.px,p.py,p.pz,0,0,0,0.8+Math.sin(p.ttl)*0.08);
-				randV3values(0.04,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x,p.py+rv.y,p.pz+rv.z,rv.x,rv.y,rv.z,0.3);
+				randV3values(0.04,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x*6,p.py+rv.y*6,p.pz+rv.z*6,-rv.x,-rv.y,-rv.z,0.3);
+				randV3values(0.04,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x*6,p.py+rv.y*6,p.pz+rv.z*6,-rv.x,-rv.y,-rv.z,0.3);
+				randV3values(0.04,rv); (ParticlesEmitter)(EffectEMs["flash"]).emit(p.px+rv.x*6,p.py+rv.y*6,p.pz+rv.z*6,-rv.x,-rv.y,-rv.z,0.3);
 			};
 			BulletFXs["gunRailM"] = function(p:Projectile):void
 			{
@@ -1038,7 +1041,7 @@
 					var dx:Number = v.pop()-px;
 					loudness += 4/((Number)(SoundFxs[id+"_Af"])*Math.sqrt(dx*dx+dy*dy+dz*dz));
 				}
-				if (loudness>2) loudness=2;
+				if (loudness>1.5) loudness=1.5;
 				if (loudness>0.01)
 					(Sound)(SoundFxs[id]).play(0,0,new SoundTransform(loudness,0));
 			}
@@ -1624,7 +1627,7 @@
 			{
 				if (delay%10==0)
 				{
-					var T:Matrix4x4 = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*0.51,m.y+m.ny*0.51,m.z+m.nz*0.51);
+					var T:Matrix4x4 = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*0.6,m.y+m.ny*0.6,m.z+m.nz*0.6);
 					T = shp.skin.transform.mult(T);	// turret global space
 					var ang:Number = delay/20*Math.PI;
 					var px:Number = Math.sin(ang)*0.25;
@@ -3791,8 +3794,8 @@ class Module		// data class
 		{
 			fireDelay=3;
 			speed=0.5;
-			damage=2;
-			range=7;
+			damage=4;
+			range=8;
 			turnRate=0.1;
 			muzzleLen=0.26;
 		}
@@ -3815,7 +3818,7 @@ class Module		// data class
 		else if (kind=="gunPlasmaS")
 		{
 			fireDelay=80;
-			speed=0.2;
+			speed=0.15;
 			damage=80;
 			range=15;
 			muzzleLen=0.35;
@@ -3849,10 +3852,10 @@ class Module		// data class
 		else if (kind=="gunPlasmaM")
 		{
 			fireDelay=100;
-			speed=0.3;
+			speed=0.15;
 			damage=400;
 			turnRate = 0.01;
-			range=20;
+			range=30;
 			muzzleLen=0.7;
 		}
 	}//endconstr
