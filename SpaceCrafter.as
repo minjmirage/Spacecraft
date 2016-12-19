@@ -69,7 +69,6 @@
 		[Embed(source="3D/textures/TexPanel.jpg")] 			private static var TexPanel:Class;
 		[Embed(source="3D/textures/TexTransPanel.png")] private static var TexTransPanel:Class;
 		[Embed(source="3D/textures/SpecPanel.jpg")] 		private static var SpecPanel:Class;
-		[Embed(source="3D/textures/TexStreak.png")] 		private static var TexStreak:Class;
 		[Embed(source="3D/textures/halo.png")] 					private static var TexHalo:Class;
 
 		[Embed(source="3D/textures/texRocks.jpg")] 			private static var TexRocks:Class;
@@ -216,6 +215,7 @@
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
 			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
 							TexRocks:new TexRocks().bitmapData, SpecRocks:new SpecRocks().bitmapData, NormRocks:new NormRocks().bitmapData,
+							TexWhiteGradient:new TexLinearGradient().bitmapData,
 							TexTrans:new TexTransPanel().bitmapData,
 							TexPlanets:new TexPlanets().bitmapData,
 							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
@@ -822,12 +822,14 @@
 				sky.addChild(p);
 			}
 			sky = sky.mergeTree();
-			sky.setLightingParameters(1,1,1,0,0,false);
+			sky.setLightingParameters(1,1,1,0,0,false,true);
+			sky.depthWrite = false;
 			world.addChild(sky);
 
 			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
-			planet.transform = planet.transform.rotFromTo(0,1,0,Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).translate(0,-100,0);
+			var rv:Vector3D = randV3values(1);
+			planet.transform = planet.transform.rotFromTo(0,1,0,rv.x,rv.y*0.7,rv.z).translate(0,-100,0);
 			planetsDat = new Vector.<Vector3D>();
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
@@ -838,18 +840,17 @@
 				if (Math.random()<0.7 || i==0)
 				{
 					var r:int = Math.floor(Math.random()*8);
-					var ux:Number = int(r/4)/2;
-					var uy:Number = (r%4)/4;
-					p = createPlanetMesh((75/(i*2+1)),R[i],Mtls["TexPlanets"]);
-					var rad:Number = 0;
-					if (i>0)	rad =i*100 + 200/(i+1)+Math.random()*50;
+					var planetRad:Number = 75/(i*2+1);
+					var orbitRad:Number = 0;
+					if (i>0)	orbitRad =i*100 + 200/(i+1)+Math.random()*50;
+					p = createPlanetMesh(planetRad,R[i],Mtls["TexPlanets"]);
 					var ang:Number = Math.random()*Math.PI*2;
-					p.transform = p.transform.translate(rad*Math.sin(ang),0,rad*Math.cos(ang));
+					p.transform = p.transform.translate(orbitRad*Math.sin(ang),0,orbitRad*Math.cos(ang));
 					p.material.setSpecular(0);
 					p.material.setAmbient(0,0,0);
 					planet.addChild(p);
 					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
-					ringsGap.push(rad-75/(i*2+1),rad+75/(i*2+1));
+					ringsGap.push(orbitRad-planetRad,orbitRad+planetRad);
 				}
 			}//endfor
 			sky.addChild(planet);
@@ -857,24 +858,21 @@
 			// ----- create planetary rings
 			ringsGap.shift();
 			ringsGap.pop();
-			var ringBmd:BitmapData = new BitmapData(1,1,true,0x33000000);
 			var rings:Mesh = new Mesh();
 			rings.transform = new Matrix4x4().rotX(Math.PI/2);
 			for (i=0; i<ringsGap.length; i+=2)
 			{
-				var a:Number = Math.random()*0.9;
-				var b:Number = 0.1 + Math.random()*0.9;
+				var a:Number = Math.random()*0.8;
+				var b:Number = 0.2 + Math.random()*0.8;
 				if (a<b)
-				{
-					a = ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]);
-					b = ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i]);
-					rings.addChild(Mesh.createCylinder(a,b,0,0,128,ringBmd));
-					rings.addChild(Mesh.createCylinder(b,a,0,0,128,ringBmd));
-				}
+					rings.addChild(createPlanetRing(ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]),
+																					ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i])));
 			}
 			rings = rings.mergeTree();
+			rings.material.setBlendMode("add");
+			rings.depthWrite = false;
 			planet.addChild(rings);
-			rings.setLightingParameters(0,0,0,1,1,true,true);
+			rings.setLightingParameters(1,1,1,0,0,false,true);
 
 			// ----- create main and sub title
 			var sw:int = stage.stageWidth;
@@ -893,6 +891,46 @@
 			addChild(subTitle);
 			return sky;
 		}//
+
+		//===============================================================================================
+		// create banded planetary ring stretching from radius a to b
+		//===============================================================================================
+		private function createPlanetRing(a:Number,b:Number):Mesh
+		{
+			var ring:Mesh = new Mesh();
+
+			var n:int = Math.round(Math.random()*(b-a));	// randomize number of bands
+			if (n>30) n=30;
+			var B:Vector.<Number> = new <Number>[a,b];
+			while (n>0)
+			{
+				var p:int=0;
+				var q:int=B.length-1;
+				var r:Number = Math.random()*(b-a)+a;
+				while (p<=q)
+				{
+					var m:int = (p+q)/2;
+					if (B[m]<r)	p=m+1;
+					else 				q=m-1;
+				}
+				B.splice(p,0,r);
+				n--;
+			}
+			for (p=B.length-2; p>-1; p--)
+			{
+				var opacity:Number = 1-Math.random()*0.5-0.05;
+				var band:Mesh = Mesh.createCylinder(B[p],B[p+1],0,0,128,Mtls["TexWhiteGradient"]);
+				var vd:Vector.<Number> = band.vertData;
+				for (var i:int=vd.length-11; i>-1; i-=11)		vd[i+10] = opacity;
+				ring.addChild(band);
+				band = Mesh.createCylinder(B[p+1],B[p],0,0,128,Mtls["TexWhiteGradient"]);
+				vd = band.vertData;
+				for (i=vd.length-11; i>-1; i-=11)		vd[i+10] = opacity;
+				ring.addChild(band);
+			}
+
+			return ring;
+		}//endfunction
 
 		//===============================================================================================
 		// generate random asteroids
@@ -1770,7 +1808,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// force ship to move away
 		//===============================================================================================
 		[Inline]
 		private final function doShipSeparation(ship:Ship):void
