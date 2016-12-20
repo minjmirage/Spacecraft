@@ -828,8 +828,7 @@
 
 			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
-			var rv:Vector3D = randV3values(1);
-			planet.transform = planet.transform.rotFromTo(0,1,0,rv.x,rv.y*0.7,rv.z).translate(0,-100,0);
+			planet.transform = planet.transform.rotX((Math.random()-0.5)*Math.PI*0.9).rotY(Math.random()*Math.PI*2).translate(0,-100,0);
 			planetsDat = new Vector.<Vector3D>();
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
@@ -919,13 +918,9 @@
 			for (p=B.length-2; p>-1; p--)
 			{
 				var opacity:Number = 1-Math.random()*0.5-0.05;
-				var band:Mesh = Mesh.createCylinder(B[p],B[p+1],0,0,128,Mtls["TexWhiteGradient"]);
+				var band:Mesh = Mesh.createCylinder(B[p],B[p+1],0,0,64,Mtls["TexWhiteGradient"]);
 				var vd:Vector.<Number> = band.vertData;
 				for (var i:int=vd.length-11; i>-1; i-=11)		vd[i+10] = opacity;
-				ring.addChild(band);
-				band = Mesh.createCylinder(B[p+1],B[p],0,0,128,Mtls["TexWhiteGradient"]);
-				vd = band.vertData;
-				for (i=vd.length-11; i>-1; i-=11)		vd[i+10] = opacity;
 				ring.addChild(band);
 			}
 
