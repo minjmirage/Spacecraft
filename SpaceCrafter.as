@@ -709,13 +709,13 @@
 					smoke3Em.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
 					v = FW[i];
 					v.z = (v.z+1)%rotDiv;
-					flareWEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					flareWEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w*(0.8+Math.random()*0.3));
 					v = FY[i];
 					v.z = (v.z+1)%rotDiv;
-					flareYEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					flareYEm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w*(0.8+Math.random()*0.3));
 					v = FR[i];
 					v.z = (v.z+1)%rotDiv;
-					flareREm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w);
+					flareREm.emit(v.x*SinA[v.z],v.y,v.x*CosA[v.z],0,0,0,sc*v.w*(0.8+Math.random()*0.3));
 				}
 
 				// ----- draw reticle
@@ -1788,16 +1788,23 @@
 					var px:Number = T.aa*pt.vx + T.ab*pt.vy + T.ac*pt.vz + T.ad;
 					var py:Number = T.ba*pt.vx + T.bb*pt.vy + T.bc*pt.vz + T.bd;
 					var pz:Number = T.ca*pt.vx + T.cb*pt.vy + T.cc*pt.vz + T.cd;
-					var nx:Number = T.aa*pt.nx + T.ab*pt.ny + T.ac*pt.nz;
-					var ny:Number = T.ba*pt.nx + T.bb*pt.ny + T.bc*pt.nz;
-					var nz:Number = T.ca*pt.nx + T.cb*pt.ny + T.cc*pt.nz;
-					var cnt:int = Math.floor(-pt.u/50)+1;
 					if (posnIsOnScreen(px,py,pz))
 					{
-						var mag:Number = 0.003*Math.sqrt(pt.w);
-						(ParticlesEmitter)(EffectEMs["blast"]).emit(px,py,pz,ship.vel.x+nx*mag,ship.vel.y+ny*mag,ship.vel.z+nz*mag,mag*5);
-						mag *=3;
-						(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.5,1);
+						var nx:Number = T.aa*pt.nx + T.ab*pt.ny + T.ac*pt.nz;
+						var ny:Number = T.ba*pt.nx + T.bb*pt.ny + T.bc*pt.nz;
+						var nz:Number = T.ca*pt.nx + T.cb*pt.ny + T.cc*pt.nz;
+						var mag:Number = Math.sqrt(pt.w);
+						if (Math.random()<0.5)
+						{
+							mag *= 0.003;
+							(ParticlesEmitter)(EffectEMs["blast"]).emit(px,py,pz,ship.vel.x+nx*mag,ship.vel.y+ny*mag,ship.vel.z+nz*mag,mag*5);
+						}
+						else
+						{
+							mag *= 0.012;
+							var cnt:int = Math.sqrt(-pt.u/50)+1;
+							(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.3,0.6);
+						}
 					}
 					pt.u=50;
 				}
@@ -4673,7 +4680,7 @@ class Ship extends Hull
 	}//endfunction
 
 	//===============================================================================================
-	// records down the damage position and magnitude
+	// records down the damage position and magnitude {(vx,vy,vz):posn (nx,ny,nz):normal w:damage }
 	//===============================================================================================
 	public override function registerHit(hitPt:VertexData,dmg:Number):void
 	{
