@@ -86,6 +86,7 @@
 		[Embed(source="3D/textures/flareWhite.jpg")] 			private static var TexFlareWhite:Class;
 		[Embed(source="3D/textures/flareYellow.jpg")] 		private static var TexFlareYellow:Class;
 		[Embed(source="3D/textures/flareRed.jpg")]	 			private static var TexFlareRed:Class;
+		[Embed(source="3D/textures/thrustGradient.png")]	private static var TexThrustGradient:Class;
 		[Embed(source="3D/textures/linearGradient.png")]	private static var TexLinearGradient:Class;
 
 		[Embed(source="3D/textures/FxBitsSheet.png")] 		private static var FxBitsSheet:Class;
@@ -216,6 +217,7 @@
 			Mtls = {Tex:new Tex().bitmapData, TexPanel:new TexPanel().bitmapData, SpecPanel:new SpecPanel().bitmapData,
 							TexRocks:new TexRocks().bitmapData, SpecRocks:new SpecRocks().bitmapData, NormRocks:new NormRocks().bitmapData,
 							TexWhiteGradient:new TexLinearGradient().bitmapData,
+							TexThrustGradient:new TexThrustGradient().bitmapData,
 							TexTrans:new TexTransPanel().bitmapData,
 							TexPlanets:new TexPlanets().bitmapData,
 							TexSpace1:fadeVertEnds(new TexSpace1().bitmapData),
@@ -254,7 +256,7 @@
 			EffectMPs["gunFlakS"] = new MeshParticles(Mesh.createSphere(0.05, 8, 4, new BitmapData(1, 1, false, 0x88FF88)));
 			EffectMPs["gunRailS"] = new MeshParticles(Mesh.createStreak(0.2, 0.07, new BitmapData(1, 1, false, 0xFFFFCC)));
 			EffectMPs["gunRailM"] = new MeshParticles(Mesh.createStreak(0.4, 0.14, new BitmapData(1, 1, false, 0xFFFFCC)));
-			var grad:BitmapData = new TexLinearGradient().bitmapData;
+			var grad:BitmapData = Mtls["TexThrustGradient"];
 			EffectMPs["thrustConeW"] = new MeshParticles(createLightCone(0.09,0.45,0,0.8,grad));
 			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1,grad));
 			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.1,grad));
