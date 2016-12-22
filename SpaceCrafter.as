@@ -278,7 +278,7 @@
 						halo:new ParticlesEmitter(new TexHalo().bitmapData,1,1,"add"),
 						hyperCharge:new ParticlesEmitter(new FxThrustSheet().bitmapData,25,4,"add"),
 						missileTrail:new ParticlesEmitter(new FxTrailSheet().bitmapData,25,2,"add"),
-						sparks:new ParticlesEmitter(new FxSparksSheet().bitmapData,9,0.5,"add"),
+						sparks:new ParticlesEmitter(new FxSparksSheet().bitmapData,16,0.5,"add"),
 						flash:new ParticlesEmitter(new FxFlashSheet().bitmapData,9,5,"add"),
 						ring:new ParticlesEmitter(new FxRingsSheet().bitmapData,25,2,"add"),
 						bit:new ParticlesEmitter(new FxBitsSheet().bitmapData, 25, 1),
@@ -1779,6 +1779,7 @@
 		private final function doShipDamageFx(ship:Ship):void
 		{
 			var T:Matrix4x4 = ship.skin.transform;
+			var rv:Vector3D = new Vector3D();
 			for (var j:int=ship.damagePosns.length-1; j>-1; j--)
 			{
 				var pt:VertexData = ship.damagePosns[j];
@@ -1802,8 +1803,15 @@
 						else
 						{
 							mag *= 0.012;
-							var cnt:int = Math.sqrt(-pt.u/50)+1;
-							(ParticlesEmitter)(EffectEMs["sparks"]).batchEmit(cnt,px,py,pz, nx*mag, ny*mag, nz*mag, mag, 0.3,0.6);
+							randV3values(0.1,rv);
+							var dp:Number = rv.x*nx + rv.y*ny + rv.z*nz;
+							if (dp<0)
+							{
+								rv.x+=dp*2*nx;
+								rv.y+=dp*2*ny;
+								rv.z+=dp*2*nz;
+							}
+							(ParticlesEmitter)(EffectEMs["sparks"]).emit(px,py,pz,ship.vel.x+nx*mag+rv.x,ship.vel.y+ny*mag+rv.y,ship.vel.z+nz*mag+rv.z,0.5);
 						}
 					}
 					pt.u=50;
