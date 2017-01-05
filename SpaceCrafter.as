@@ -2079,7 +2079,18 @@
 		}//endfunction
 
 		//===============================================================================================
-		// creates hyper jump in effect given x,y,z position and w=bearing
+		//
+		//===============================================================================================
+		private function setPlayerAI(ship:Ship):void
+		{
+			ship.stepFn = function():void
+			{
+
+			}//
+		}//endfunction
+
+		//===============================================================================================
+		//
 		//===============================================================================================
 		private function setDumbAI(ship:Ship):void
 		{
@@ -2134,8 +2145,7 @@
 					//(ParticlesEmitter)(EffectEMs["flareWhite"]).emit(tp.x,tp.y,tp.z,0,0,0,1);		// debug
 					ship.moveTowardsStep(tp);
 
-					if (ship.integrity<ship.maxIntegrity*0.25)
-						jumpOut(ship,Math.random()*Math.PI*2);
+
 				}//endif
 			}//endfunction
 		}//endfunction
@@ -4592,7 +4602,6 @@ class Ship extends Hull
 
 	public var tte:int = 90;										// time to explode
 
-	public var facing:Vector3D = null;					// current facing of ship
 	public var banking:Number = 0;							// current ship roll
 	public var accel:Number = 0;								// current acceleration
 	public var rotAccel:Vector3D = null;				// current rota acceleration
@@ -4622,9 +4631,8 @@ class Ship extends Hull
 		super(shpName,texMap,specMap,normMap);
 
 		modelAssets = assets;
-		facing = new Vector3D(0,0,1);	// default facing
-		rotVel = new Vector3D();
-		rotAccel = new Vector3D();
+		rotVel = new Vector3D(0,0,0,1);
+		rotAccel = new Vector3D(0,0,0,1);
 
 		hullSkin.material.setAmbient(0.2,0.2,0.2);
 		hullSkin.material.setSpecular(2,0.5);
@@ -4736,33 +4744,48 @@ class Ship extends Hull
 	}//endfunction
 
 	//===============================================================================================
+	// re sets ship facing to
+	//===============================================================================================
+	public function setFacing(bearing:Number):void
+	{
+		rotPosn = new Vector3D(0,Math.sin(bearing/2),0,Math.cos(bearing/2));
+	}
+
+	//===============================================================================================
+	// returns ship forward vector
+	//===============================================================================================
+	public function getForwardFacing(bearing:Number):Vector3D
+	{
+		return new Vector3D(skin.transform.ac,skin.transform.bc,skin.transform.cc);
+	}
+
+	//===============================================================================================
 	//
 	//===============================================================================================
 	public function moveTowardsStep(pt:Vector3D):void
 	{
 		// ----- modify ship heading to travel towards point
-		var targV:Vector3D = new Vector3D(pt.x - posn.x,pt.y - posn.y,pt.z - posn.z);
-		targV.normalize();
-		var turn:Vector3D = facing.crossProduct(targV);		// rotation needed to face target
+		var targF:Vector3D = new Vector3D(pt.x - posn.x,pt.y - posn.y,pt.z - posn.z);
+		targF.normalize();
+		var curF:Vector3D = new Vector3D(skin.transform.ac,skin.transform.bc,skin.transform.cc);
+		var cross:Vector3D = curF.crossProduct(targF);
+		cross.normalize();
+		var ang:Number = targF.x*curF.x+targF.y*curF.y+targF.z*curF.z;
+		if (ang<-1) ang=-1;
+		if (ang>1)	ang= 1;
+		ang = Math.acos(ang);
+		if (ang>maxRotAccel) ang=maxRotAccel;
+		var sinA2:Number = Math.sin(ang/2);
+		rotAccel = new Vector3D(sinA2*cross.x,sinA2*cross.y,sinA2*cross.z,Math.cos(ang/2));
+		rotVel = Matrix4x4.quatMult(rotAccel,rotVel);
 
-		var targTurnVel:Vector3D = turn.clone();
-		targTurnVel.scaleBy(1-slowF);								// target turning vel
-		rotAccel = targTurnVel.subtract(rotVel);		// diff actual rotVel to target turn vel
-		if (rotAccel.length>maxRotAccel)						// limit rot accel
-			rotAccel.scaleBy(maxRotAccel/rotAccel.length);
-
-		rotVel.x += rotAccel.x;				// increment rotational Vel
-		rotVel.y += rotAccel.y;
-		rotVel.z += rotAccel.z;
-
-		var ang:Number = Vector3D.angleBetween(facing,targV);
 		var thrustTresh:Number = Math.PI*0.5;
 		if (ang<thrustTresh)
 		{
 			accel = (thrustTresh-ang)/(thrustTresh)*maxAccel;
-			vel.x += facing.x*accel;	// increment vel
-			vel.y += facing.y*accel;
-			vel.z += facing.z*accel;
+			vel.x += curF.x*accel;	// increment vel
+			vel.y += curF.y*accel;
+			vel.z += curF.z*accel;
 		}
 	}//endfunction
 
@@ -4775,19 +4798,27 @@ class Ship extends Hull
 		energy += hullConfig.length/10;
 		if (energy>maxEnergy) energy = maxEnergy;
 
-		// ----- move ship with current velocity
-		posn.x += vel.x;			// update ship position
+		// ----- calculate rotVel quaternion
+
+
+
+		// ----- calculate ship banking
+		banking *= 1-(1-slowF)*(1-slowF);
+		banking += -rotVel.length*0.1;
+
+		// ----- move ship with current velocity and rotation
+		posn.x += vel.x;
 		posn.y += vel.y;
 		posn.z += vel.z;
-		facing = new Matrix4x4().rotate(rotVel.x,rotVel.y,rotVel.z).rotateVector(facing);
-		facing.normalize();
+		rotPosn = Matrix4x4.quatMult(rotVel,rotPosn);		// update rotation
+
+		// ----- update transform
+		skin.transform = Matrix4x4.quaternionToMatrix(rotPosn.w,rotPosn.x,rotPosn.y,rotPosn.z).mult(new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z).rotZ(banking)).translate(posn.x,posn.y,posn.z);
+		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
 		vel.scaleBy(slowF);			// speed slow
 		rotVel.scaleBy(slowF);	// rotation slow
 
 		// ----- update ship transform
-		banking *= 1-(1-slowF)*(1-slowF);
-		banking += -rotVel.y*0.5;
-		skin.transform = new Matrix4x4().translate(-pivot.x,-pivot.y,-pivot.z).rotZ(banking).rotFromTo(0,0,1,facing.x,facing.y,facing.z).translate(posn.x,posn.y,posn.z);
 		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
 	}//endfunction
 
