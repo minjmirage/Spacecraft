@@ -258,8 +258,8 @@
 			EffectMPs["gunRailM"] = new MeshParticles(Mesh.createStreak(0.4, 0.14, new BitmapData(1, 1, false, 0xFFFFCC)));
 			var grad:BitmapData = Mtls["TexThrustGradient"];
 			EffectMPs["thrustConeW"] = new MeshParticles(createLightCone(0.09,0.45,0,0.8,grad));
-			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1,grad));
-			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.1,grad));
+			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1.1,grad));
+			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.4,grad));
 			for (key in EffectMPs)
 			{
 				(MeshParticles)(EffectMPs[key]).skin.setLightingParameters(1,1,1,0,0,false);
