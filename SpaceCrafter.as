@@ -88,6 +88,7 @@
 		[Embed(source="3D/textures/flareRed.jpg")]	 			private static var TexFlareRed:Class;
 		[Embed(source="3D/textures/thrustGradient.png")]	private static var TexThrustGradient:Class;
 		[Embed(source="3D/textures/linearGradient.png")]	private static var TexLinearGradient:Class;
+		[Embed(source="3D/textures/shipWheel.png")]				private static var TexShipWheel:Class;
 
 		[Embed(source="3D/textures/FxBitsSheet.png")] 		private static var FxBitsSheet:Class;
 		[Embed(source="3D/textures/FxBlastSheet.png")] 		private static var FxBlastSheet:Class;
@@ -1213,12 +1214,16 @@
 				if (upPt.endT - upPt.startT<300)
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
+					var selected:Hull = null;
 					for (var i:int=Entities.length-1; i>-1; i--)
 						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
-						{
-							focusOn(Entities[i]);
-							velDBER.x = (focusedEntity.radius*3-lookDBER.x)*(1-0.9);
-						}
+							selected = Entities[i];
+
+					if (selected!=null)
+					{
+						focusOn(selected);
+						velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
+					}
 				}
 			}//
 
@@ -1261,7 +1266,7 @@
 
 			if (selected!=null)
 			{
-				focusedEntity = selected;
+				focusOn(selected);
 				toggleView();
 			}
 			else if (Input.zoomF<1)
@@ -1292,19 +1297,21 @@
 				prevLookDBER = lookDBER;
 
 				// ----- ease to mean position of ships
+				/*
 				var meanPt:Vector3D = new Vector3D();
 				for (var i:int=Entities.length-1; i>-1; i--)
 					meanPt = meanPt.add(Entities[i].posn);
 				meanPt.scaleBy(1/Entities.length);
 				lookVel = meanPt.subtract(lookPt);
 				lookVel.scaleBy(1-0.9);
+				*/
 				viewStep = tacticalViewStep;
 			}
 			else
 			{	// restore prev view
 				world.removeChild(gridMesh);
 				viewStep = focusPlayerShipViewStep;
-				if (focusedEntity!=null) prevLookDBER.x = focusedEntity.radius*3;	// hack to dist cam from ship
+				if (focusedEntity!=null) prevLookDBER.x = focusedEntity.radius*4;	// hack to dist cam from ship
 				velDBER = prevLookDBER.subtract(lookDBER);
 				velDBER.scaleBy(1-0.9);
 			}
@@ -1390,7 +1397,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// hit fireball and splattering
 		//===============================================================================================
 		private function projectileHitFx(px:Number,py:Number,pz:Number,nx:Number,ny:Number,nz:Number,vx:Number,vy:Number,vz:Number,dmg:Number):void
 		{
@@ -1852,7 +1859,7 @@
 		//===============================================================================================
 		private function explodingStep() : void
 		{
-			for (var j:int=Exploding.length-1; j>=0; j--)
+			for (var j:int=Exploding.length-1; j>-1; j--)
 			{
 				var ship:Ship = Exploding[j];
 				var hb:HullBlock = null;
@@ -1941,6 +1948,7 @@
 				else							ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1,Mtls["TexPanel"],Mtls["SpecPanel"]);
 				Friendlies.push(ship);
 				ship.targets = Hostiles;
+				setPlayerAI(ship);
 			}
 			else
 			{
@@ -1948,6 +1956,7 @@
 				else							ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1,Mtls["SpecPanel"],Mtls["TexPanel"]);
 				Hostiles.push(ship);
 				ship.targets = Friendlies;
+				setDumbAI(ship);
 			}
 			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
 			ship.hullSkin.material.setSpecular(2);
@@ -1957,7 +1966,7 @@
 			ship.posn.x = Math.sin(ang)*dist;
 			ship.posn.z = Math.cos(ang)*dist;
 			ship.setFacing(ang);
-			setDumbAI(ship);
+
 			return ship;
 		}//endfunction
 
@@ -2085,42 +2094,27 @@
 		//===============================================================================================
 		private function setPlayerAI(ship:Ship):void
 		{
-			var targF:Vector3D = ship.getFacing();
+			setDumbAI(ship);
+			var dumbStepFn:Function = ship.stepFn;
 			ship.stepFn = function():void
 			{
-				/*
-				// ----- enable drag to steer
-				if (Input.downPts.length==1)	// one finger
-				{
-					var downPt:InputPt = Input.downPts[0];
-					var rotAccel:Number = (downPt.x-downPt.ox)/1000;	// bearing change
-					var thrustInc:Number = (downPt.y-downPt.oy)/1000;	// elevation change
-
-					targF.normalize();
-
-					var curF:Vector3D = new Vector3D(ship.skin.transform.ac,ship.skin.transform.bc,ship.skin.transform.cc);
-					var cross:Vector3D = curF.crossProduct(targF);
-					cross.normalize();
-					var ang:Number = targF.x*curF.x+targF.y*curF.y+targF.z*curF.z;
-					if (ang<-1) ang=-1;
-					if (ang>1)	ang= 1;
-					ang = Math.acos(ang);
+				if (focusedShip==ship)
+				{	// allow user control
+					var ang:Number = Input.yawAccel;
 					if (ang>ship.maxRotAccel) ang=ship.maxRotAccel;
 					var sinA2:Number = Math.sin(ang/2);
+					var cross:Vector3D = ship.skin.transform.rotateVector(new Vector3D(0,1,0));
 					ship.rotAccel = new Vector3D(sinA2*cross.x,sinA2*cross.y,sinA2*cross.z,Math.cos(ang/2));
-					ship.rotVel = Matrix4x4.quatMult(rotAccel,rotVel);
+					ship.accel = ship.maxAccel;
+					ship.rotVel = Matrix4x4.quatMult(ship.rotAccel,ship.rotVel);
+					var curF:Vector3D = ship.skin.transform.rotateVector(new Vector3D(0,0,1));
+					ship.vel.x += curF.x*ship.accel;	// increment vel
+					ship.vel.y += curF.y*ship.accel;
+					ship.vel.z += curF.z*ship.accel;
 				}
-
-				var thrustTresh:Number = Math.PI*0.5;
-				if (ang<thrustTresh)
-				{
-					accel = (thrustTresh-ang)/thrustTresh * maxAccel;
-					vel.x += curF.x*accel;	// increment vel
-					vel.y += curF.y*accel;
-					vel.z += curF.z*accel;
-					*/
-			}//
-
+				else
+					dumbStepFn();	// AI control
+			}//endfunction
 		}//endfunction
 
 		//===============================================================================================
@@ -2918,6 +2912,7 @@ import flash.display3D.VertexBuffer3D;
 import flash.events.Event;
 import flash.events.MouseEvent;
 import flash.events.TouchEvent;
+import flash.events.KeyboardEvent;
 import flash.filters.GlowFilter;
 import flash.geom.Point;
 import flash.geom.Matrix;
@@ -2932,6 +2927,8 @@ import flash.utils.ByteArray;
 import flash.utils.getTimer;
 import flash.ui.Multitouch;
 import flash.ui.MultitouchInputMode;
+import flash.sensors.Accelerometer;
+import flash.events.AccelerometerEvent;
 
 TweenPlugin.activate([GlowFilterPlugin]); //activation is permanent in the SWF, so this line only needs to be run once.
 
@@ -2940,6 +2937,9 @@ class Input
 	public static var zoomF:Number = 1;
 	public static var downPts:Vector.<InputPt> = null;
 	public static var upPts:Vector.<InputPt> = null;
+
+	public static var yawAccel:Number = 0;
+	public static var pitch:Number = 0;
 
 	private static var touchObj:Object = null;
 	private static var mousePt:InputPt = null;
@@ -2965,6 +2965,18 @@ class Input
 			stage.addEventListener(MouseEvent.MOUSE_WHEEL,Input.mouseWheelHandler);
 		}
 
+		if (Accelerometer.isSupported)
+		{
+			var my_acc:Accelerometer = new Accelerometer();
+			my_acc.addEventListener(AccelerometerEvent.UPDATE, accUpdateHandler);
+		}
+		else
+		{
+			stage.addEventListener(KeyboardEvent.KEY_DOWN, keyDownHandler);
+			stage.addEventListener(KeyboardEvent.KEY_UP, keyUpHandler);
+		}
+		stage.addEventListener(Event.DEACTIVATE, deactivateHandler);
+
 		touchObj = new Object();
 		downPts = new Vector.<InputPt>();
 		upPts = new Vector.<InputPt>();
@@ -2987,8 +2999,44 @@ class Input
 			mousePt.x = stage.mouseX;
 			mousePt.y = stage.mouseY;
 		}
+
 		while (upPts.length>0)	upPts.shift();
 		zoomF = 1;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function accUpdateHandler(ev:AccelerometerEvent) : void
+	{
+		if (ev.accelerationX*ev.accelerationX>0.01)
+			yawAccel = ev.accelerationX*0.01;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function keyDownHandler(ev:KeyboardEvent) : void
+	{
+		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel -= 0.01;
+		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel += 0.01;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function keyUpHandler(ev:KeyboardEvent) : void
+	{
+		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel += 0.01;
+		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel -= 0.01;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	private static function deactivateHandler(ev:Event) : void
+	{
+		yawAccel = 0;
 	}//endfunction
 
 	//===============================================================================================
