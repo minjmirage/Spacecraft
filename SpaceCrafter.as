@@ -2100,12 +2100,13 @@
 			{
 				if (focusedShip==ship)
 				{	// allow user control
-					var ang:Number = Input.yawAccel;
-					if (ang>ship.maxRotAccel) ang=ship.maxRotAccel;
+					var ang:Number = Input.yawAccel*0.1;
+					if (ang> ship.maxRotAccel) 	ang= ship.maxRotAccel;
+					if (ang<-ship.maxRotAccel) 	ang=-ship.maxRotAccel;
 					var sinA2:Number = Math.sin(ang/2);
 					var cross:Vector3D = ship.skin.transform.rotateVector(new Vector3D(0,1,0));
 					ship.rotAccel = new Vector3D(sinA2*cross.x,sinA2*cross.y,sinA2*cross.z,Math.cos(ang/2));
-					ship.accel = ship.maxAccel;
+					ship.accel = ship.maxAccel*Input.thrust;
 					ship.rotVel = Matrix4x4.quatMult(ship.rotAccel,ship.rotVel);
 					var curF:Vector3D = ship.skin.transform.rotateVector(new Vector3D(0,0,1));
 					ship.vel.x += curF.x*ship.accel;	// increment vel
@@ -2939,6 +2940,7 @@ class Input
 	public static var upPts:Vector.<InputPt> = null;
 
 	public static var yawAccel:Number = 0;
+	public static var thrust:Number = 0;
 	public static var pitch:Number = 0;
 
 	private static var touchObj:Object = null;
@@ -3018,6 +3020,7 @@ class Input
 	//===============================================================================================
 	private static function keyDownHandler(ev:KeyboardEvent) : void
 	{
+		if (ev.keyCode == 38 || ev.keyCode == 87)	thrust = 1;
 		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel -= 0.01;
 		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel += 0.01;
 	}//endfunction
@@ -3027,6 +3030,7 @@ class Input
 	//===============================================================================================
 	private static function keyUpHandler(ev:KeyboardEvent) : void
 	{
+		if (ev.keyCode == 38 || ev.keyCode == 87)	thrust -= 1;
 		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel += 0.01;
 		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel -= 0.01;
 	}//endfunction
@@ -3036,6 +3040,7 @@ class Input
 	//===============================================================================================
 	private static function deactivateHandler(ev:Event) : void
 	{
+		thrust = 0;
 		yawAccel = 0;
 	}//endfunction
 
