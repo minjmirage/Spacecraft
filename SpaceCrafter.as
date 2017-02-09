@@ -260,8 +260,6 @@
 			EffectMPs["thrustConeW"] = new MeshParticles(createLightCone(0.09,0.45,0,0.8,grad));
 			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1.1,grad));
 			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.4,grad));
-			EffectMPs["healthBar"] = new MeshParticles(Mesh.createCube(0.0015,0.0015,0.0001,new BitmapData(1,1,false,0x00FFFF)));
-			EffectMPs["energyBar"] = new MeshParticles(Mesh.createCube(0.0015,0.0015,0.0001,new BitmapData(1,1,false,0xFFFF00)));
 			for (key in EffectMPs)
 			{
 				(MeshParticles)(EffectMPs[key]).skin.setLightingParameters(1,1,1,0,0,false);
@@ -1145,30 +1143,6 @@
 			Mesh.setCamera(camPosn.x,camPosn.y,camPosn.z,lookPt.x,lookPt.y,lookPt.z,1,0.01);
 			sky.transform = new Matrix4x4().translate(lookPt.x,lookPt.y,lookPt.z);
 
-			// ----- show health bar of focusedShip
-			if (focusedShip!=null)
-			{
-				var sw:int = stage.stageWidth;
-				var sh:int = stage.stageHeight;
-				var r:VertexData = null;
-				var gap:Number = sw/100;
-				var n:int = focusedShip.integrity/100;
-				var invVT:Matrix4x4 = Mesh.viewT.inverse();
-				for (i=n-1; i>-1; i--)
-				{
-					r = Mesh.cursorRay(sw/2-(sw/100)*(int(i/2)+3),sh*0.95+gap*(i%2),0.1,0.2);
-					var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
-					EffectMPs["healthBar"].nextLocRotScale(invVT.mult(new Matrix4x4(1,0,0,lp.x,0,1,0,lp.y,0,0,1,lp.z)),1);
-				}
-				n = focusedShip.energy/100;
-				for (i=n-1; i>-1; i--)
-				{
-					r = Mesh.cursorRay(sw/2+(sw/100)*(int(i/2)+3),sh*0.95+gap*(i%2),0.1,0.2);
-					lp = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
-					EffectMPs["energyBar"].nextLocRotScale(invVT.mult(new Matrix4x4(1,0,0,lp.x,0,1,0,lp.y,0,0,1,lp.z)),1);
-				}
-			}
-
 			// ----- play sound FXs
 			soundsStep(camPosn);
 
@@ -1193,7 +1167,8 @@
 		private function focusOn(entity:Hull):void
 		{
 			focusedEntity = entity;
-
+			focusedShip = null;
+			
 			if (entity!=null)
 			{
 				if (entity is Ship)
@@ -1201,8 +1176,6 @@
 				else if (entity is Asteroid)
 					mainTitle.name = "Asteroid : "+entity.name;
 			}
-			else
-				focusedShip = null;
 
 			if (shipHUD != null && shipHUD.parent != null)
 				shipHUD.parent.removeChild(shipHUD);
@@ -2128,9 +2101,7 @@
 			{
 				if (focusedShip==ship)
 				{	// allow user control
-					var ang:Number = Input.yaw*0.1;
-					if (ang> ship.maxRotAccel) 	ang= ship.maxRotAccel;
-					if (ang<-ship.maxRotAccel) 	ang=-ship.maxRotAccel;
+					var ang:Number = Input.yaw*ship.maxRotAccel;
 					var sinA2:Number = Math.sin(ang/2);
 					var cross:Vector3D = new Vector3D(0,1,0);
 					ship.rotAccel = new Vector3D(sinA2*cross.x,sinA2*cross.y,sinA2*cross.z,Math.cos(ang/2));
@@ -3739,9 +3710,9 @@ class MenuUI
 		// ----- create stats labels
 		var labColor:uint = uint((colorTone>>16)*0.7)<<16 | uint(((colorTone>>8) & 0xFF)*0.7)<<8 | uint((colorTone & 0xFF)*0.7);
 		var fSize:Number = fontScale*stage.stageHeight/2;
-		var labelsBmp:Bitmap = createTextBmp("Integrity\nEnergy\nSpeed\nAccel\nTurnRate",fSize,0,labColor);
+		var labelsBmp:Bitmap = createTextBmp("Speed\nAccel\nTurnRate",fSize,0,labColor);
 		s.addChild(labelsBmp);
-		var maxValuesBmp:Bitmap = createTextBmp("/ "+ship.maxIntegrity+"\n/ "+ship.maxEnergy+"\n/ "+Math.floor(ship.maxSpeed*10000)/10+"\n/ "+Math.floor(ship.maxAccel*10000)/10+"\n/ "+Math.floor(ship.maxRotAccel*10000)/10,fSize,0,labColor);
+		var maxValuesBmp:Bitmap = createTextBmp("/ "+Math.floor(ship.maxSpeed*10000)/10+"\n/ "+Math.floor(ship.maxAccel*10000)/10+"\n/ "+Math.floor(ship.maxRotAccel*10000)/10,fSize,0,labColor);
 		s.addChild(maxValuesBmp);
 
 		var curStatsTf:TextField = new TextField();
@@ -3751,34 +3722,19 @@ class MenuUI
 		curStatsTf.filters = [new GlowFilter(colorTone, 1, fSize/4, fSize/4, 1, 1)];
 		s.addChild(curStatsTf);
 
-		function drawBar(x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint):void
-		{
-			if (p1<0) p1=0;
-			if (p2<p1) p2=p1;
-			s.graphics.lineStyle(0, 0xBBCC00, 1);			// draw border
-			s.graphics.drawRect(x, y, w, h);
-			s.graphics.lineStyle();
-			x += 2;			// create bar inset
-			y += 2;
-			w -= 4;
-			h -= 4;
-			p1*= w;
-			p2*= w;
-			var matr:Matrix = new Matrix();
-			matr.createGradientBox(w, h, Math.PI/2, x, y);
-			s.graphics.beginGradientFill("linear", [c3, c3+0x333333, c3+0x111111], [0.5,0.5,0.5], [0x00,0x80,0xFF], matr, "pad"); 	// grey bar
-			s.graphics.drawRect(x+p2, y, w-p2, h);
-			s.graphics.endFill();
-			if (p2 > p1)
-			{
-				s.graphics.beginGradientFill("linear", [ c2, c2+0x333333, c2+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");	// red retreat bar
-				s.graphics.drawRect(x+p1, y, p2-p1, h);
-				s.graphics.endFill();
-			}
-			s.graphics.beginGradientFill("linear", [c1, c1+0x333333, c1+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");			// green health bar
-			s.graphics.drawRect(x, y, p1, h);
-			s.graphics.endFill();
-		}//endfunction
+		var txtIntegrity:TextField = new TextField();
+		txtIntegrity.autoSize = "left";
+		txtIntegrity.wordWrap = false;
+		txtIntegrity.defaultTextFormat = new TextFormat("arial bold",fSize,colorTone,null,null,null,null,null,"right",0,0);
+		txtIntegrity.filters = [new GlowFilter(colorTone, 1, fSize/4, fSize/4, 1, 1)];
+		s.addChild(txtIntegrity);
+
+		var txtEnergy:TextField = new TextField();
+		txtEnergy.autoSize = "right";
+		txtEnergy.wordWrap = false;
+		txtEnergy.defaultTextFormat = new TextFormat("arial bold",fSize,colorTone,null,null,null,null,null,"right",0,0);
+		txtEnergy.filters = [new GlowFilter(colorTone, 1, fSize/4, fSize/4, 1, 1)];
+		s.addChild(txtEnergy);
 
 		var curE:int = 0;
 		var curH:int = 0;
@@ -3786,17 +3742,29 @@ class MenuUI
 		var p2:Number=0;
 		function update(ev:Event=null):void
 		{
-			var bw:int = Math.round(stage.stageWidth*(1-margF*2));
-			var bh:int = Math.round(stage.stageHeight*0.013);
+			var sw:int = stage.stageWidth;
+			var sh:int = stage.stageHeight;
+			var bw:int = Math.round(sw*(0.5-margF*4));
+			var bh:int = Math.round(sh*0.02);
 
-			curStatsTf.text = Math.round(ship.integrity)+"\n"+Math.round(ship.energy)+"\n"+Math.round(ship.vel.length*10000)/10+"\n"+Math.round(ship.accel*10000)/10+"\n"+Math.round(ship.rotAccel.length*10000)/10;
+			curStatsTf.text = Math.round(ship.vel.length*10000)/10+"\n"+Math.round(ship.accel*10000)/10+"\n"+Math.round(ship.rotAccel.length*10000)/10;
 
-			maxValuesBmp.x = stage.stageWidth*(1-margF)-maxValuesBmp.width;
-			maxValuesBmp.y = stage.stageHeight-bh*3.5-maxValuesBmp.height;
+			maxValuesBmp.x = sw*(1-margF)-maxValuesBmp.width;
+			maxValuesBmp.y = sh-bh*3.5-maxValuesBmp.height;
 			curStatsTf.x = maxValuesBmp.x-curStatsTf.width;
 			curStatsTf.y = maxValuesBmp.y+fSize/4;
 			labelsBmp.x = maxValuesBmp.x - maxValuesBmp.width - labelsBmp.width;
 			labelsBmp.y = maxValuesBmp.y;
+
+			var ph:int = sh-bh-sw*margF;
+
+			txtEnergy.text = "Energy : "+Math.round(ship.energy)+"/"+ship.maxEnergy;
+			txtEnergy.x = sw*margF;
+			txtEnergy.y = ph - txtEnergy.height;
+
+			txtIntegrity.text = Math.round(ship.integrity)+"/"+ship.maxIntegrity+" : Hull Integrity";
+			txtIntegrity.x = sw*(1-margF)-txtIntegrity.width;
+			txtIntegrity.y = ph - txtIntegrity.height;
 
 			s.graphics.clear();
 			var targE:int = Math.round(ship.energy);
@@ -3806,13 +3774,13 @@ class MenuUI
 				// --- draw energy bar
 				p1 = targE / ship.maxEnergy;
 				p2 = curE / ship.maxEnergy;
-				drawBar((stage.stageWidth-bw)/2,stage.stageHeight-bh*3.5,bw,bh,p1,p2,0x00AACC,0xCC0000,0x111111);
+				drawBar(s,sw*margF,ph,bw,bh,p1,p2,0x00AACC,0xCC0000,0x111111,false);
 				curE = Math.round((curE*2 + targE) / 3);
 				if ((curE-targE)*(curE-targE)<1) curE = targE;
 				// --- draw health bar
 				p1 = targH / ship.maxIntegrity;
 				p2 = curH / ship.maxIntegrity;
-				drawBar((stage.stageWidth-bw)/2,stage.stageHeight-bh*2,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111);
+				drawBar(s,sw*(1-margF)-bw,ph,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111);
 				curH = Math.round((curH*2 + targH) / 3);
 				if ((curH-targH)*(curH-targH)<1) curH = targH;
 			}
@@ -3831,6 +3799,42 @@ class MenuUI
 
 		update();
 		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// convenience function to draw a healthbar
+	//===============================================================================================
+	[Inline]
+	private static function drawBar(s:Sprite,x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint,alignL:Boolean=true):void
+	{
+		if (p1<0) p1=0;
+		if (p2<p1) p2=p1;
+		s.graphics.lineStyle(0, 0xBBCC00, 1);			// draw border
+		s.graphics.drawRect(x, y, w, h);
+		s.graphics.lineStyle();
+		x += 2;			// create bar inset
+		y += 2;
+		w -= 4;
+		h -= 4;
+		p1*= w;
+		p2*= w;
+		var matr:Matrix = new Matrix();
+		matr.createGradientBox(w, h, Math.PI/2, x, y);
+		s.graphics.beginGradientFill("linear", [c3, c3+0x333333, c3+0x111111], [0.5,0.5,0.5], [0x00,0x80,0xFF], matr, "pad"); 	// grey bar
+		if (alignL) s.graphics.drawRect(x+p2, y, w-p2, h);
+		else				s.graphics.drawRect(x, y, w-p2, h);
+		s.graphics.endFill();
+		if (p2 > p1)
+		{
+			s.graphics.beginGradientFill("linear", [ c2, c2+0x333333, c2+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");	// red retreat bar
+			if (alignL)	s.graphics.drawRect(x+p1, y, p2-p1, h);
+			else 				s.graphics.drawRect(x+w-p2, y, p2-p1, h);
+			s.graphics.endFill();
+		}
+		s.graphics.beginGradientFill("linear", [c1, c1+0x333333, c1+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");			// green health bar
+		if (alignL)	s.graphics.drawRect(x, y, p1, h);
+		else				s.graphics.drawRect(x+w-p1, y, p1, h);
+		s.graphics.endFill();
 	}//endfunction
 
 	//===============================================================================================
