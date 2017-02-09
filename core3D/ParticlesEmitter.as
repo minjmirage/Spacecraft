@@ -230,7 +230,7 @@
 					}
 				}
 			}//endfor
-			if (T!=null && pcnt>0)
+			if (T!=null && pcnt>0)	// set the render data for the last mesh
 			{
 				rmesh = skin.getChildAt(mcnt-1);
 				rmesh.trisCnt = pcnt*2;

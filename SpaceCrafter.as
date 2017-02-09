@@ -88,7 +88,6 @@
 		[Embed(source="3D/textures/flareRed.jpg")]	 			private static var TexFlareRed:Class;
 		[Embed(source="3D/textures/thrustGradient.png")]	private static var TexThrustGradient:Class;
 		[Embed(source="3D/textures/linearGradient.png")]	private static var TexLinearGradient:Class;
-		[Embed(source="3D/textures/shipWheel.png")]				private static var TexShipWheel:Class;
 
 		[Embed(source="3D/textures/FxBitsSheet.png")] 		private static var FxBitsSheet:Class;
 		[Embed(source="3D/textures/FxBlastSheet.png")] 		private static var FxBlastSheet:Class;
@@ -261,6 +260,8 @@
 			EffectMPs["thrustConeW"] = new MeshParticles(createLightCone(0.09,0.45,0,0.8,grad));
 			EffectMPs["thrustConeM"] = new MeshParticles(createLightCone(0.07,0.35,0,1.1,grad));
 			EffectMPs["thrustConeN"] = new MeshParticles(createLightCone(0.05,0.22,0,1.4,grad));
+			EffectMPs["healthBar"] = new MeshParticles(Mesh.createCube(0.0015,0.0015,0.0001,new BitmapData(1,1,false,0x00FFFF)));
+			EffectMPs["energyBar"] = new MeshParticles(Mesh.createCube(0.0015,0.0015,0.0001,new BitmapData(1,1,false,0xFFFF00)));
 			for (key in EffectMPs)
 			{
 				(MeshParticles)(EffectMPs[key]).skin.setLightingParameters(1,1,1,0,0,false);
@@ -268,6 +269,7 @@
 				(MeshParticles)(EffectMPs[key]).skin.depthWrite = false;
 				world.addChild(EffectMPs[key].skin);
 			}
+
 			//(MeshParticles)(EffectMPs["missileS"]).skin.material.setBlendMode("normal");
 
 			// ---- initialize effects emitters
@@ -1143,6 +1145,30 @@
 			Mesh.setCamera(camPosn.x,camPosn.y,camPosn.z,lookPt.x,lookPt.y,lookPt.z,1,0.01);
 			sky.transform = new Matrix4x4().translate(lookPt.x,lookPt.y,lookPt.z);
 
+			// ----- show health bar of focusedShip
+			if (focusedShip!=null)
+			{
+				var sw:int = stage.stageWidth;
+				var sh:int = stage.stageHeight;
+				var r:VertexData = null;
+				var gap:Number = sw/100;
+				var n:int = focusedShip.integrity/100;
+				var invVT:Matrix4x4 = Mesh.viewT.inverse();
+				for (i=n-1; i>-1; i--)
+				{
+					r = Mesh.cursorRay(sw/2-(sw/100)*(int(i/2)+3),sh*0.95+gap*(i%2),0.1,0.2);
+					var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
+					EffectMPs["healthBar"].nextLocRotScale(invVT.mult(new Matrix4x4(1,0,0,lp.x,0,1,0,lp.y,0,0,1,lp.z)),1);
+				}
+				n = focusedShip.energy/100;
+				for (i=n-1; i>-1; i--)
+				{
+					r = Mesh.cursorRay(sw/2+(sw/100)*(int(i/2)+3),sh*0.95+gap*(i%2),0.1,0.2);
+					lp = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
+					EffectMPs["energyBar"].nextLocRotScale(invVT.mult(new Matrix4x4(1,0,0,lp.x,0,1,0,lp.y,0,0,1,lp.z)),1);
+				}
+			}
+
 			// ----- play sound FXs
 			soundsStep(camPosn);
 
@@ -1168,13 +1194,15 @@
 		{
 			focusedEntity = entity;
 
-			if (entity is Ship)
-				focusedShip = (Ship)(entity);
+			if (entity!=null)
+			{
+				if (entity is Ship)
+					focusedShip = (Ship)(entity);
+				else if (entity is Asteroid)
+					mainTitle.name = "Asteroid : "+entity.name;
+			}
 			else
 				focusedShip = null;
-
-			if (entity is Asteroid)
-				mainTitle.name = "Asteroid : "+entity.name;
 
 			if (shipHUD != null && shipHUD.parent != null)
 				shipHUD.parent.removeChild(shipHUD);
@@ -1190,11 +1218,12 @@
 			// ----- shows appropriate menu for different focused entity
 			if (optionsMenu!=null && optionsMenu.parent!=null)
 				optionsMenu.parent.removeChild(optionsMenu);
-			if (optionsMenuSelector!=null)
+			if (entity!=null && optionsMenuSelector!=null)
 				optionsMenuSelector(entity);
 
 			// ----- zoom in to the focused entity
-			velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
+			if (entity!=null)
+				velDBER.x = (entity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
 			viewStep = focusViewStep;
 			stage.focus = stage;
 		}//endfunction
