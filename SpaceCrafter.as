@@ -61,7 +61,7 @@
 
 		private var undoStk:Vector.<String> = null;
 
-		private var viewStep:Function = focusPlayerShipViewStep;
+		private var viewStep:Function = focusViewStep;
 		private var prevLookDBER:Vector3D = null;			// to restore back previous view
 		private var gridMesh:Mesh = null;
 
@@ -432,39 +432,6 @@
 		{
 			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
 			return so.data.ships;
-		}//endfunction
-
-		//===============================================================================================
-		// zooms to entity and display controls/options menu
-		//===============================================================================================
-		private function focusOn(entity:Hull):void
-		{
-			focusedEntity = entity;
-
-			if (entity is Ship)
-				focusedShip = (Ship)(entity);
-			else
-				focusedShip = null;
-
-			if (entity is Asteroid)
-				mainTitle.name = "Asteroid : "+entity.name;
-
-			if (shipHUD != null && shipHUD.parent != null)
-				shipHUD.parent.removeChild(shipHUD);
-			if (focusedShip!=null)
-			{
-				if (Friendlies.indexOf(focusedShip)!=-1)
-					mainTitle.name = focusedShip.name;
-				else
-					mainTitle.name = "Hostile : " + focusedShip.name;
-				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
-				addChild(shipHUD);
-			}
-			// ----- shows appropriate menu for different focused entity
-			if (optionsMenu!=null && optionsMenu.parent!=null)
-				optionsMenu.parent.removeChild(optionsMenu);
-			if (optionsMenuSelector!=null)
-				optionsMenuSelector(entity);
 		}//endfunction
 
 		//===============================================================================================
@@ -1195,9 +1162,47 @@
 		}//endfunction
 
 		//===============================================================================================
+		// zooms to entity and display controls/options menu
+		//===============================================================================================
+		private function focusOn(entity:Hull):void
+		{
+			focusedEntity = entity;
+
+			if (entity is Ship)
+				focusedShip = (Ship)(entity);
+			else
+				focusedShip = null;
+
+			if (entity is Asteroid)
+				mainTitle.name = "Asteroid : "+entity.name;
+
+			if (shipHUD != null && shipHUD.parent != null)
+				shipHUD.parent.removeChild(shipHUD);
+			if (focusedShip!=null)
+			{
+				if (Friendlies.indexOf(focusedShip)!=-1)
+					mainTitle.name = focusedShip.name;
+				else
+					mainTitle.name = "Hostile : " + focusedShip.name;
+				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
+				addChild(shipHUD);
+			}
+			// ----- shows appropriate menu for different focused entity
+			if (optionsMenu!=null && optionsMenu.parent!=null)
+				optionsMenu.parent.removeChild(optionsMenu);
+			if (optionsMenuSelector!=null)
+				optionsMenuSelector(entity);
+
+			// ----- zoom in to the focused entity
+			velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
+			viewStep = focusViewStep;
+			stage.focus = stage;
+		}//endfunction
+
+		//===============================================================================================
 		// to be used as viewStep function, to be executed in worldStep. focus ship view
 		//===============================================================================================
-		private function focusPlayerShipViewStep():void
+		private function focusViewStep():void
 		{
 			// ----- enable drag to pan view interraction
 			if (Input.downPts.length==1)	// one finger
@@ -1220,10 +1225,7 @@
 							selected = Entities[i];
 
 					if (selected!=null)
-					{
 						focusOn(selected);
-						velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
-					}
 				}
 			}//
 
@@ -1265,10 +1267,7 @@
 			velDBER.z = (-Math.PI*0.5-lookDBER.z)*(1-0.9);				// look from top down
 
 			if (selected!=null)
-			{
 				focusOn(selected);
-				toggleView();
-			}
 			else if (Input.zoomF<1)
 				toggleView();
 
@@ -1291,7 +1290,7 @@
 		[Inline]
 		private final function toggleView():void
 		{
-			if (viewStep==focusPlayerShipViewStep)
+			if (viewStep==focusViewStep)
 			{
 				world.addChild(gridMesh);
 				prevLookDBER = lookDBER;
@@ -1310,7 +1309,7 @@
 			else
 			{	// restore prev view
 				world.removeChild(gridMesh);
-				viewStep = focusPlayerShipViewStep;
+				viewStep = focusViewStep;
 				if (focusedEntity!=null) prevLookDBER.x = focusedEntity.radius*4;	// hack to dist cam from ship
 				velDBER = prevLookDBER.subtract(lookDBER);
 				velDBER.scaleBy(1-0.9);
@@ -2100,11 +2099,11 @@
 			{
 				if (focusedShip==ship)
 				{	// allow user control
-					var ang:Number = Input.yawAccel*0.1;
+					var ang:Number = Input.yaw*0.1;
 					if (ang> ship.maxRotAccel) 	ang= ship.maxRotAccel;
 					if (ang<-ship.maxRotAccel) 	ang=-ship.maxRotAccel;
 					var sinA2:Number = Math.sin(ang/2);
-					var cross:Vector3D = ship.skin.transform.rotateVector(new Vector3D(0,1,0));
+					var cross:Vector3D = new Vector3D(0,1,0);
 					ship.rotAccel = new Vector3D(sinA2*cross.x,sinA2*cross.y,sinA2*cross.z,Math.cos(ang/2));
 					ship.accel = ship.maxAccel*Input.thrust;
 					ship.rotVel = Matrix4x4.quatMult(ship.rotAccel,ship.rotVel);
@@ -2939,7 +2938,7 @@ class Input
 	public static var downPts:Vector.<InputPt> = null;
 	public static var upPts:Vector.<InputPt> = null;
 
-	public static var yawAccel:Number = 0;
+	public static var yaw:Number = 0;
 	public static var thrust:Number = 0;
 	public static var pitch:Number = 0;
 
@@ -3012,7 +3011,7 @@ class Input
 	private static function accUpdateHandler(ev:AccelerometerEvent) : void
 	{
 		if (ev.accelerationX*ev.accelerationX>0.01)
-			yawAccel = ev.accelerationX*0.01;
+			yaw = ev.accelerationX*0.01;
 	}//endfunction
 
 	//===============================================================================================
@@ -3021,8 +3020,8 @@ class Input
 	private static function keyDownHandler(ev:KeyboardEvent) : void
 	{
 		if (ev.keyCode == 38 || ev.keyCode == 87)	thrust = 1;
-		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel -= 0.01;
-		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel += 0.01;
+		if (ev.keyCode == 37 || ev.keyCode == 65)	yaw =-1;
+		if (ev.keyCode == 39 || ev.keyCode == 68)	yaw = 1;
 	}//endfunction
 
 	//===============================================================================================
@@ -3030,9 +3029,9 @@ class Input
 	//===============================================================================================
 	private static function keyUpHandler(ev:KeyboardEvent) : void
 	{
-		if (ev.keyCode == 38 || ev.keyCode == 87)	thrust -= 1;
-		if (ev.keyCode == 37 || ev.keyCode == 65)	yawAccel += 0.01;
-		if (ev.keyCode == 39 || ev.keyCode == 68)	yawAccel -= 0.01;
+		if (ev.keyCode == 38 || ev.keyCode == 87)	thrust = 0;
+		if (ev.keyCode == 37 || ev.keyCode == 65)	yaw = 0;
+		if (ev.keyCode == 39 || ev.keyCode == 68)	yaw = 0;
 	}//endfunction
 
 	//===============================================================================================
@@ -3041,7 +3040,7 @@ class Input
 	private static function deactivateHandler(ev:Event) : void
 	{
 		thrust = 0;
-		yawAccel = 0;
+		yaw = 0;
 	}//endfunction
 
 	//===============================================================================================
