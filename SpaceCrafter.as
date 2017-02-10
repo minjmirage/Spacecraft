@@ -1168,7 +1168,7 @@
 		{
 			focusedEntity = entity;
 			focusedShip = null;
-			
+
 			if (entity!=null)
 			{
 				if (entity is Ship)
@@ -3809,9 +3809,10 @@ class MenuUI
 	{
 		if (p1<0) p1=0;
 		if (p2<p1) p2=p1;
-		s.graphics.lineStyle(0, 0xBBCC00, 1);			// draw border
-		s.graphics.drawRect(x, y, w, h);
-		s.graphics.lineStyle();
+		s.graphics.beginFill(0xFFFFFF,0.5);
+		s.graphics.drawRect(x,y,2,h);
+		s.graphics.drawRect(x+w-2,y,2,h);
+		s.graphics.endFill();
 		x += 2;			// create bar inset
 		y += 2;
 		w -= 4;
@@ -3819,22 +3820,35 @@ class MenuUI
 		p1*= w;
 		p2*= w;
 		var matr:Matrix = new Matrix();
-		matr.createGradientBox(w, h, Math.PI/2, x, y);
-		s.graphics.beginGradientFill("linear", [c3, c3+0x333333, c3+0x111111], [0.5,0.5,0.5], [0x00,0x80,0xFF], matr, "pad"); 	// grey bar
+		if (alignL) matr.createGradientBox(w, h, Math.PI, x, y);
+		else 				matr.createGradientBox(w, h, 0, x, y);
+		s.graphics.beginGradientFill("linear", [colorBrightness(c3,1.1), colorBrightness(c3,0.8), colorBrightness(c3,0.3)], [0.5,0.5,0.5], [0x00,0x80,0xFF], matr, "pad"); 	// grey bar
 		if (alignL) s.graphics.drawRect(x+p2, y, w-p2, h);
 		else				s.graphics.drawRect(x, y, w-p2, h);
 		s.graphics.endFill();
 		if (p2 > p1)
 		{
-			s.graphics.beginGradientFill("linear", [ c2, c2+0x333333, c2+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");	// red retreat bar
+			s.graphics.beginGradientFill("linear", [colorBrightness(c2,1.1), colorBrightness(c2,0.8), colorBrightness(c2,0.3)], [1,1,1], [0x00,0x80,0xFF], matr, "pad");	// red retreat bar
 			if (alignL)	s.graphics.drawRect(x+p1, y, p2-p1, h);
 			else 				s.graphics.drawRect(x+w-p2, y, p2-p1, h);
 			s.graphics.endFill();
 		}
-		s.graphics.beginGradientFill("linear", [c1, c1+0x333333, c1+0x111111], [1,1,1], [0x00,0x80,0xFF], matr, "pad");			// green health bar
+		s.graphics.beginGradientFill("linear", [colorBrightness(c1,1.1), colorBrightness(c1,0.8), colorBrightness(c1,0.3)], [1,1,1], [0x00,0x80,0xFF], matr, "pad");			// green health bar
 		if (alignL)	s.graphics.drawRect(x, y, p1, h);
 		else				s.graphics.drawRect(x+w-p1, y, p1, h);
 		s.graphics.endFill();
+	}//endfunction
+
+	[Inline]
+	private static function colorBrightness(c:uint,mul:Number) : uint
+	{
+		var r:uint = c>>16;
+		var g:uint = (c>>8) & 0xFF;
+		var b:uint = c & 0xFF;
+		r*=mul;	if (r>255) r=255;
+		g*=mul; if (g>255) g=255;
+		b*=mul; if (b>255) b=255;
+		return r<<16 | g<<8 | b;
 	}//endfunction
 
 	//===============================================================================================
