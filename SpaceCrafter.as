@@ -1069,28 +1069,7 @@
 
 				// ----- simulate ships
 				var time:uint = getTimer();
-				for (i=Entities.length-1; i>=0; i--)
-				{
-					var entity:Hull = Entities[i];
-					if (entity.integrity<=0)
-					{
-						if (entity is Ship)
-							destroyShip((Ship)(entity));
-						else
-							removeEntity(entity);
-					}
-					else
-					{
-						if (entity is Ship)
-						{
-							if ((Ship)(entity).stepFn!=null)	(Ship)(entity).stepFn();
-							doShipDamageFx((Ship)(entity));
-							doShipSeparation((Ship)(entity));
-						}
-						entity.updateStep();
-					}//
-				}//endfor
-
+				shipsStep();
 				debugTxt += "Entities:"+Entities.length+" Projectiles:"+Projectiles.length+" shipsT:"+(getTimer()-time);
 
 				// ----- simulate turrets
@@ -1344,13 +1323,14 @@
 							var hitPt:VertexData = s.hullSkin.lineMeshIntersection(p.px,p.py,p.pz,p.vx,p.vy,p.vz,s.skin.transform);
 							if (hitPt!=null)
 							{
-								if (posnIsOnScreen(p.px,p.py,p.pz))
+								if (posnIsOnScreen(hitPt.vx,hitPt.vy,hitPt.vz))
 									projectileHitFx(hitPt.vx,hitPt.vy,hitPt.vz, hitPt.nx,hitPt.ny,hitPt.nz, s.vel.x,s.vel.y,s.vel.z, p.integrity);
 								playSound(p.px,p.py,p.pz,"hit");
 								if (p.targ.parent==s)	// if is target
 									s.registerHit(hitPt,p.integrity);
 								p.integrity = 0;
 								p.ttl=0;
+
 							}
 						}//endif
 					}//endfor
@@ -1376,7 +1356,7 @@
 				}
 			}//endfor
 
-			for (i=Projectiles.length-1; i>=0; i--)
+			for (i=Projectiles.length-1; i>-1; i--)
 			{
 				p = Projectiles[i];
 				if (p.ttl<=1)
@@ -1394,6 +1374,69 @@
 					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
 						p.renderFn(p);
 				}
+			}//endfor
+		}//endfunction
+
+		//===============================================================================================
+		// simulate ships chk ship hits projectile after move
+		//===============================================================================================
+		private function shipsStep():void
+		{
+			for (var i:int=Entities.length-1; i>-1; i--)
+			{
+				var entity:Hull = Entities[i];
+				if (entity.integrity<=0)
+				{
+					if (entity is Ship)
+						destroyShip((Ship)(entity));
+					else
+						removeEntity(entity);
+				}
+				else
+				{
+					// ----- calculate all projectiles relative position to hull
+					var iT:Matrix4x4 = entity.skin.transform.inverse();
+					for (var j:int=Projectiles.length-1; j>-1; j--)
+					{
+						var p:Projectile = Projectiles[j];
+						p.tx = iT.aa*p.px+iT.ab*p.py+iT.ac*p.pz+iT.ad;	// previous local position to ship
+						p.ty = iT.ba*p.px+iT.bb*p.py+iT.bc*p.pz+iT.bd;
+						p.tz = iT.ca*p.px+iT.cb*p.py+iT.cc*p.pz+iT.cd;
+					}
+
+					if (entity is Ship)
+					{
+						if ((Ship)(entity).stepFn!=null)	(Ship)(entity).stepFn();
+						doShipDamageFx((Ship)(entity));
+						doShipSeparation((Ship)(entity));
+					}
+					entity.updateStep();
+
+					// ----- chk projectile hits after ship moved to new posn
+					for (j=Projectiles.length-1; j>-1; j--)
+					{
+						p = Projectiles[j];
+						var T:Matrix4x4 = entity.skin.transform;
+						var hitPt:VertexData =
+						entity.hullSkin.lineMeshIntersection(p.px,p.py,p.pz,
+														T.aa*p.tx+T.ab*p.ty+T.ac*p.tz+T.ad - p.px,
+														T.ba*p.tx+T.bb*p.ty+T.bc*p.tz+T.bd - p.py,
+														T.ca*p.tx+T.cb*p.ty+T.cc*p.tz+T.cd - p.pz,T);
+						if (hitPt!=null)
+						{
+							if (posnIsOnScreen(hitPt.vx,hitPt.vy,hitPt.vz))
+								projectileHitFx(hitPt.vx,hitPt.vy,hitPt.vz,
+																hitPt.nx,hitPt.ny,hitPt.nz,
+																entity.vel.x,entity.vel.y,entity.vel.z,
+																p.integrity);
+							playSound(p.px,p.py,p.pz,"hit");
+							if (p.targ is Ship && p.targ.parent==entity)	// if is target
+								entity.registerHit(hitPt,p.integrity);
+							p.integrity = 0;
+							p.ttl=0;
+						}
+					}//endfor
+				}//
 			}//endfor
 		}//endfunction
 
@@ -1949,7 +1992,7 @@
 				else							ship = Ship.createRandomShip(Assets,Math.random()*15+5,Math.random()*6+1,Mtls["TexPanel"],Mtls["SpecPanel"]);
 				Friendlies.push(ship);
 				ship.targets = Hostiles;
-				setPlayerAI(ship);
+				setDumbAI(ship);
 			}
 			else
 			{
@@ -3780,7 +3823,7 @@ class MenuUI
 				// --- draw health bar
 				p1 = targH / ship.maxIntegrity;
 				p2 = curH / ship.maxIntegrity;
-				drawBar(s,sw*(1-margF)-bw,ph,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111);
+				drawBar(s,sw*(1-margF)-bw,ph,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111,true);
 				curH = Math.round((curH*2 + targH) / 3);
 				if ((curH-targH)*(curH-targH)<1) curH = targH;
 			}
@@ -3805,7 +3848,7 @@ class MenuUI
 	// convenience function to draw a healthbar
 	//===============================================================================================
 	[Inline]
-	private static function drawBar(s:Sprite,x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint,alignL:Boolean=true):void
+	private static function drawBar(s:Sprite,x:int,y:int,w:int,h:int,p1:Number,p2:Number,c1:uint,c2:uint,c3:uint,alignL:Boolean):void
 	{
 		if (p1<0) p1=0;
 		if (p2<p1) p2=p1;
@@ -5192,12 +5235,15 @@ class Ship extends Hull
 
 class Projectile	// data class
 {
-	public var px:Number = 0;
+	public var px:Number = 0;	// position
 	public var py:Number = 0;
 	public var pz:Number = 0;
-	public var vx:Number = 0;
+	public var vx:Number = 0;	// velocity
 	public var vy:Number = 0;
 	public var vz:Number = 0;
+	public var tx:Number = 0;	// temp vars
+	public var ty:Number = 0;
+	public var tz:Number = 0;
 	public var ttl:Number = 120;
 	public var integrity:Number = 1;
 	public var projIntegrity:Number = 1;	// to prevent double targeting
