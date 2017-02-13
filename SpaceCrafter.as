@@ -3814,18 +3814,22 @@ class MenuUI
 			var targH:int = Math.round(ship.integrity);
 			if (targE!=curE || targH!=curH)
 			{
+				var x1:int = sw*margF;
+				var x2:int = sw*(1-margF)-bw;
 				// --- draw energy bar
 				p1 = targE / ship.maxEnergy;
 				p2 = curE / ship.maxEnergy;
-				drawBar(s,sw*margF,ph,bw,bh,p1,p2,0x00AACC,0xCC0000,0x111111,false);
+				drawBar(s,x1,ph,bw,bh,p1,p2,0x00AACC,0xCC0000,0x111111,false);
 				curE = Math.round((curE*2 + targE) / 3);
 				if ((curE-targE)*(curE-targE)<1) curE = targE;
 				// --- draw health bar
 				p1 = targH / ship.maxIntegrity;
 				p2 = curH / ship.maxIntegrity;
-				drawBar(s,sw*(1-margF)-bw,ph,bw,bh,p1,p2,0x00CC00,0xCC0000,0x111111,true);
+				drawBar(s,x2,ph,bw,bh,p1,p2,0xBBBBAA,0xCC0000,0x111111,true);
 				curH = Math.round((curH*2 + targH) / 3);
 				if ((curH-targH)*(curH-targH)<1) curH = targH;
+
+				drawVertThrottle(s,x1+bw+sw*margF,sh*(1-10*margF),x2-x1-bw-2*sw*margF,sh*9*margF,ship.accel/ship.maxAccel,0x66FF66,0x000000);
 			}
 
 			if (ship.integrity <= 0)	removeHandler();
@@ -3842,6 +3846,23 @@ class MenuUI
 
 		update();
 		return s;
+	}//endfunction
+
+	//===============================================================================================
+	// convenience function to
+	//===============================================================================================
+	private static function drawVertThrottle(s:Sprite,x:int,y:int,w:int,h:int,p:Number,c1:uint,c2:uint):void
+	{
+		var n:int=10;
+		for (var i:int=0; i<n; i++)
+		{
+			if ((i/n)<p)
+				s.graphics.beginFill(c1,1);
+			else
+				s.graphics.beginFill(c2,1);
+			s.graphics.drawRoundRect(x,y+h/10*i,w,h/20,h/20);
+			s.graphics.endFill();
+		}
 	}//endfunction
 
 	//===============================================================================================
