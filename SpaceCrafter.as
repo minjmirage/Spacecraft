@@ -21,6 +21,7 @@
 
 		private var Projectiles:Vector.<Projectile> = null;
 		private var Entities:Vector.<Hull> = null;
+		private var DropItems:Vector.<Projectile> = null;
 		private var Hostiles:Vector.<Hull> = null;
 		private var Friendlies:Vector.<Hull> = null;
 		private var Exploding:Vector.<Ship> = null;
@@ -103,6 +104,9 @@
 		[Embed(source="icons/icoCross.png")] 		private static var icoCross:Class;
 		[Embed(source="icons/icoUndo.png")] 		private static var icoUndo:Class;
 
+		[Embed(source='3D/RawM.rmf', mimeType='application/octet-stream')] 						private static var RawM_Rmf:Class;
+		[Embed(source='3D/RawR.rmf', mimeType='application/octet-stream')] 						private static var RawR_Rmf:Class;
+		[Embed(source='3D/RawT.rmf', mimeType='application/octet-stream')] 						private static var RawT_Rmf:Class;
 		[Embed(source='3D/hullPosnMkr.rmf', mimeType='application/octet-stream')] 		private static var HullPosnMkr_Rmf:Class;
 		[Embed(source='3D/thrusterSmall.rmf', mimeType='application/octet-stream')] 	private static var ThrusterS_Rmf:Class;
 		[Embed(source='3D/missileSmall.rmf', mimeType='application/octet-stream')] 		private static var MissileS_Rmf:Class;
@@ -209,7 +213,8 @@
 			world = new Mesh();
 
 			// ----- initialize 3D model assets
-			Assets = { buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
+			Assets = { RawM:RawM_Rmf,RawR:RawR_Rmf,RawT:RawT_Rmf,
+						buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
 						missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
 						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
@@ -269,6 +274,9 @@
 			}
 
 			//(MeshParticles)(EffectMPs["missileS"]).skin.material.setBlendMode("normal");
+			EffectMPs["RawM"] = new MeshParticles(Assets["RawM"]); world.addChild(EffectMPs["RawM"].skin);
+			EffectMPs["RawR"] = new MeshParticles(Assets["RawR"]); world.addChild(EffectMPs["RawR"].skin);
+			EffectMPs["RawT"] = new MeshParticles(Assets["RawT"]); world.addChild(EffectMPs["RawT"].skin);
 
 			// ---- initialize effects emitters
 			EffectEMs ={
@@ -393,6 +401,7 @@
 			gridMesh.material.setAmbient(1,1,1);
 
 			Projectiles = new Vector.<Projectile>();
+			DropItems = new Vector.<Projectile>();
 			Entities = new Vector.<Hull>();
 			Hostiles = new Vector.<Hull>();
 			Friendlies = new Vector.<Hull>();
@@ -1079,9 +1088,10 @@
 					turretsCnt+=simulateShipTurrets((Ship)(Friendlies[i]),(Ship)(Friendlies[i]).engageEnemy);
 				for (i=Hostiles.length-1; i>-1; i--)
 					turretsCnt+=simulateShipTurrets((Ship)(Hostiles[i]),(Ship)(Hostiles[i]).engageEnemy);
-				debugTxt += " Turrets:"+turretsCnt+"    turretsT:"+(getTimer()-time); time=getTimer();
-				projectilesStep();	debugTxt += " projectilesT:"+(getTimer()-time); time=getTimer();
-				explodingStep();	debugTxt += " explodingT:"+(getTimer()-time); time=getTimer();
+				debugTxt += " Turrets:"+turretsCnt+"    turrT:"+(getTimer()-time); time=getTimer();
+				projectilesStep();	debugTxt += " projT:"+(getTimer()-time); time=getTimer();
+				explodingStep();	debugTxt += " explT:"+(getTimer()-time); time=getTimer();
+				dropItemsStep();	debugTxt += " itmsT:"+(getTimer()-time); time=getTimer();
 
 				// ----- update mesh particles
 				var frameSShown:int = frameS_MP.update();
@@ -1441,6 +1451,33 @@
 		}//endfunction
 
 		//===============================================================================================
+		//
+		//===============================================================================================
+		private function dropItemsStep():void
+		{
+			for (var i:int=DropItems.length-1; i>-1; i--)
+			{
+				var p:Projectile = DropItems[i];
+				if (p.ttl<1)	// reached target flak point
+				{
+					DropItems.splice(i,1);
+				}
+				else
+				{
+					p.ttl-=1;
+					p.px+=p.vx;	// move projectile
+					p.py+=p.vy;
+					p.pz+=p.vz;
+					p.vx*=0.95;
+					p.vy*=0.95;
+					p.vz*=0.95;
+					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
+						p.renderFn(p);
+				}
+			}
+		}//endfunction
+
+		//===============================================================================================
 		// hit fireball and splattering
 		//===============================================================================================
 		private function projectileHitFx(px:Number,py:Number,pz:Number,nx:Number,ny:Number,nz:Number,vx:Number,vy:Number,vz:Number,dmg:Number):void
@@ -1487,7 +1524,6 @@
 				};
 				stepFns.push(streamersFn);
 			}
-
 		}//endfunction
 
 		//===============================================================================================
@@ -1925,7 +1961,7 @@
 				else
 				{	// ----- do multiple hull explosions
 					var dir:Vector3D = new Vector3D();
-					for (var i:int=ship.hullConfig.length-1; i>=0; i--)
+					for (var i:int=ship.hullConfig.length-1; i>-1; i--)
 					{
 						hb = ship.hullConfig[i];
 						var pt:Vector3D = ship.skin.transform.transform(new Vector3D(hb.x,hb.y,hb.z));
@@ -1959,6 +1995,33 @@
 			playSound(ship.posn.x,ship.posn.y,ship.posn.z,"hullGroan"+(1+Math.round(Math.random())));
 			removeEntity(ship);
 			world.addChild(ship.skin);	// add back ship skin for explosion fx
+
+			// ----- drop RawM items
+			for (var i:int=ship.hullConfig.length-1; i>-1; i--)
+			{
+				var h:HullBlock = ship.hullConfig[i];
+				var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+				v.scaleBy(1/v.length);
+				addDropItemToScene("M",h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+			}//endfor
+
+			// ----- drop RawT/RawR items
+			for (i=ship.modulesConfig.length-1; i>-1; i--)
+			{
+				var m:Module = ship.modulesConfig[i];
+				v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+				v.scaleBy(1/v.length);
+				var type:String = "T";
+				if (m.type.indexOf(type)==-1)		type = "R";
+				var n:int=1;
+				if (m.type.indexOf("M")!=-1)		n=4;
+				for (var j:int=0; j<4; j++)
+				{
+					v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+					v.scaleBy(0.1/v.length);
+					addDropItemToScene(type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+				}
+			}//endfor
 		}//endfunction
 
 		//===============================================================================================
@@ -1978,6 +2041,30 @@
 			world.removeChild(e.skin);
 			if (focusedEntity==e && Friendlies.length>0)
 				focusOn(Friendlies[0]);
+		}//endfunction
+
+		//===============================================================================================
+		// drop pickUp items
+		//===============================================================================================
+		private function addDropItemToScene(type:String,px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number) : Projectile
+		{
+			var rvQ:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);			// tumbling quaternion
+			var rotSpeed:Number = Math.random()*1;
+			rvQ.scaleBy(Math.sin(rotSpeed/2)/rvQ.length);
+			rvQ.w = Math.cos(rotSpeed/2);
+
+			var oQ:Vector3D = new Vector3D(0,0,0,1);	// starting identity quaternion
+
+			var p:Projectile = new Projectile(px,py,pz,vx,vy,vz,null,
+			function():void {
+				oQ = Matrix4x4.quatMult(rvQ,oQ);		// increment rotation
+				var dir:Vector3D = Matrix4x4.quatMult(Matrix4x4.quatMult(oQ,new Vector3D(0,0,1)),new Vector3D(-oQ.x,-oQ.y,-oQ.z,oQ.w));
+				EffectMPs["Raw"+type].nextLocDirScale(p.px,p.py,p.pz,dir.x,dir.y,dir.z,1);	// item icon
+				EffectEMs["halo"].emit(p.px,p.py,p.pz,0,0,0,1);		// halo
+			},0,500,"Raw"+type);
+
+			DropItems.push(p);
+			return p;
 		}//endfunction
 
 		//===============================================================================================
@@ -2271,7 +2358,8 @@
 																									function(confirm:Boolean):void
 																									{
 																										if (confirm)
-																										convToRmf(['3D/missileSmall.obj',
+																										convToRmf(['3D/RawM.obj','3D/RawR.obj','3D/RawT.obj',
+																													'3D/missileSmall.obj',
 																													'3D/launcherSmall.obj',
 																													'3D/hullPosnMkr.obj',
 																													'3D/thrusterSmall.obj',
