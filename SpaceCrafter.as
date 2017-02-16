@@ -62,9 +62,9 @@
 
 		private var undoStk:Vector.<String> = null;
 
-		private var viewStep:Function = focusViewStep;
 		private var prevLookDBER:Vector3D = null;			// to restore back previous view
 		private var gridMesh:Mesh = null;
+		private var viewStep:Function = shipViewStep;
 
 		[Embed(source="3D/textures/tex.jpg")] 					private static var Tex:Class;
 		[Embed(source="3D/textures/TexPanel.jpg")] 			private static var TexPanel:Class;
@@ -274,9 +274,9 @@
 			}
 
 			//(MeshParticles)(EffectMPs["missileS"]).skin.material.setBlendMode("normal");
-			EffectMPs["RawM"] = new MeshParticles(Assets["RawM"]); world.addChild(EffectMPs["RawM"].skin);
-			EffectMPs["RawR"] = new MeshParticles(Assets["RawR"]); world.addChild(EffectMPs["RawR"].skin);
-			EffectMPs["RawT"] = new MeshParticles(Assets["RawT"]); world.addChild(EffectMPs["RawT"].skin);
+			EffectMPs["RawM"] = new MeshParticles(Assets["RawM"]); (MeshParticles)(EffectMPs["RawM"]).skin.setLightingParameters(1,1,1,0,0,false); world.addChild(EffectMPs["RawM"].skin);
+			EffectMPs["RawR"] = new MeshParticles(Assets["RawR"]); (MeshParticles)(EffectMPs["RawR"]).skin.setLightingParameters(1,1,1,0,0,false); world.addChild(EffectMPs["RawR"].skin);
+			EffectMPs["RawT"] = new MeshParticles(Assets["RawT"]); (MeshParticles)(EffectMPs["RawT"]).skin.setLightingParameters(1,1,1,0,0,false); world.addChild(EffectMPs["RawT"].skin);
 
 			// ---- initialize effects emitters
 			EffectEMs ={
@@ -1061,7 +1061,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// main world step function
+		// MAIN world step function
 		//===============================================================================================
 		private function worldStep(ev:Event=null) : void
 		{
@@ -1108,10 +1108,12 @@
 
 			viewStep();	// modifies velDBER and lookVel
 
+			velDBER.x += lookDBER.x*(Input.zoomF-1);	// adjust zoom from input
+
 			// ----- camera Distance Bearing Elevation Rotation calcuation
 			lookDBER = lookDBER.add(velDBER);
 			lookDBER.z = Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,lookDBER.z));
-			lookDBER.x = Math.max(1, lookDBER.x);
+			if (focusedEntity!=null) lookDBER.x = Math.max(focusedEntity.radius*1.1, lookDBER.x);
 			velDBER.scaleBy(0.9);
 
 			// ----- calculate cam lookPt easing
@@ -1145,7 +1147,6 @@
 			//Mesh.setPointLighting(new <Number>[lookPt.x+100,lookPt.y+100,lookPt.z+100,1,1,1]);
 			Mesh.renderBranch(stage, world, false);
 
-			velDBER.x += lookDBER.x*(Input.zoomF-1);	// adjust zoom
 			Input.update();
 			gameTime++;
 		}//endfunction
@@ -1186,23 +1187,16 @@
 			// ----- zoom in to the focused entity
 			if (entity!=null)
 				velDBER.x = (entity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
-			viewStep = focusViewStep;
+
 			stage.focus = stage;
 		}//endfunction
 
 		//===============================================================================================
-		// to be used as viewStep function, to be executed in worldStep. focus ship view
+		// default focus on ship view
 		//===============================================================================================
-		private function focusViewStep():void
+		private function shipViewStep():void
 		{
-			// ----- enable drag to pan view interraction
-			if (Input.downPts.length==1)	// one finger
-			{
-				var downPt:InputPt = Input.downPts[0];
-				velDBER.y+=(downPt.x-downPt.ox)/1000;	// bearing change
-				velDBER.z-=(downPt.y-downPt.oy)/1000;	// elevation change
-			}
-
+			// ----- enable user focus on selection
 			if (Input.upPts.length>0)
 			{
 				var upPt:InputPt = Input.upPts[0];
@@ -1210,101 +1204,63 @@
 				if (upPt.endT - upPt.startT<300)
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
+
 					var selected:Hull = null;
 					for (var i:int=Entities.length-1; i>-1; i--)
 						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
 							selected = Entities[i];
-
 					if (selected!=null)
 						focusOn(selected);
 				}
-			}//
-
-			if (focusedEntity!=null && Math.max(2,lookDBER.x)>focusedEntity.radius*10 && velDBER.x>0)	toggleView();		// toggle to tactical if zoom out too far away
+			}
 
 			// ----- calculate cam lookPt easing
 			if (focusedEntity!=null)
 			{
-				lookVel = focusedEntity.posn.subtract(lookPt);
-				lookVel.scaleBy(1-0.9);
-				lookDBER.x = Math.max(focusedEntity.radius*1.1, lookDBER.x);
-			}
-		}//endfunction
-
-		//===============================================================================================
-		// to be used as viewStep function, to be executed in worldStep. top down view with grid
-		//===============================================================================================
-		private function tacticalViewStep():void
-		{
-			// ----- enable ship selection on mouse click
-			var selected:Hull = null;
-			if (Input.upPts.length>0)
-			{
-				var upPt:InputPt=Input.upPts[0];
-				if (upPt.endT-upPt.startT<300)
+				if (lookDBER.x>focusedEntity.radius*10 && velDBER.x>0)	// tactical view mode
 				{
-					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
-					for (var i:int=Entities.length-1; i>-1; i--)
-						if (Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
-							selected = Entities[i];
+					if (prevLookDBER==null)
+					{
+						world.addChild(gridMesh);
+						prevLookDBER = lookDBER;
+					}
+
+					// ----- enable drag to scroll top down view interraction
+					if (Input.downPts.length==1)	// one finger
+					{
+						var downPt:InputPt = Input.downPts[0];
+						lookVel.x -= (downPt.x-downPt.ox)/100;
+						lookVel.z += (downPt.y-downPt.oy)/100;
+					}
+
+					velDBER.x = (50-lookDBER.x)*(1-0.9);									// set dist to 50
+					velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
+					if (Math.sin(lookDBER.y)>0)	velDBER.y*=-1;						// correct direction of turn
+					velDBER.z = (-Math.PI*0.5-lookDBER.z)*(1-0.9);				// look from top down
 				}
-			}
+				else // zoom in mode
+				{
+					if (prevLookDBER!=null)
+					{
+						world.removeChild(gridMesh);
+						prevLookDBER.x = focusedEntity.radius*4;	// hack to dist cam from ship
+						velDBER = prevLookDBER.subtract(lookDBER);
+						velDBER.scaleBy(1-0.9);
+						prevLookDBER = null;
+					}
 
-			velDBER.x = (50-lookDBER.x)*(1-0.9);									// set dist to 50
-			if (Math.sin(lookDBER.y)<0)
-				velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
-			else
-				velDBER.y =-Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
-			velDBER.z = (-Math.PI*0.5-lookDBER.z)*(1-0.9);				// look from top down
+					// ----- enable drag to pan view interraction
+					if (Input.downPts.length==1)	// one finger
+					{
+						var downPt:InputPt = Input.downPts[0];
+						velDBER.y+=(downPt.x-downPt.ox)/1000;	// bearing change
+						velDBER.z-=(downPt.y-downPt.oy)/1000;	// elevation change
+					}
 
-			if (selected!=null)
-				focusOn(selected);
-			else if (Input.zoomF<1)
-				toggleView();
-
-			// ----- calculate cam lookPt easing
-			if (Input.downPts.length==1)	// one finger
-			{
-				var downPt:InputPt = Input.downPts[0];
-				lookVel.x -= (downPt.x-downPt.ox)/100;
-				lookVel.z += (downPt.y-downPt.oy)/100;
-			}
-
-			// ----- position grid markings
-			gridMesh.transform.ad = Math.round((lookPt.x+lookVel.x)/10)*10;
-			gridMesh.transform.cd = Math.round((lookPt.z+lookVel.z)/10)*10;
-		}//endfunction
-
-		//===============================================================================================
-		// to be used as viewStep function, to be executed in worldStep
-		//===============================================================================================
-		[Inline]
-		private final function toggleView():void
-		{
-			if (viewStep==focusViewStep)
-			{
-				world.addChild(gridMesh);
-				prevLookDBER = lookDBER;
-
-				// ----- ease to mean position of ships
-				/*
-				var meanPt:Vector3D = new Vector3D();
-				for (var i:int=Entities.length-1; i>-1; i--)
-					meanPt = meanPt.add(Entities[i].posn);
-				meanPt.scaleBy(1/Entities.length);
-				lookVel = meanPt.subtract(lookPt);
-				lookVel.scaleBy(1-0.9);
-				*/
-				viewStep = tacticalViewStep;
-			}
-			else
-			{	// restore prev view
-				world.removeChild(gridMesh);
-				viewStep = focusViewStep;
-				if (focusedEntity!=null) prevLookDBER.x = focusedEntity.radius*4;	// hack to dist cam from ship
-				velDBER = prevLookDBER.subtract(lookDBER);
-				velDBER.scaleBy(1-0.9);
-			}
+					lookVel = focusedEntity.posn.subtract(lookPt);
+					lookVel.scaleBy(1-0.9);
+				}
+			}//endif
 		}//endfunction
 
 		//===============================================================================================
@@ -1468,9 +1424,9 @@
 					p.px+=p.vx;	// move projectile
 					p.py+=p.vy;
 					p.pz+=p.vz;
-					p.vx*=0.95;
-					p.vy*=0.95;
-					p.vz*=0.95;
+					p.vx*=0.97;
+					p.vy*=0.97;
+					p.vz*=0.97;
 					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
 						p.renderFn(p);
 				}
@@ -1996,32 +1952,42 @@
 			removeEntity(ship);
 			world.addChild(ship.skin);	// add back ship skin for explosion fx
 
-			// ----- drop RawM items
-			for (var i:int=ship.hullConfig.length-1; i>-1; i--)
-			{
-				var h:HullBlock = ship.hullConfig[i];
-				var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-				v.scaleBy(1/v.length);
-				addDropItemToScene("M",h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
-			}//endfor
+			var itmI:int = ship.hullConfig.length-1;
+			var modI:int = ship.modulesConfig.length-1;
 
-			// ----- drop RawT/RawR items
-			for (i=ship.modulesConfig.length-1; i>-1; i--)
+			var dropFn:Function = function():void
 			{
-				var m:Module = ship.modulesConfig[i];
-				v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-				v.scaleBy(1/v.length);
-				var type:String = "T";
-				if (m.type.indexOf(type)==-1)		type = "R";
-				var n:int=1;
-				if (m.type.indexOf("M")!=-1)		n=4;
-				for (var j:int=0; j<4; j++)
+				// ----- drop RawM items
+				if (itmI>-1)
 				{
+					var h:HullBlock = ship.hullConfig[itmI--];
+					var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+					v.scaleBy(0.6*Math.random()/v.length);
+					addDropItemToScene("M",h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+				}//endfor
+
+				// ----- drop RawT/RawR items
+				if (modI>-1)
+				{
+					var m:Module = ship.modulesConfig[modI--];
 					v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-					v.scaleBy(0.1/v.length);
-					addDropItemToScene(type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
-				}
-			}//endfor
+					v.scaleBy(1/v.length);
+					var type:String = "T";
+					if (m.type.indexOf("gun")==-1)		type = "R";
+					var n:int=1;
+					if (m.type.indexOf("M")!=-1)		n=4;
+					for (var j:int=0; j<n; j++)
+					{
+						v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+						v.scaleBy(0.6*Math.random()/v.length);
+						addDropItemToScene(type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+					}
+				}//endfor
+
+				if (itmI<=-1 && modI<=-1)
+					stepFns.splice(stepFns.indexOf(dropFn),1);
+			}//endfunction
+			stepFns.push(dropFn);
 		}//endfunction
 
 		//===============================================================================================
@@ -2049,7 +2015,7 @@
 		private function addDropItemToScene(type:String,px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number) : Projectile
 		{
 			var rvQ:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);			// tumbling quaternion
-			var rotSpeed:Number = Math.random()*1;
+			var rotSpeed:Number = Math.random()*0.2;
 			rvQ.scaleBy(Math.sin(rotSpeed/2)/rvQ.length);
 			rvQ.w = Math.cos(rotSpeed/2);
 
@@ -2058,8 +2024,11 @@
 			var p:Projectile = new Projectile(px,py,pz,vx,vy,vz,null,
 			function():void {
 				oQ = Matrix4x4.quatMult(rvQ,oQ);		// increment rotation
-				var dir:Vector3D = Matrix4x4.quatMult(Matrix4x4.quatMult(oQ,new Vector3D(0,0,1)),new Vector3D(-oQ.x,-oQ.y,-oQ.z,oQ.w));
-				EffectMPs["Raw"+type].nextLocDirScale(p.px,p.py,p.pz,dir.x,dir.y,dir.z,1);	// item icon
+				var T:Matrix4x4 = Matrix4x4.quaternionToMatrix(oQ.w,oQ.x,oQ.y,oQ.z);
+				T.ad = p.px;
+				T.bd = p.py;
+				T.cd = p.pz;
+				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);			// item icon
 				EffectEMs["halo"].emit(p.px,p.py,p.pz,0,0,0,1);		// halo
 			},0,500,"Raw"+type);
 
@@ -2781,7 +2750,7 @@
 		{
 			if (ev.keyCode==32)
 			{
-				toggleView();
+				//toggleView();
 			}
 		}//endfunction
 
