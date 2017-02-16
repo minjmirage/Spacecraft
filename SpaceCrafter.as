@@ -1106,10 +1106,10 @@
 				planetStep();
 			}//endif !simulationPaused
 
-			viewStep();	// modifies velDBER and lookVel
-
 			velDBER.x += lookDBER.x*(Input.zoomF-1);	// adjust zoom from input
 
+			viewStep();	// modifies velDBER and lookVel
+		
 			// ----- camera Distance Bearing Elevation Rotation calcuation
 			lookDBER = lookDBER.add(velDBER);
 			lookDBER.z = Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,lookDBER.z));
@@ -1217,7 +1217,7 @@
 			// ----- calculate cam lookPt easing
 			if (focusedEntity!=null)
 			{
-				if (lookDBER.x>focusedEntity.radius*10 && velDBER.x>0)	// tactical view mode
+				if (lookDBER.x>45 && velDBER.x>=0)	// tactical view mode
 				{
 					if (prevLookDBER==null)
 					{
@@ -1233,7 +1233,13 @@
 						lookVel.z += (downPt.y-downPt.oy)/100;
 					}
 
-					velDBER.x = (50-lookDBER.x)*(1-0.9);									// set dist to 50
+					if (lookDBER.x>50)
+					{
+						lookDBER.x = 50;
+						velDBER.x = 0;
+					}
+					else
+						velDBER.x = (50-lookDBER.x)*(1-0.9);									// set dist to 50
 					velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-0.9);	// set bearing to face north
 					if (Math.sin(lookDBER.y)>0)	velDBER.y*=-1;						// correct direction of turn
 					velDBER.z = (-Math.PI*0.5-lookDBER.z)*(1-0.9);				// look from top down
@@ -1252,7 +1258,7 @@
 					// ----- enable drag to pan view interraction
 					if (Input.downPts.length==1)	// one finger
 					{
-						var downPt:InputPt = Input.downPts[0];
+						downPt = Input.downPts[0];
 						velDBER.y+=(downPt.x-downPt.ox)/1000;	// bearing change
 						velDBER.z-=(downPt.y-downPt.oy)/1000;	// elevation change
 					}
@@ -3960,6 +3966,9 @@ class MenuUI
 		s.graphics.endFill();
 	}//endfunction
 
+	//===============================================================================================
+	// convenience function to tweak color brightness with multiplier
+	//===============================================================================================
 	[Inline]
 	private static function colorBrightness(c:uint,mul:Number) : uint
 	{
