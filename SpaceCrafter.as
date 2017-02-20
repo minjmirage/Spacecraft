@@ -104,6 +104,7 @@
 		[Embed(source="icons/icoCross.png")] 		private static var icoCross:Class;
 		[Embed(source="icons/icoUndo.png")] 		private static var icoUndo:Class;
 
+		[Embed(source='3D/shipsWheel.rmf', mimeType='application/octet-stream')] 			private static var ShipsWheel_Rmf:Class;
 		[Embed(source='3D/RawM.rmf', mimeType='application/octet-stream')] 						private static var RawM_Rmf:Class;
 		[Embed(source='3D/RawR.rmf', mimeType='application/octet-stream')] 						private static var RawR_Rmf:Class;
 		[Embed(source='3D/RawT.rmf', mimeType='application/octet-stream')] 						private static var RawT_Rmf:Class;
@@ -213,7 +214,7 @@
 			world = new Mesh();
 
 			// ----- initialize 3D model assets
-			Assets = { RawM:RawM_Rmf,RawR:RawR_Rmf,RawT:RawT_Rmf,
+			Assets = { shipsWheel:ShipsWheel_Rmf,RawM:RawM_Rmf,RawR:RawR_Rmf,RawT:RawT_Rmf,
 						buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
 						missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
@@ -237,6 +238,7 @@
 				Assets[id].material.setTexMap(tex);
 				Assets[id].material.setSpecular(0);
 			}
+			Assets["shipsWheel"].setLightingParameters(1,1,1,1);
 
 			// ----- initialize turrets particles
 			frameS_MP = new MeshParticles(Assets['frameS']);
@@ -1109,7 +1111,7 @@
 			velDBER.x += lookDBER.x*(Input.zoomF-1);	// adjust zoom from input
 
 			viewStep();	// modifies velDBER and lookVel
-		
+
 			// ----- camera Distance Bearing Elevation Rotation calcuation
 			lookDBER = lookDBER.add(velDBER);
 			lookDBER.z = Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,lookDBER.z));
@@ -1133,6 +1135,23 @@
 			// ----- set camera position and orientation
 			Mesh.setCamera(camPosn.x,camPosn.y,camPosn.z,lookPt.x,lookPt.y,lookPt.z,1,0.01);
 			sky.transform = new Matrix4x4().translate(lookPt.x,lookPt.y,lookPt.z);
+
+			// ----- hack to show shipsWheel animation of focusedShip
+			if (focusedShip!=null)
+			{
+				var sT:Matrix4x4 = focusedShip.skin.transform;
+				var bearing:Number = Math.acos(Math.max(-1,Math.min(1,sT.cc)));		// ship bearing
+				if (sT.ac>0)	bearing*=-1;
+
+				var invVT:Matrix4x4 = Mesh.viewT.inverse();
+				var r:VertexData = Mesh.cursorRay(stage.stageWidth/2,stage.stageHeight*0.95,0.1,0.2);;
+				var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
+				var wheel:Mesh = Assets["shipsWheel"];
+				wheel.transform = invVT.mult(new Matrix4x4().rotZ(bearing*10).translate(lp.x,lp.y,lp.z));
+				world.addChild(wheel);
+			}
+			else
+				world.removeChild(Assets["shipsWheel"]);
 
 			// ----- play sound FXs
 			soundsStep(camPosn);
@@ -1197,20 +1216,32 @@
 		private function shipViewStep():void
 		{
 			// ----- enable user focus on selection
-			if (Input.upPts.length>0)
+			if (Input.upPts.length==1)
 			{
 				var upPt:InputPt = Input.upPts[0];
 				// enable ship selection on mouse click
 				if (upPt.endT - upPt.startT<300)
 				{
 					var ray:VertexData = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
-
+					// ----- detect clicked another ship
 					var selected:Hull = null;
 					for (var i:int=Entities.length-1; i>-1; i--)
 						if (Entities[i]!=focusedEntity && Entities[i].hullSkin.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,Entities[i].skin.transform))
-							selected = Entities[i];
+						{
+							if (selected==null)
+								selected = Entities[i];
+						}
 					if (selected!=null)
 						focusOn(selected);
+					// ----- detect clicked pickup Item
+					var cube:Mesh = Mesh.createCube(1,1,1);				// hit test mesh
+					var picked:Projectile = null;
+					for (i=DropItems.length-1; i>-1; i--)
+					{
+						var p:Projectile = DropItems[i];
+						if (cube.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,new Matrix4x4(1,0,0,p.px,0,1,0,p.py,0,0,1,p.pz)))
+							p.ttl=0;
+					}
 				}
 			}
 
@@ -2333,7 +2364,7 @@
 																									function(confirm:Boolean):void
 																									{
 																										if (confirm)
-																										convToRmf(['3D/RawM.obj','3D/RawR.obj','3D/RawT.obj',
+																										convToRmf(['3D/shipsWheel.obj','3D/RawM.obj','3D/RawR.obj','3D/RawT.obj',
 																													'3D/missileSmall.obj',
 																													'3D/launcherSmall.obj',
 																													'3D/hullPosnMkr.obj',
@@ -3892,7 +3923,7 @@ class MenuUI
 				curH = Math.round((curH*2 + targH) / 3);
 				if ((curH-targH)*(curH-targH)<1) curH = targH;
 
-				drawVertThrottle(s,x1+bw+sw*margF,sh*(1-10*margF),x2-x1-bw-2*sw*margF,sh*9*margF,ship.accel/ship.maxAccel,0x66FF66,0x000000);
+				drawVertThrottle(s,x1+bw+sw*margF,sh*(1-10*margF),x2-x1-bw-2*sw*margF,sh*9*margF,ship.vel.length/ship.maxSpeed,0x66FF66,0x000000);
 			}
 
 			if (ship.integrity <= 0)	removeHandler();
@@ -3923,7 +3954,7 @@ class MenuUI
 				s.graphics.beginFill(c1,1);
 			else
 				s.graphics.beginFill(c2,1);
-			s.graphics.drawRoundRect(x,y+h/10*i,w,h/20,h/20);
+			s.graphics.drawRoundRect(x,y+h*(1-(i+1)/n),w,h/n/2,h/n/2);
 			s.graphics.endFill();
 		}
 	}//endfunction
