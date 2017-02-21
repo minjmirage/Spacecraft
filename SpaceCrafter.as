@@ -89,6 +89,7 @@
 		[Embed(source="3D/textures/flareRed.jpg")]	 			private static var TexFlareRed:Class;
 		[Embed(source="3D/textures/thrustGradient.png")]	private static var TexThrustGradient:Class;
 		[Embed(source="3D/textures/linearGradient.png")]	private static var TexLinearGradient:Class;
+		[Embed(source="3D/textures/reticleR.png")]				private static var TexReticleR:Class;
 
 		[Embed(source="3D/textures/FxBitsSheet.png")] 		private static var FxBitsSheet:Class;
 		[Embed(source="3D/textures/FxBlastSheet.png")] 		private static var FxBlastSheet:Class;
@@ -295,7 +296,8 @@
 						bit:new ParticlesEmitter(new FxBitsSheet().bitmapData, 25, 1),
 						blast:new ParticlesEmitter(new FxBlastSheet().bitmapData, 25, 10,"add"),
 						wave:new ParticlesEmitter(new FxWaveSheet().bitmapData, 25, 100,"add"),
-						hyperspace:new ParticlesEmitter(new FxHyperSheet().bitmapData, 16, 100, "add")};
+						hyperspace:new ParticlesEmitter(new FxHyperSheet().bitmapData, 16, 100, "add"),
+						reticle:new ParticlesEmitter(new TexReticleR().bitmapData, 1, 1, "add")};
 			for (key in EffectEMs)
 				world.addChild(EffectEMs[key].skin);
 
@@ -2066,7 +2068,7 @@
 				T.bd = p.py;
 				T.cd = p.pz;
 				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);			// item icon
-				EffectEMs["halo"].emit(p.px,p.py,p.pz,0,0,0,1);		// halo
+				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);		// 
 			},0,500,"Raw"+type);
 
 			DropItems.push(p);
