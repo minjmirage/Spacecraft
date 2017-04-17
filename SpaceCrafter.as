@@ -1540,11 +1540,11 @@
 				else
 				{
 					// ----- turret position ------------------------------------------
-					var T:Matrix4x4 = null;
+					var T:Matrix4x4 = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz);
 					if (m.type.charAt(m.type.length-1)=='M')	// mid sized module
-						T = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*1.57,m.y+m.ny*1.57,m.z+m.nz*1.57);	// turret local space
+						T = T.translate(m.x+m.nx*1.57,m.y+m.ny*1.57,m.z+m.nz*1.57);	// turret local space
 					else
-						T = new Matrix4x4().rotFromTo(0,1,0,m.nx,m.ny,m.nz).translate(m.x+m.nx*0.71,m.y+m.ny*0.71,m.z+m.nz*0.71);	// turret local space
+						T = T.translate(m.x+m.nx*0.71,m.y+m.ny*0.71,m.z+m.nz*0.71);	// turret local space
 					T = ship.skin.transform.mult(T);	// turret global space
 
 					var turX:Number = T.ad;		// turret global space posn
@@ -2068,7 +2068,7 @@
 				T.bd = p.py;
 				T.cd = p.pz;
 				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);			// item icon
-				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);		// 
+				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);		//
 			},0,500,"Raw"+type);
 
 			DropItems.push(p);
