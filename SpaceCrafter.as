@@ -1685,10 +1685,11 @@
 					{
 						var tPt:HullBlock = targ.hullConfig[j];
 						var iV:Vector3D =
-						collisionVector3(pspeed,			// projectile speed
+						interceptVector3(pspeed,	// projectile speed
 										tPt.extPosn.x-turX,tPt.extPosn.y-turY,tPt.extPosn.z-turZ,	// target block posn from turret
-										dvx,dvy,dvz);					// target vel from turret
-						if (iV!=null && interceptV.w>iV.w &&
+										dvx,dvy,dvz,			// target vel from turret
+										interceptV.w);		// cutoff time
+						if (iV!=null &&
 							!ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform))	// does not hit self
 						{
 							targObj = tPt;
@@ -1717,10 +1718,11 @@
 				if (pp.targ is HullBlock && pp.targ.parent==ship && Projectiles[j].projIntegrity>0)
 				{
 					var ipV:Vector3D =
-					collisionVector3(pspeed, 			// projectile speed
+					interceptVector3(pspeed, 	// projectile speed
 									pp.px-turX,pp.py-turY,pp.pz-turZ, 	// target block posn from turret
-									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z);	// target vel from turret
-					if (ipV!=null && interceptV.w>ipV.w &&
+									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z,	// target vel from turret
+									interceptV.w);		// cutoff time
+					if (ipV!=null &&
 						!ship.hullSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform))	// does not hit self
 					{
 						targObj = pp;
@@ -2875,6 +2877,43 @@
 				var det:Number = Math.sqrt(b*b-4*a*c);
 				var t:Number = (-b - det)/(2*a);	// time to hit
 				if (t<0) t = (-b + det)/(2*a);
+				var fpx:Number = tpx + tvx*t;	// target final position x
+				var fpy:Number = tpy + tvy*t;	// target final position y
+				var fpz:Number = tpz + tvz*t;	// target final position y
+				var _fpl:Number = pspeed/Math.sqrt(fpx*fpx+fpy*fpy+fpz*fpz);
+				return new Vector3D(fpx*_fpl,fpy*_fpl,fpz*_fpl,t);	// returns vector from gun posn to targ posn
+			}// endif has solution
+
+			return null;
+		}//endfunction
+
+		//=================================================================================================
+		// given gun muzzle speed, and target (posn,vel) RELATIVE to gun,
+		// returns projectile intercept vector (x,y,z,w)	where w is time to collision
+		// pspeed: projectile velocity
+		// gun posn assumed to be at (0,0,0)
+		// targ posn (tpx,tpy,tpz) targ vel (tvx,tvy,tvz)
+		//=================================================================================================
+		[Inline]
+		public static function interceptVector3(pspeed:Number,tpx:Number,tpy:Number,tpz:Number,tvx:Number,tvy:Number,tvz:Number,cutoffT:Number) : Vector3D
+		{
+			// finalP = initialP + targV*time			... (1)    target
+			// time = |finalP|/pspeed					... (2)	   projectile
+			// | initialP + targV*time | / pspeed		... sub (1) in (2)
+			// simplifying
+			// => 0 = (tpx*tpx + tpy*tpy + tpz*tpz) + 2*(tpx*tvx + tpy*tvy + tpz*tvz)*t + (tvx*tvx + tvy*tvy + tvz*tvz - pspeed*pspeed)*t*t
+			// using quadratic formula (-b +- sqrt(b*b-4*a*c))/(2*a) ...
+
+			var a:Number = tvx*tvx + tvy*tvy + tvz*tvz - pspeed*pspeed;
+			var b:Number = 2*(tpx*tvx + tpy*tvy +tpz*tvz);
+			var c:Number = tpx*tpx + tpy*tpy + tpz*tpz;
+
+			if (b*b-4*a*c>=0)						// if has solution
+			{
+				var det:Number = Math.sqrt(b*b-4*a*c);
+				var t:Number = (-b - det)/(2*a);	// time to hit
+				if (t<0) t = (-b + det)/(2*a);
+				if (t>cutoffT) return null;
 				var fpx:Number = tpx + tvx*t;	// target final position x
 				var fpy:Number = tpy + tvy*t;	// target final position y
 				var fpz:Number = tpz + tvz*t;	// target final position y
