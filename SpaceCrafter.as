@@ -1666,9 +1666,9 @@
 		// finds nearest hittable ship hull, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargShipHull(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Object
+		private final function nearestTargShipHull(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):HullBlock
 		{
-			var targObj:Object = null;	// targ current position & vel
+			var targObj:HullBlock = null;	// targ current position & vel
 
 			for (var st:int=ship.targets.length-1; st>-1; st--)
 			{
@@ -1707,9 +1707,9 @@
 		// finds nearest interceptable incoming projectile, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargProjectile(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Object
+		private final function nearestTargProjectile(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
-			var targObj:Object = null;	// targ current position & vel
+			var targObj:Projectile = null;	// targ current position & vel
 
 			for (var j:int=Projectiles.length-1; j>-1; j--)
 			{
@@ -1731,6 +1731,31 @@
 					}
 				}
 			}
+
+			return targObj;
+		}//endfunction
+
+		//===============================================================================================
+		// finds direction to nearest drop item, returns drop item
+		//===============================================================================================
+		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,ship:Ship,interceptV:Vector3D):Projectile
+		{
+			var targObj:Projectile = null;	// targ current position & vel
+			var distSq:Number = Number.MAX_VALUE;
+
+			for (var j:int=DropItems.length-1; j>-1; j--)
+			{
+				var pp:Projectile = DropItems[j];
+				var dx:Number = pp.px-turX;
+				var dy:Number = pp.py-turY;
+				var dz:Number = pp.pz-turZ;
+
+				if (distSq>dx*dx+dy*dy+dz*dz && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,dx,dy,dz,ship.skin.transform))
+				{
+					distSq = dx*dx+dy*dy+dz*dz;
+					targObj = pp;
+				}//endif
+			}//endfor
 
 			return targObj;
 		}//endfunction
@@ -4138,7 +4163,12 @@ class Module		// data class
 		nz=vz;
 		type=kind;
 
-		if (kind=="launcherS")
+		if (kind=="tractorS")
+		{
+			range=30;
+			turnRate=0.1;
+		}
+		else if (kind=="launcherS")
 		{
 			fireDelay=1000;
 			speed=0.2;		// only initial launch speed. missiles have accel
