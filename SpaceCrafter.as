@@ -111,6 +111,7 @@
 		[Embed(source='3D/RawT.rmf', mimeType='application/octet-stream')] 						private static var RawT_Rmf:Class;
 		[Embed(source='3D/hullPosnMkr.rmf', mimeType='application/octet-stream')] 		private static var HullPosnMkr_Rmf:Class;
 		[Embed(source='3D/thrusterSmall.rmf', mimeType='application/octet-stream')] 	private static var ThrusterS_Rmf:Class;
+		[Embed(source='3D/tractorSmall.rmf', mimeType='application/octet-stream')] 		private static var TractorS_Rmf:Class;
 		[Embed(source='3D/missileSmall.rmf', mimeType='application/octet-stream')] 		private static var MissileS_Rmf:Class;
 		[Embed(source='3D/launcherSmall.rmf', mimeType='application/octet-stream')] 	private static var LauncherS_Rmf:Class;
 		[Embed(source='3D/mountSmall.rmf', mimeType='application/octet-stream')] 			private static var MountS_Rmf:Class;
@@ -217,7 +218,7 @@
 			// ----- initialize 3D model assets
 			Assets = { shipsWheel:ShipsWheel_Rmf,RawM:RawM_Rmf,RawR:RawR_Rmf,RawT:RawT_Rmf,
 						buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
-						missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
+						tractorS:TractorS_Rmf,missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
 						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
@@ -244,7 +245,8 @@
 			// ----- initialize turrets particles
 			frameS_MP = new MeshParticles(Assets['frameS']);
 			frameM_MP = new MeshParticles(Assets['frameM']);
-			TurretMPs ={gunAutoS:new MeshParticles(Assets['gunAutoS']),
+			TurretMPs ={tractorS:new MeshParticles(Assets['tractorS']),
+						gunAutoS:new MeshParticles(Assets['gunAutoS']),
 						gunFlakS:new MeshParticles(Assets['gunFlakS']),
 						gunIonS:new MeshParticles(Assets['gunIonS']),
 						gunPlasmaS:new MeshParticles(Assets['gunPlasmaS']),
@@ -1235,15 +1237,6 @@
 						}
 					if (selected!=null)
 						focusOn(selected);
-					// ----- detect clicked pickup Item
-					var cube:Mesh = Mesh.createCube(1,1,1);				// hit test mesh
-					var picked:Projectile = null;
-					for (i=DropItems.length-1; i>-1; i--)
-					{
-						var p:Projectile = DropItems[i];
-						if (cube.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,new Matrix4x4(1,0,0,p.px,0,1,0,p.py,0,0,1,p.pz)))
-							p.ttl=0;
-					}
 				}
 			}
 
@@ -1571,7 +1564,9 @@
 					else	// is weapon turret
 					{
 						// ----- seek nearest target projectile/hull posn -------------------
-						if (m.type=="gunAutoS" || m.type=="gunFlakS")
+						if (m.type=="tractorS")
+							targObj = nearestTargDropItem(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+						else if (m.type=="gunAutoS" || m.type=="gunFlakS")
 							targObj = nearestTargProjectile(turX,turY,turZ,m.speed,m.range,ship,interceptV);
 						else if (active)
 							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,m.range,ship,interceptV);
@@ -1612,6 +1607,17 @@
 								m.ttf = m.fireDelay + 1;
 								if (targObj is HullBlock)
 									Projectiles.push(new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, m.range / m.speed, m.type));
+								else if (m.type=="tractorS" && targObj is Projectile)
+								{
+									if (interceptV.w<3)
+										DropItems.splice(DropItems.indexOf((Projectile)(targObj)),1);
+									else
+									{
+										targObj.vx-=interceptV.x;
+										targObj.vy-=interceptV.y;
+										targObj.vz-=interceptV.z;
+									}
+								}
 								else if (targObj is Projectile)
 								{	// target is projectile
 									(Projectile)(targObj).projIntegrity -= m.damage;	// prevent double targeting
@@ -1677,10 +1683,11 @@
 				var dvy:Number = targ.vel.y - ship.vel.y;
 				var dvz:Number = targ.vel.z - ship.vel.z;
 				var targCV:Vector3D =
-				collisionVector3(pspeed,					// projectile speed
+				interceptVector3(pspeed,					// projectile speed
 									targ.posn.x-turX,targ.posn.y-turY,targ.posn.z-turZ,	// target ship posn from turret
-									dvx,dvy,dvz);						// target vel from turret
-				if (targCV!=null && targCV.w*pspeed<range+targ.radius*2)		// chk ship is in range culling
+									dvx,dvy,dvz,						// target vel from turret
+									(range+targ.radius*2)/pspeed);		// cutoff T
+				if (targCV!=null)			// chk ship is in range culling
 					for (var j:int=targ.hullConfig.length-1; j>-1; j--)
 					{
 						var tPt:HullBlock = targ.hullConfig[j];
@@ -1740,10 +1747,10 @@
 		//===============================================================================================
 		// finds direction to nearest drop item, returns drop item
 		//===============================================================================================
-		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,ship:Ship,interceptV:Vector3D):Projectile
+		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
 			var targObj:Projectile = null;	// targ current position & vel
-			var distSq:Number = Number.MAX_VALUE;
+			var distSq:Number = range*range;
 
 			for (var j:int=DropItems.length-1; j>-1; j--)
 			{
@@ -1756,6 +1763,10 @@
 				{
 					distSq = dx*dx+dy*dy+dz*dz;
 					targObj = pp;
+					interceptV.w = Math.sqrt(distSq);
+					interceptV.x = pspeed*dx/interceptV.w;
+					interceptV.y = pspeed*dy/interceptV.w;
+					interceptV.z = pspeed*dz/interceptV.w;
 				}//endif
 			}//endfor
 
@@ -2394,6 +2405,7 @@
 																									{
 																										if (confirm)
 																										convToRmf(['3D/shipsWheel.obj','3D/RawM.obj','3D/RawR.obj','3D/RawT.obj',
+																													'3D/tractorSmall.obj',
 																													'3D/missileSmall.obj',
 																													'3D/launcherSmall.obj',
 																													'3D/hullPosnMkr.obj',
@@ -2523,6 +2535,7 @@
 
 			var Ids:Vector.<Object> =
 			new <Object>[	{id:'thrusterS', name:'Ship Thruster'},
+										{id:'tractorS', name:'Tractor Beam'},
 										{id:'gunAutoS', name:'Point Defense Gatling Gun'},
 										{id:'gunFlakS', name:'Point Defense Flak Gun'},
 										{id:'gunIonS', name:'Ion Blaster'},
