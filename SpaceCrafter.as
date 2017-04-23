@@ -1453,6 +1453,7 @@
 				else
 				{
 					p.ttl-=1;
+					p.projIntegrity=1;
 					p.px+=p.vx;	// move projectile
 					p.py+=p.vy;
 					p.pz+=p.vz;
@@ -1609,13 +1610,14 @@
 									Projectiles.push(new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, m.range / m.speed, m.type));
 								else if (m.type=="tractorS" && targObj is Projectile)
 								{
-									if (interceptV.w<3)
+									if (interceptV.w<1)
 										DropItems.splice(DropItems.indexOf((Projectile)(targObj)),1);
 									else
 									{
-										targObj.vx-=interceptV.x;
-										targObj.vy-=interceptV.y;
-										targObj.vz-=interceptV.z;
+										targObj.vx=interceptV.x;
+										targObj.vy=interceptV.y;
+										targObj.vz=interceptV.z;
+										EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
 									}
 								}
 								else if (targObj is Projectile)
@@ -1759,14 +1761,16 @@
 				var dy:Number = pp.py-turY;
 				var dz:Number = pp.pz-turZ;
 
-				if (distSq>dx*dx+dy*dy+dz*dz && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,dx,dy,dz,ship.skin.transform))
+				if (pp.projIntegrity==1 && distSq>dx*dx+dy*dy+dz*dz && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,dx,dy,dz,ship.skin.transform))
 				{
 					distSq = dx*dx+dy*dy+dz*dz;
+					if (targObj!=null) targObj.projIntegrity = 1;
 					targObj = pp;
+					pp.projIntegrity = 0;
 					interceptV.w = Math.sqrt(distSq);
-					interceptV.x = pspeed*dx/interceptV.w;
-					interceptV.y = pspeed*dy/interceptV.w;
-					interceptV.z = pspeed*dz/interceptV.w;
+					interceptV.x = -pspeed*dx/interceptV.w;
+					interceptV.y = -pspeed*dy/interceptV.w;
+					interceptV.z = -pspeed*dz/interceptV.w;
 				}//endif
 			}//endfor
 
@@ -4219,6 +4223,7 @@ class Module		// data class
 		{
 			range=30;
 			turnRate=0.1;
+			speed=0.3;
 		}
 		else if (kind=="launcherS")
 		{
