@@ -1553,7 +1553,7 @@
 						if (m.ttf<=0)
 						{
 							// ----- seek nearest target hull posn ----------------------------
-							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,ship,interceptV);
 							if (targObj!=null)
 							{
 								playSound(turX,turY,turZ,m.type);
@@ -1566,11 +1566,11 @@
 					{
 						// ----- seek nearest target projectile/hull posn -------------------
 						if (m.type=="tractorS")
-							targObj = nearestTargDropItem(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+							targObj = nearestTargDropItem(turX,turY,turZ,m.speed,ship,interceptV);
 						else if (m.type=="gunAutoS" || m.type=="gunFlakS")
-							targObj = nearestTargProjectile(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+							targObj = nearestTargProjectile(turX,turY,turZ,m.speed,ship,interceptV);
 						else if (active)
-							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,m.range,ship,interceptV);
+							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,ship,interceptV);
 
 						// ----- rotate turret towards interceptV ---------------------------
 						var canFire:Boolean = targObj!=null && m.ttf<=0;
@@ -1610,13 +1610,13 @@
 									Projectiles.push(new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, m.range / m.speed, m.type));
 								else if (m.type=="tractorS" && targObj is Projectile)
 								{
-									if (interceptV.w<1)
+									if (interceptV.w*m.speed<1)
 										DropItems.splice(DropItems.indexOf((Projectile)(targObj)),1);
 									else
 									{
-										targObj.vx=interceptV.x;
-										targObj.vy=interceptV.y;
-										targObj.vz=interceptV.z;
+										targObj.vx=-interceptV.x;
+										targObj.vy=-interceptV.y;
+										targObj.vz=-interceptV.z;
 										EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
 									}
 								}
@@ -1674,7 +1674,7 @@
 		// finds nearest hittable ship hull, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargShipHull(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):HullBlock
+		private final function nearestTargShipHull(turX:Number,turY:Number,turZ:Number,pspeed:Number,ship:Ship,interceptV:Vector3D):HullBlock
 		{
 			var targObj:HullBlock = null;	// targ current position & vel
 
@@ -1688,7 +1688,7 @@
 				interceptVector3(pspeed,					// projectile speed
 									targ.posn.x-turX,targ.posn.y-turY,targ.posn.z-turZ,	// target ship posn from turret
 									dvx,dvy,dvz,						// target vel from turret
-									(range+targ.radius*2)/pspeed);		// cutoff T
+									(interceptV.w*pspeed+targ.radius*2)/pspeed);		// cutoff T
 				if (targCV!=null)			// chk ship is in range culling
 					for (var j:int=targ.hullConfig.length-1; j>-1; j--)
 					{
@@ -1698,8 +1698,7 @@
 										tPt.extPosn.x-turX,tPt.extPosn.y-turY,tPt.extPosn.z-turZ,	// target block posn from turret
 										dvx,dvy,dvz,			// target vel from turret
 										interceptV.w);		// cutoff time
-						if (iV!=null &&
-							!ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform))	// does not hit self
+						if (iV!=null &&	!ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform))	// does not hit self
 						{
 							targObj = tPt;
 							interceptV.x = iV.x;
@@ -1717,7 +1716,7 @@
 		// finds nearest interceptable incoming projectile, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargProjectile(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Projectile
+		private final function nearestTargProjectile(turX:Number,turY:Number,turZ:Number,pspeed:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
 			var targObj:Projectile = null;	// targ current position & vel
 
@@ -1749,28 +1748,31 @@
 		//===============================================================================================
 		// finds direction to nearest drop item, returns drop item
 		//===============================================================================================
-		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,pspeed:Number,range:Number,ship:Ship,interceptV:Vector3D):Projectile
+		[Inline]
+		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,pspeed:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
 			var targObj:Projectile = null;	// targ current position & vel
-			var distSq:Number = range*range;
 
 			for (var j:int=DropItems.length-1; j>-1; j--)
 			{
 				var pp:Projectile = DropItems[j];
-				var dx:Number = pp.px-turX;
-				var dy:Number = pp.py-turY;
-				var dz:Number = pp.pz-turZ;
-
-				if (pp.projIntegrity==1 && distSq>dx*dx+dy*dy+dz*dz && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,dx,dy,dz,ship.skin.transform))
+				if (pp.projIntegrity==1)
 				{
-					distSq = dx*dx+dy*dy+dz*dz;
-					if (targObj!=null) targObj.projIntegrity = 1;
-					targObj = pp;
-					pp.projIntegrity = 0;
-					interceptV.w = Math.sqrt(distSq);
-					interceptV.x = -pspeed*dx/interceptV.w;
-					interceptV.y = -pspeed*dy/interceptV.w;
-					interceptV.z = -pspeed*dz/interceptV.w;
+					var iV:Vector3D =
+					interceptVector3(pspeed,	// tractorBeam speed
+									turX-pp.px,turY-pp.py,turZ-pp.pz,	// turret posn from item
+									ship.vel.x,ship.vel.y,ship.vel.z,	// target vel from turret
+									interceptV.w);		// cutoff time
+					if (iV!=null && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,pp.px-turX,pp.py-turY,pp.pz-turZ,ship.skin.transform))
+					{
+						if (targObj!=null) targObj.projIntegrity = 1;
+						targObj = pp;
+						pp.projIntegrity = 0;
+						interceptV.x = -iV.x;
+						interceptV.y = -iV.y;
+						interceptV.z = -iV.z;
+						interceptV.w = iV.w;
+					}//endif
 				}//endif
 			}//endfor
 
@@ -2112,6 +2114,7 @@
 				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);			// item icon
 				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);		//
 			},0,500,"Raw"+type);
+			p.ttl = 1000;
 
 			DropItems.push(p);
 			return p;
@@ -4222,8 +4225,8 @@ class Module		// data class
 		if (kind=="tractorS")
 		{
 			range=30;
-			turnRate=0.1;
-			speed=0.3;
+			turnRate=0.2;
+			speed=0.2;
 		}
 		else if (kind=="launcherS")
 		{
