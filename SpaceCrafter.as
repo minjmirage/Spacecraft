@@ -11,7 +11,7 @@
 	import flash.utils.*;
 	import flash.net.SharedObject;
 
-	[SWF(backgroundColor="#000000", frameRate="30", width="1334", height="750")]
+	[SWF(backgroundColor="#000000", frameRate="30", width="1920", height="1080")]
 
 	public class SpaceCrafter extends Sprite
 	{
@@ -800,7 +800,6 @@
 			sky = new Mesh();
 			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
 			MenuUI.colorTone = colorTones[skyIdx];
-
 			for (var i:int=0; i<4; i++)
 			{
 				var p:Mesh = Mesh.createPlane(3000,3000,skyTex);

@@ -84,10 +84,12 @@
 
 		private static var outTex:Texture;				// GLOBAL for post processing filters support
 
-		private static var antiAliasing:uint = 4;		// render result antialiasing
+		private static var antiAliasing:uint = 2;		// render result antialiasing
 		public static var context3d:Context3D;			// reference to the shared context3D for rendering onto stage3D
 
 		// ----- remembers previous assets used in render to skip resetting buffers
+		private static var VBConfig:Vector.<String> = Vector.<String>([null,null,null,null,null,null,null,null]);
+		private static var pVBConfig:Vector.<String> = Vector.<String>([null,null,null,null,null,null,null,null]);
 		private static var prevType:int = -1;
 		private static var prevTex:Texture=null;
 		private static var prevEnv:CubeTexture=null;
@@ -1527,9 +1529,8 @@
 			M.flattenTree(viewT,R);
 			R = R.sort(depthCompare);
 
-			var rlen:uint = R.length;
-			numMeshes = rlen;
-			for (var i:int=0; i<rlen; i++)
+			numMeshes = R.length;
+			for (var i:int=0; i<numMeshes; i++)
 			{
 				M = R[i];
 				var mat:Material = M.material;
@@ -1552,55 +1553,53 @@
 						context3d.setProgramConstantsFromVector("vertex", 1, Vector.<Number>([T.aa,T.ab,T.ac,T.ad,T.ba,T.bb,T.bc,T.bd,T.ca,T.cb,T.cc,T.cd,0,0,0,1]));	// set vc register 1,2,3,4
 
 						// ----- ambient, specular, fog factors for this mesh -----------
-						context3d.setProgramConstantsFromVector("fragment", 1, Vector.<Number>([mat.ambR, mat.ambG, mat.ambB,0]));					// r,g,b,0
-						context3d.setProgramConstantsFromVector("fragment", 2, Vector.<Number>([mat.specStr,mat.specHard+1,mat.specHard, 0]));	// st,h1,h0,0
-						context3d.setProgramConstantsFromVector("fragment", 3, Vector.<Number>([mat.fogR,mat.fogG,mat.fogB,mat.fogFar]));	//
+						context3d.setProgramConstantsFromVector("fragment", 1, mat.toFragConstsVector());					// 3 registers (ambR,G,B,0, st,h1,h0,0, fogR,G,B,fogDist)
 
 						// ----- clear off prev used buffers
-						for (j=0; j<7; j++)	context3d.setVertexBufferAt(j, null);
+						for (j=0; j<8; j++)	VBConfig[j] = null;
 
 						// ----- sets vertices info for this mesh to context3d ----------
 						if (M.dataType==_typeV)
 						{
-							context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float3");		// va0 to expect vertices
+							VBConfig[0] = "0_float3";			// va0 to expect vertices
 							if (M.illuminable)
 							{
-								context3d.setVertexBufferAt(1, M.vertexBuffer, 3, "float3");		// va1 to expect normals
+								VBConfig[1] = "3_float3";		// va1 to expect normals
 								if (M.normMapBuffer!=null)
-									context3d.setVertexBufferAt(2, M.vertexBuffer, 6, "float3");		// va2 to expect tangents
+									VBConfig[2] = "6_float3";	// va2 to expect tangents
 							}
-							context3d.setVertexBufferAt(3, M.vertexBuffer, 9, "float2");		// va3 to expect uvs
+							VBConfig[3] = "9_float2";			// va3 to expect uvs
 						}
 						else if (M.dataType==_typeP)
 						{
-							context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float3");		// va0 to expect vertices
-							context3d.setVertexBufferAt(1, M.vertexBuffer, 3, "float3");		// va1 to expect UV and idx
+							VBConfig[0] = "0_float3";			// va0 to expect vertices
+							VBConfig[1] = "3_float3";			// va1 to expect UV and idx
 							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
 						}
 						else if (M.dataType==_typeM)
 						{
-							context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float3");		// va0 to expect vertices
-							context3d.setVertexBufferAt(3, M.vertexBuffer, 9, "float4");		// va3 to expect UV and idx
+							VBConfig[0] = "0_float3";			// va0 to expect vertices
 							if (M.illuminable)
 							{
-								context3d.setVertexBufferAt(1, M.vertexBuffer, 3, "float3");	// va1 to expect normals
+								VBConfig[1] = "3_float3";		// va1 to expect normals
 								if (M.normMapBuffer!=null)
-									context3d.setVertexBufferAt(2, M.vertexBuffer, 6, "float3");// va2 to expect tangents
+									VBConfig[2] = "6_float3";	// va2 to expect tangents
 							}
+							VBConfig[3] = "9_float4";			// va3 to expect UV and idx
 							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the meshes orientation and positions data
 						}
 						else if (M.dataType==_typeS)
 						{
-							context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float2");		// va0 to expect texU texV
+							VBConfig[0] = "0_float2";			// va0 to expect texU texV
 							if (M.illuminable)
 							{
-								context3d.setVertexBufferAt(1, M.vertexBuffer, 2, "float4");	// va1 to expect wnx,wny,wnx,transIdx
-								context3d.setVertexBufferAt(2, M.vertexBuffer, 6, "float4");	// va2 to expect wtx,wty,wtx,transIdx
+								VBConfig[1] = "2_float4";		// va1 to expect wnx,wny,wnx,transIdx
+								VBConfig[2] = "6_float4";		// va2 to expect wtx,wty,wtx,transIdx
 							}
-							context3d.setVertexBufferAt(3, M.vertexBuffer, 10, "float4");		// va3 to expect weight vertex 1
-							context3d.setVertexBufferAt(4, M.vertexBuffer, 14,"float4");		// va4 to expect weight vertex 2
-							context3d.setVertexBufferAt(5, M.vertexBuffer, 18,"float4");		// va5 to expect weight vertex 3
-							context3d.setVertexBufferAt(6, M.vertexBuffer, 22,"float4");		// va6 to expect weight vertex 4
+							VBConfig[3] = "10_float4";		// va3 to expect weight vertex 1
+							VBConfig[4] = "14_float4";		// va4 to expect weight vertex 2
+							VBConfig[5] = "18_float4";		// va5 to expect weight vertex 3
+							VBConfig[6] = "22_float4";		// va6 to expect weight vertex 4
 							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
 						}
 						prevType = M.dataType;
@@ -1609,6 +1608,20 @@
 						var prog:Program3D = M.stdProgram;			// use standard program
 						if (prevProg!=prog)		context3d.setProgram(prog);
 						prevProg = prog;
+
+						// ----- sets vertexBuffer data to context3d --------------------
+						for (j=0; j<7; j++)	//only used until 7 so far
+						{
+							var configStr:String = VBConfig[j];
+							if (configStr!=null)
+							{
+								var cA:Array = configStr.split("_");
+								context3d.setVertexBufferAt(j,M.vertexBuffer,parseInt(cA[0]),cA[1]);
+							}
+							else if (pVBConfig[j]!=null)
+								context3d.setVertexBufferAt(j,null);
+							pVBConfig[j] = configStr;
+						}//endfor
 
 						// ----- sets texture info for this mesh to context3d -----------
 						if (prevTex!=M.textureBuffer) context3d.setTextureAt(0,M.textureBuffer);	// fs0 to hold texture data
@@ -1836,6 +1849,11 @@
 				context3d=stage3d.context3D;
 				context3d.enableErrorChecking=false;	//**********************************
 				debugTrace("got context3d, driverInfo:"+context3d.driverInfo);
+				for (var i:int=0; i<8; i++)
+				{
+					VBConfig[i] = null;
+					pVBConfig[i] = null;
+				}
 				configBackBufferAndCallBack();
 			}//endfunction
 
@@ -1850,7 +1868,7 @@
 				if (gettingContext) return;
 				gettingContext=true;
 				stage.stage3Ds[0].addEventListener(Event.CONTEXT3D_CREATE, onContext);
-				stage.stage3Ds[0].requestContext3D();
+				stage.stage3Ds[0].requestContext3D("auto","standard");
 				return;
 			}
 			else configBackBufferAndCallBack();
@@ -3368,8 +3386,6 @@
 				if (hasTex)
 					s = "tex ft0, v2, fs0 <2d,linear,"+mip+",repeat> \n" + 	// sample tex "tex ft0, v2, fs0 <2d,nearest,repeat> \n" + // sample tex
 						"mul ft0.xyz, ft0.xyz, fc1.xyz\n"; 			// mult ambient color
-
-
 				else
 					s = "mov ft0.a, fc0.z\n" + 						// alpha = 1
 						"mov ft0.xyz, fc1.xyz\n"; 					// set as ambient color

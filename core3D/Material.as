@@ -3,7 +3,7 @@ package core3D
 	import flash.geom.Matrix;
 	import flash.display.BitmapData;
 	import flash.display3D.textures.CubeTexture;
-	
+
 	/**
 	 * ...
 	 * @author Minj
@@ -19,9 +19,9 @@ package core3D
 		public var fogFar:Number = 0;
 		public var specStr:Number = 0.5;
 		public var specHard:Number = 0.5;
-		
+
 		public var changed:uint = 0;	// bits flag for changes in material, to trigger AGAL recompile
-		
+
 		public static const UPDATE_AMBIENT:uint 	= 1;
 		public static const UPDATE_SPECULAR:uint 	= 2;
 		public static const UPDATE_FOG:uint 		= 4;
@@ -29,41 +29,43 @@ package core3D
 		public static const UPDATE_NORMMAP:uint 	= 16;
 		public static const UPDATE_SPECMAP:uint 	= 32;
 		public static const UPDATE_ENVMAP:uint 		= 64;
-		
+
 		public static const BLENDMODE_NORMAL:String = "normal";
 		public static const BLENDMODE_ALPHA:String 	= "alpha";
 		public static const BLENDMODE_ADD:String 	= "add";
-		
+
 		public var blendSrc:String="one";			// source pixel blend mode
 		public var blendDest:String="zero";			// destination pixel blend mode
-		
+
 		public var texMap:BitmapData;				// texture map, can be null
 		public var normMap:BitmapData;				// normal map, can be null
 		public var specMap:BitmapData;				// speclar map, can be null
 		public var envMap:CubeTexture;				// environment map, can be null
-		
-		
+
+		private var fragConsts:Vector.<Number> = null;
+
 		/**
 		 * constructs default material with diffuse (0.5,0.5,0.5) fog (0,0,0) specStr 0.5 specHard 0.5
 		 */
-		public function Material(tex:BitmapData=null,norm:BitmapData=null,spec:BitmapData=null,env:CubeTexture=null):void		
+		public function Material(tex:BitmapData=null,norm:BitmapData=null,spec:BitmapData=null,env:CubeTexture=null):void
 		{
 			texMap = tex;
 			normMap = norm;
 			specMap = spec;
 			envMap = env;
 		}//endconstr
-		
+
 		/**
 		 * sets ambient lighting, forces shader recompile if necessary
 		 */
 		public function setAmbient(r:Number,g:Number,b:Number) : void
 		{
-			if ((r == 1 || g == 1 || b == 1) || (ambR==1 || ambG==1 || ambB==1))		
+			if ((r == 1 || g == 1 || b == 1) || (ambR==1 || ambG==1 || ambB==1))
 				changed = changed | UPDATE_AMBIENT;
 			ambR = r;
 			ambG = g;
 			ambB = b;
+			fragConsts = null;
 		}//endfunction
 
 		/**
@@ -74,8 +76,9 @@ package core3D
 			if (specStr==0 || strength==0)	changed = changed | UPDATE_SPECULAR;
 			specStr = strength;
 			specHard = hardness;
+			fragConsts = null;
 		}//endfunction
-		
+
 		/**
 		 * sets fog far distance, forces shader recompile if necessary
 		 */
@@ -86,8 +89,22 @@ package core3D
 			fogG = g;
 			fogB = b;
 			fogFar = fogDist;
+			fragConsts = null;
 		}//endfunction
-		
+
+		/**
+		 *
+		 */	
+		public function toFragConstsVector():Vector.<Number>
+		{
+			if (fragConsts==null)
+				fragConsts =
+				Vector.<Number>([ambR, ambG, ambB,0,						// amb lighting rgb
+												specStr,specHard+1,specHard, 0,	// st,h1,h0,0
+												fogR,fogG,fogB,fogFar]);				//
+			return fragConsts;
+		}//endfunction
+
 		/**
 		* sets/overrides new texture to this mesh
 		*/
@@ -115,7 +132,7 @@ package core3D
 			changed = changed | UPDATE_SPECMAP;
 			specMap = powOf2Size(bmd);
 		}//endfunction
-		
+
 		/**
 		* blending when drawing to stage, one of "add", "alpha", "normal"
 		*/
@@ -126,7 +143,7 @@ package core3D
 			if (s==BLENDMODE_ALPHA)		{blendSrc="sourceAlpha"; blendDest="oneMinusSourceAlpha";}
 			if (s==BLENDMODE_NORMAL)	{blendSrc="one"; blendDest="zero";}
 		}//endfunction
-		
+
 		public function clone():Material
 		{
 			var mat:Material = new Material(texMap, normMap, specMap, envMap);
@@ -144,7 +161,7 @@ package core3D
 			mat.blendDest = blendDest;
 			return mat;
 		}//endfunction
-		
+
 		/**
 		* returns a new bitmapData with width,height to power of 2 or original, if already power of 2
 		*/

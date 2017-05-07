@@ -16,7 +16,7 @@
 	<text xml:lang="ja">Japanese App name goes here</text>
 	</name>
 -->
-<application xmlns="http://ns.adobe.com/air/application/23.0">
+<application xmlns="http://ns.adobe.com/air/application/25.0">
   <id>SpaceCrafter</id>
   <versionNumber>1.0.0</versionNumber>
   <versionLabel></versionLabel>
@@ -25,8 +25,9 @@
   <name>SpaceCrafter</name>
   <copyright/>
   <initialWindow>
+    <requestedDisplayResolution>standard</requestedDisplayResolution>
     <content>SpaceCrafter.swf</content>
-    <systemChrome>standard</systemChrome>
+    <systemChrome>none</systemChrome>
     <transparent>false</transparent>
     <visible>true</visible>
     <fullScreen>true</fullScreen>
@@ -34,7 +35,8 @@
     <renderMode>direct</renderMode>
 	  <depthAndStencil>true</depthAndStencil>
     <resizable>false</resizable>
-    <autoOrients>false</autoOrients></initialWindow>
+    <autoOrients>false</autoOrients>
+  </initialWindow>
   <icon>
         <image29x29>icons/icon29.png</image29x29>
         <image57x57>icons/icon57.png</image57x57>
