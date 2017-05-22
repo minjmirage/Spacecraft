@@ -4365,7 +4365,7 @@ class Hull
 
 		skin = new Mesh();
 		hullSkin = new Mesh();
-		hullSkin.material.setSpecular(1,0.5);
+		hullSkin.material.setSpecular(3,100);
 		hullSkin.material.setTexMap(texMap);
 		hullSkin.material.setSpecMap(specMap);
 		hullSkin.material.setNormMap(normMap);

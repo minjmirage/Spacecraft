@@ -801,11 +801,12 @@
 				fragSrc = "tex oc, v2, fs0 <2d,linear,"+mipMapping+",repeat>\n";
 			else
 				fragSrc = _stdFragSrc(	numLights,
-										material.texMap != null,
+										material.fogFar > 0,
+										material.specStr !=0,
 										mipMapping,
+										material.texMap != null,
 										material.normMap != null,
 										material.specMap != null,
-										material.fogFar > 0,
 										material.envMap != null,
 										shadows);
 
@@ -3376,14 +3377,14 @@
 		*				fc_n*2+4= [px,py,pz,0]		// light n position
 		*				fc_n*2+5= [r,g,b,1]			// light n color,
 		*/
-		private static function _stdFragSrc(numLights:uint,hasTex:Boolean,mip:String,hasNorm:Boolean,hasSpec:Boolean,fog:Boolean,envMap:Boolean,shadowMap:Boolean) : String
+		private static function _stdFragSrc(numLights:uint,fog:Boolean,spec:Boolean,mip:String,texMap:Boolean,normMap:Boolean,specMap:Boolean,envMap:Boolean,shadowMap:Boolean) : String
 		{
 			var s:String = "";
 
 			// ----- frag shader optimization test --------------------------------------
 			if (numLights==0)
 			{
-				if (hasTex)
+				if (texMap)
 					s = "tex ft0, v2, fs0 <2d,linear,"+mip+",repeat> \n" + 	// sample tex "tex ft0, v2, fs0 <2d,nearest,repeat> \n" + // sample tex
 						"mul ft0.xyz, ft0.xyz, fc1.xyz\n"; 			// mult ambient color
 				else
@@ -3405,19 +3406,19 @@
 			}
 
 			// ----- upload lightpoints info ----------------------------------
-			if (hasTex)
+			if (texMap)
 				s =	"tex ft0, v2, fs0 <2d,linear,"+mip+",repeat> \n"; 	// ft0=sample texture with UV use miplinear to enable mipmapping
 			else
 				s = "mov ft0, fc0.zzzz\n";				// ft0 = 1,1,1,1
 
-			if (hasNorm)	// if has normal mapping
+			if (normMap)	// if has normal mapping
 			s +="tex ft7, v2, fs1 <2d,linear,"+mip+",repeat>\n" +	// ft7=sample normMap with UV
 				"mul ft7.xyz, ft7.xyz, fc0.www\n"+			// ft7.xyz *= 2
 				"sub ft7.xyz, ft7.xyz, fc0.zzz\n"+			// ft7.xyz = ft7.xyz*2-1
-				"crs ft3.xyz, v1.xyz, v4.xyz\n"+			// ft3=co tangent y
-				"mul ft2.xyz, v4.xyz, ft7.xxx\n"+			// ft2=x*tangent
+				"crs ft3.xyz, v1.xyz, v4.xyz\n"+				// ft3=co tangent y
+				"mul ft2.xyz, v4.xyz, ft7.xxx\n"+				// ft2=x*tangent
 				"mul ft3.xyz, ft3.xyz, ft7.yyy\n"+			// ft3=y*co tangent
-				"mul ft1.xyz, v1.xyz, ft7.zzz\n"+			// ft1=z*normal
+				"mul ft1.xyz, v1.xyz, ft7.zzz\n"+				// ft1=z*normal
 				"add ft1.xyz, ft1.xyz, ft2.xyz\n"+
 				"add ft1.xyz, ft1.xyz, ft3.xyz\n"+			// ft1=perturbed normal
 				"nrm ft1.xyz, ft1.xyz\n";
@@ -3433,23 +3434,26 @@
 					// ----- calculate diffuse lighting
 				s+=	"dp3 ft3, ft2, ft1.xyz\n"+			// ft3.xyzw=dot normal with light vector
 					"max ft3, ft3, fc0.xxxx\n"+	  		// ft3=max(0,ft3)
-					"mul ft3, ft0, ft3\n"+  			// ft3=multiply fragment color by intensity from texture
-					"mul ft3, ft3, fc"+(i*2+5)+"\n"+	// ft3=multiply fragment color by light color
+					"mul ft3, ft0, ft3\n"+  					// ft3=multiply fragment color by intensity from texture
+					"mul ft3, ft3, fc"+(i*2+5)+"\n";	// ft3=multiply fragment color by light color
 
+				if (spec)
 					// ----- calculate phong lighting
-					"nrm ft4.xyz, v0.xyz\n" +			// ft4 = normalized vector to point
+				s+=	"nrm ft4.xyz, v0.xyz\n" +						// ft4 = normalized vector to point
 					"dp3 ft4.w, ft4.xyz, ft1.xyz\n" + 	// ft4.w = ptVector . normal
-					"add ft4.w, ft4.w, ft4.w\n" +		// ft4.w = 2*(ptVector . normal)
-					"mul ft7.xyz, ft1.xyz, ft4.www\n" + // ft5.xyz = 2(ptVector . normal)normal
+					"add ft4.w, ft4.w, ft4.w\n" +				// ft4.w = 2*(ptVector . normal)
+					"mul ft7.xyz, ft1.xyz, ft4.www\n" + // ft7.xyz = 2(ptVector . normal)normal
 					"sub ft4.xyz, ft4.xyz, ft7.xyz\n" + // ft4.xyz = reflected vector to point
-					"dp3 ft4.xyz, ft4.xyz, ft2.xyz\n";	// ft4=magnitude of specular
+					"dp3 ft4.xyz, ft4.xyz, ft2.xyz\n"+	// ft4=magnitude of specular
 
 					// ----- calculate specular reflection
-				s+= "mul ft7.z, ft4.x, fc2.y\n"+		// ft7.z=mag*hardness1
-					"sub ft7.z, ft7.z, fc2.z\n"+		// ft7.z=mag*hardness1 - hardness0
+				  "mul ft7.z, ft4.x, fc2.y\n"+		// ft7.z=mag*hardness1
+					"sub ft7.z, ft7.z, fc2.z\n"+			// ft7.z=mag*hardness1 - hardness0
 					"max ft7.z, ft7.z, fc0.xxxx\n"+		// ft7.z=max(brightness,0)
-					"mul ft7.z, ft7.z, fc2.x\n"+		// ft7.z=brightness*sf
+					"mul ft7.z, ft7.z, fc2.x\n"+			// ft7.z=brightness*sf
 					"mul ft2, fc"+(i*2+5)+", ft7.zzzz\n";	// ft2 = spec light color*sf
+				else
+				s+= "mov ft2.xyzw, fc0.xxxx\n";
 
 				if (shadowMap)
 				//s+=_cubeSoftShadowFragSrc(i,numLights)+	// uses ft7 output to ft4
@@ -3470,7 +3474,7 @@
 			s += _envMapFragSrc()+						// uses ft7 output to ft4
 				"max ft6, ft6, ft4\n";					// include environment map
 
-			if (hasSpec)
+			if (spec && specMap)
 			s+=	"tex ft7, v2, fs2 <2d,linear,"+mip+",repeat>\n"+	// ft7=sample SpecMap with UV
 				"mul ft6, ft6, ft7\n";					// normMapspecFactor*light color*sf
 
