@@ -2142,7 +2142,6 @@
 				setDumbAI(ship);
 			}
 			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
-			ship.hullSkin.material.setSpecular(2);
 			world.addChild(ship.skin);
 			Entities.push(ship);
 			var ang:Number = Math.random()*Math.PI*2;
@@ -4365,7 +4364,7 @@ class Hull
 
 		skin = new Mesh();
 		hullSkin = new Mesh();
-		hullSkin.material.setSpecular(3,100);
+		hullSkin.material.setSpecular(1,1);
 		hullSkin.material.setTexMap(texMap);
 		hullSkin.material.setSpecMap(specMap);
 		hullSkin.material.setNormMap(normMap);
@@ -5018,8 +5017,8 @@ class Ship extends Hull
 		rotVel = new Vector3D(0,0,0,1);
 		rotAccel = new Vector3D(0,0,0,1);
 
-		hullSkin.material.setAmbient(0.2,0.2,0.2);
-		hullSkin.material.setSpecular(2,0.5);
+		hullSkin.material.setAmbient(0.3,0.3,0.3);
+		hullSkin.material.setSpecular(5,2);
 		modulesSkin = new Mesh();
 		modulesSkin.material.setSpecular(0.2);
 		skin.addChild(modulesSkin);

@@ -41,23 +41,25 @@
 		public var childMeshes:Vector.<Mesh>;			// list of children meshes
 		public var vertData:Vector.<Number>;			// vertices, normals and UV data [vx,vy,vz,nx,ny,nz,tx,ty,tz,u,v, ...] can be null
 		public var idxsData:Vector.<uint>;				// indices to vertices forming triangles [a1,a2,a3, b1,b2,b3, ...]
-		public var jointsData:Vector.<Number>;			// joints position and orientation data for GPU skinning
-		public var transform:Matrix4x4;					// local transform matrix of this mesh
-		public var castsShadow:Boolean = true;			// specifies if this mesh geometry casts shadow
-		public var workingTransform:Matrix4x4;			// calculated global transform for this mesh during rendering
+		public var vcData:ByteArray;					// joints position and orientation data for GPU skinning
+		public var vcDataNumReg:int=0;
+		public var vcDataOffset:int=0;
+		public var transform:Matrix4x4;						// local transform matrix of this mesh
+		public var castsShadow:Boolean = true;		// specifies if this mesh geometry casts shadow
+		public var workingTransform:Matrix4x4;		// calculated global transform for this mesh during rendering
 
-		public var material:Material;					// contains {ambR,ambG,ambB,specStr,specHard,fogR,fogG,fogB,fogFar}
+		public var material:Material;							// contains {ambR,ambG,ambB,specStr,specHard,fogR,fogG,fogB,fogFar}
 
 		private var collisionGeom:CollisionGeometry;	// for detecting collision on this mesh geometry
 		private var illuminable:Boolean = true;			// specifies if this mesh can be illuminated with directional lights
 
-		public var trisCnt:int;							// number of triangles to tell program to draw
-		private var vertexBuffer:VertexBuffer3D;		// Where Vertex positions for this mesh will be stored
-		private var indexBuffer:IndexBuffer3D;			// Order of Vertices to be drawn for this mesh
+		public var trisCnt:int;										// number of triangles to tell program to draw
+		private var vertexBuffer:VertexBuffer3D;	// Where Vertex positions for this mesh will be stored
+		private var indexBuffer:IndexBuffer3D;		// Order of Vertices to be drawn for this mesh
 		private var textureBuffer:Texture;				// uploaded Texture of this mesh
 		private var normMapBuffer:Texture;				// uploaded normal map of this mesh
 		private var specMapBuffer:Texture;				// uploaded specular map of this mesh
-		private var stdProgram:Program3D;				// rendering program specific for this mesh
+		private var stdProgram:Program3D;					// rendering program specific for this mesh
 		private var depthProgram:Program3D;				// program for rendering depth maps for shadow mapping
 
 		public var depthWrite:Boolean=true;				// whether to write to depth buffer
@@ -135,7 +137,9 @@
 			m.trisCnt = trisCnt;
 			m.vertData = vertData;
 			m.idxsData = idxsData;
-			m.jointsData = jointsData;
+			m.vcData = vcData;
+			m.vcDataOffset = vcDataOffset;
+			m.vcDataNumReg = vcDataNumReg;
 			m.collisionGeom = collisionGeom;	// pass collision geometry over!
 			m.material = material.clone();
 			m.vertexBuffer = vertexBuffer;
@@ -1547,7 +1551,7 @@
 				{
 					if (M.stdProgram==null) 	M.setContext3DBuffers(shadows); // build shader prog if incorrect
 
-					if (M.dataType==_typeV || M.jointsData!=null)	// if plain geometry or joints data is valid
+					if (M.dataType==_typeV || M.vcData!=null)	// if plain geometry or joints data is valid
 					{
 						var T:Matrix4x4 = M.workingTransform;		// transform for current mesh to be rendered
 						// ----- set transform parameters for this mesh to context3d ----
@@ -1575,7 +1579,7 @@
 						{
 							VBConfig[0] = "0_float3";			// va0 to expect vertices
 							VBConfig[1] = "3_float3";			// va1 to expect UV and idx
-							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
+							context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the joint transforms data
 						}
 						else if (M.dataType==_typeM)
 						{
@@ -1587,7 +1591,7 @@
 									VBConfig[2] = "6_float3";	// va2 to expect tangents
 							}
 							VBConfig[3] = "9_float4";			// va3 to expect UV and idx
-							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the meshes orientation and positions data
+							context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the meshes orientation and positions data
 						}
 						else if (M.dataType==_typeS)
 						{
@@ -1601,7 +1605,7 @@
 							VBConfig[4] = "14_float4";		// va4 to expect weight vertex 2
 							VBConfig[5] = "18_float4";		// va5 to expect weight vertex 3
 							VBConfig[6] = "22_float4";		// va6 to expect weight vertex 4
-							context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
+							context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the joint transforms data
 						}
 						prevType = M.dataType;
 
@@ -1725,7 +1729,7 @@
 						M = R[i];
 
 						if (M.dataType<0)	{/*type empty mesh*/}
-						else if (M.castsShadow && (M.dataType==_typeV || M.jointsData!=null))
+						else if (M.castsShadow && (M.dataType==_typeV || M.vcData!=null))
 						{
 							if (M.depthProgram==null || M.builtOnState!=stateId) M.setContext3DBuffers(true);	// compile shader prog if absent
 
@@ -1751,13 +1755,13 @@
 							{
 								context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float3");	// va0 to expect vertices
 								context3d.setVertexBufferAt(1, M.vertexBuffer, 3, "float3");	// va1 to expect UV and idx
-								context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
+								context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the joint transforms data
 							}
 							else if (M.dataType==_typeM)
 							{
 								context3d.setVertexBufferAt(0, M.vertexBuffer, 0, "float3");	// va0 to expect vertices
 								context3d.setVertexBufferAt(3, M.vertexBuffer, 9, "float4")		// va3 to expect UV and idx, idx+1
-								context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
+								context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the joint transforms data
 							}
 							else if (M.dataType==_typeS)
 							{
@@ -1766,7 +1770,7 @@
 								context3d.setVertexBufferAt(4, M.vertexBuffer, 14,"float4");	// va3 to expect weight vertex,transIdx
 								context3d.setVertexBufferAt(5, M.vertexBuffer, 18,"float4");	// va4 to expect weight vertex,transIdx
 								context3d.setVertexBufferAt(6, M.vertexBuffer, 22,"float4");	// va5 to expect weight vertex,transIdx
-								context3d.setProgramConstantsFromVector("vertex", 5,M.jointsData);	// the joint transforms data
+								context3d.setProgramConstantsFromByteArray("vertex", 5,M.vcDataNumReg,M.vcData,M.vcDataOffset);	// the joint transforms data
 							}
 
 							// ----- draw our triangle to screen starting fron tri 0 --------

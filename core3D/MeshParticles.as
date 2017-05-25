@@ -1,6 +1,7 @@
 package core3D
 {
 	import flash.geom.Vector3D;
+	import flash.utils.ByteArray;
 
 	/**
 	* Author: Lin Minjiang
@@ -16,6 +17,7 @@ package core3D
 
 		public var MData:Vector.<VertexData>;	// position, orientation, and scaling and of each mesh
 
+		private var MDataBytes:ByteArray=null;
 		private var particlesPerMesh:uint=60;	// total number of particles per batch render
 		private var trisPerParticle:uint=0;
 		private var particleMesh:Mesh = null;
@@ -38,6 +40,8 @@ package core3D
 			skin = new Mesh();
 			skin.material = m.material;			// copy texture/lighting info
 			MData = new Vector.<VertexData>();
+			MDataBytes = new ByteArray();
+			MDataBytes.endian = "littleEndian";
 		}//endConstructor
 
 		/**
@@ -164,46 +168,50 @@ package core3D
 		public function update() : int
 		{
 			// ----- write particles positions data -----------------
-			var T:Vector.<Number> = null;
+			var T:ByteArray = MDataBytes;
+			T.position = 0;
+			var baOffset:int = 0;
 			var mcnt:int = 0;
-			var pcnt:int = particlesPerMesh;
+			var pcnt:int = 0;
 			var rmesh:Mesh = null;
 
 			for (var i:int=numLiveParticles-1; i>-1; i--)
 			{
-				if (pcnt>=particlesPerMesh)
+				var m:VertexData = MData[i];
+				T.writeFloat(m.nx);	// quaternion x
+				T.writeFloat(m.ny);	// quaternion y
+				T.writeFloat(m.nz);	// quaternion z
+				T.writeFloat(m.w);	// scale
+				T.writeFloat(m.vx);	// translation x
+				T.writeFloat(m.vy);	// translation y
+				T.writeFloat(m.vz);	// translation z
+				T.writeFloat(0);
+				pcnt++;
+
+				if (pcnt>=particlesPerMesh || i==0)
 				{
-					if (T!=null)
-					{
-						rmesh = skin.getChildAt(mcnt-1);
-						rmesh.trisCnt = trisPerParticle*particlesPerMesh;
-						rmesh.jointsData = T;		// send particle transforms to mesh for GPU transformation
-					}
-					T = new Vector.<Number>();
+					if (skin.numChildren()<=mcnt)
+						skin.addChild(createNewRenderMesh());
+					rmesh = skin.getChildAt(mcnt);
+					rmesh.trisCnt = trisPerParticle*pcnt;
+					rmesh.vcData = T;		// send particle transforms to mesh for GPU transformation
+					rmesh.vcDataNumReg = pcnt*2;
+					rmesh.vcDataOffset = baOffset;
+
+					baOffset += pcnt*2*16;
 					mcnt++;
 					pcnt=0;
-					if (skin.numChildren()<mcnt)
-						skin.addChild(createNewRenderMesh());
 				}//endif
-
-				pcnt++;
-				var m:VertexData = MData[i];
-				T.push(m.nx,m.ny,m.nz,m.w);		// nx,ny,nz	quaternion + scale
-				T.push(m.vx,m.vy,m.vz,0);			// vx,vy,vz	translation
 			}//endfor
-			if (T!=null && pcnt>0)	// set the render data for the last mesh
-			{
-				rmesh = skin.getChildAt(mcnt-1);
-				rmesh.trisCnt = trisPerParticle*pcnt;
-				rmesh.jointsData = T;		// send particle transforms to mesh for GPU transformation
-			}
 
 			// ----- disable rest of unused render meshes
 			for (i=skin.numChildren()-1; i>=mcnt; i--)
 			{
 				rmesh = skin.getChildAt(i)
-				rmesh.jointsData = null;
+				rmesh.vcData = null;
 				rmesh.trisCnt = 0;
+				rmesh.vcDataNumReg = 0;
+				rmesh.vcDataOffset = 0;
 			}
 
 			return numLiveParticles;

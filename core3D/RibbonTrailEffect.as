@@ -2,14 +2,15 @@ package core3D
 {
 	import flash.geom.*;
 	import flash.display.BitmapData;
+	import flash.utils.ByteArray;
 	
 	public class RibbonTrailEffect
 	{
 		private var T:Vector.<Number> = null;
 		public var skin:Mesh = null;
-		
+
 		private var isReset:Boolean=true;
-		
+
 		/**
 		* creates a 60 segmented trail effect
 		*/
@@ -18,7 +19,7 @@ package core3D
 			// ----- init array -------------------------------------
 			T = new Vector.<Number>();
 			for (var i:int=0; i<120; i++)	T.push(0,0,0,0);
-			
+
 			// ----- create custom geometry data --------------------
 			var vertData:Vector.<Number> = new Vector.<Number>();	// [vx,vy,vz,nx,ny,nz,u,v, ...]
 			var idxsData:Vector.<uint> = new Vector.<uint>();
@@ -45,14 +46,14 @@ package core3D
 								0,1,0,		// normal
 								0,v,		// u,v
 								cOff+i*2,cOff+i*2+1);	// idx,idx+1
-				
+
 				idxsData.push(i*4+0,i*4+1,i*4+5);	// tri 1
 				idxsData.push(i*4+0,i*4+5,i*4+4);	// tri 2
 				idxsData.push(i*4+2,i*4+3,i*4+7);	// tri 3
 				idxsData.push(i*4+2,i*4+7,i*4+6);	// tri 4
 			}
 			for (i=0; i<12; i++)	idxsData.pop();
-			
+
 			skin = new Mesh();
 			skin.setMeshes(vertData,idxsData);
 			skin.setTexture(tex);
@@ -60,9 +61,9 @@ package core3D
 			skin.depthWrite = false;
 			skin.castsShadow = false;
 			skin.enableLighting(false);
-			
+
 		}//endfunction
-		
+
 		/**
 		* updates the trail head position and orientation with this given matrix
 		*/
@@ -78,13 +79,13 @@ package core3D
 				var quat:Vector3D = trans.rotationQuaternion();
 				T.push(quat.x,quat.y,quat.z,width);			// quatX,quatY,quatZ,scale,
 				T.push(trans.ad,trans.bd,trans.cd,0);		// transX,transY,transZ,0
-				while (T.length>120*4)			T.shift();	// remove 
+				while (T.length>120*4)			T.shift();	// remove
 			}
 			isReset=false;
-			
+
 			skin.jointsData = T;		// send transforms to mesh for GPU transformation
 		}//endfunction
-		
+
 		/**
 		* clears off current trail state and start anew
 		*/
@@ -93,6 +94,6 @@ package core3D
 			for (var i:int=0; i<120; i++)	T.push(0,0,0,0);
 			while (T.length>120*4)			T.shift();
 		}//endfunction
-		
+
 	}//endClass
 }

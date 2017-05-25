@@ -16,7 +16,7 @@
 	<text xml:lang="ja">Japanese App name goes here</text>
 	</name>
 -->
-<application xmlns="http://ns.adobe.com/air/application/25.0">
+<application xmlns="http://ns.adobe.com/air/application/23.0">
   <id>SpaceCrafter</id>
   <versionNumber>1.0.0</versionNumber>
   <versionLabel></versionLabel>
@@ -35,7 +35,7 @@
     <renderMode>direct</renderMode>
 	  <depthAndStencil>true</depthAndStencil>
     <resizable>false</resizable>
-    <autoOrients>false</autoOrients>
+    <autoOrients>true</autoOrients>
   </initialWindow>
   <icon>
         <image29x29>icons/icon29.png</image29x29>

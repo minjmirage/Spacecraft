@@ -5,6 +5,7 @@
 	import flash.geom.Matrix;
 	import flash.geom.Rectangle;
 	import flash.geom.Vector3D;
+	import flash.utils.ByteArray;
 
 	/**
 	* Author: Lin Minjiang	2012/07/10	updated
@@ -15,6 +16,7 @@
 	{
 		public var skin:Mesh;
 		public var PData:Vector.<VertexData>;	// position, scaling and  of each particle
+		private var PDataBytes:ByteArray;
 		private var Pool:Vector.<VertexData>;	// used VertexData for reuse
 
 		public var spriteSheet:BitmapData;		// the spritesheet containing movieclip sequence
@@ -48,6 +50,8 @@
 
 			// ----- default particle positions if not given --------
 			PData = new Vector.<VertexData>();
+			PDataBytes = new ByteArray();
+			PDataBytes.endian = "littleEndian";
 			Pool = new Vector.<VertexData>();
 
 			skin = new Mesh();
@@ -172,7 +176,10 @@
 			while (PData.length>0)
 				Pool.push(PData.pop());
 			for (var i:int=skin.numChildren()-1; i>-1; i--)
-				skin.getChildAt(i).jointsData=null;	// to abort render
+			{
+				skin.getChildAt(i).vcData=null;	// to abort render
+				skin.getChildAt(i).vcDataNumReg=0;
+			}
 		}//endfunctioh
 
 		/**
@@ -189,31 +196,28 @@
 			pt = invT.transform(pt);	// posn relative to particles space
 
 			// ----- write particles positions data -----------------
-			var T:Vector.<Number> = null;
+			var T:ByteArray = PDataBytes;
+			T.position = 0;
+			T.writeFloat(0);
+			T.writeFloat(1);
+			T.writeFloat(2);
+			T.writeFloat(nsp);		// nsp=num of cols in spritesheet
+			T.writeFloat(pt.x);		// lookAt point
+			T.writeFloat(pt.y);		// lookAt point
+			T.writeFloat(pt.z);		// lookAt point
+			T.writeFloat(0.001);	// 0.001 to address rounding error
+			var baOffset:int = 0;
 			var mcnt:int = 0;
-			var pcnt:int = numPerMesh;
+			var pcnt:int = 0;
 			var rmesh:Mesh = null;
 
 			for (var i:int=PData.length-1; i>-1; i--)
 			{
-				if (pcnt>=numPerMesh)
-				{
-					if (T!=null)
-					{
-						rmesh = skin.getChildAt(mcnt-1);
-						rmesh.trisCnt = pcnt*2;
-						rmesh.jointsData = T;		// send particle transforms to mesh for GPU transformation
-					}
-					T = Vector.<Number>([0,1,2,nsp, pt.x,pt.y,pt.z,0.001]);	// look at point, nsp=num of cols in spritesheet, 0.001 to address rounding error
-					mcnt++;
-					pcnt=0;
-					if (skin.numChildren()<mcnt)
-						skin.addChild(createNewRenderMesh());
-				}//endif
-
-				pcnt++;
 				var p:VertexData = PData[i];
-				T.push(p.nx,p.ny,p.nz,p.idx%totalFrames+p.w);		// tx,ty,tx,idx+scale
+				T.writeFloat(p.nx);
+				T.writeFloat(p.ny);
+				T.writeFloat(p.nz);
+				T.writeFloat(p.idx%totalFrames+p.w);		// tx,ty,tx,idx+scale
 				if (!isPaused)
 				{
 					p.vx = p.vx*slowdown + wind.x;
@@ -229,20 +233,40 @@
 						Pool.push(PData.pop());
 					}
 				}
+				pcnt++;
+
+				if (pcnt>=numPerMesh || i==0)
+				{
+					if (skin.numChildren()<=mcnt)
+						skin.addChild(createNewRenderMesh());
+					rmesh = skin.getChildAt(mcnt);
+					rmesh.trisCnt = pcnt*2;
+					rmesh.vcData = T;		// send particle transforms to mesh for GPU transformation
+					rmesh.vcDataNumReg = pcnt+2;
+					rmesh.vcDataOffset = baOffset;
+
+					T.writeFloat(0);
+					T.writeFloat(1);
+					T.writeFloat(2);
+					T.writeFloat(nsp);		// nsp=num of cols in spritesheet
+					T.writeFloat(pt.x);		// lookAt point
+					T.writeFloat(pt.y);		// lookAt point
+					T.writeFloat(pt.z);		// lookAt point
+					T.writeFloat(0.001);	// 0.001 to address rounding error
+					baOffset += (pcnt+2)*16;
+					mcnt++;
+					pcnt=0;
+				}//endif
 			}//endfor
-			if (T!=null && pcnt>0)	// set the render data for the last mesh
-			{
-				rmesh = skin.getChildAt(mcnt-1);
-				rmesh.trisCnt = pcnt*2;
-				rmesh.jointsData = T;		// send particle transforms to mesh for GPU transformation
-			}
 
 			// ----- disable rest of unused render meshes
 			for (i=skin.numChildren()-1; i>=mcnt; i--)
 			{
-				rmesh = skin.getChildAt(i)
-				rmesh.jointsData = null;
+				rmesh = skin.getChildAt(i);
+				rmesh.vcData = null;
 				rmesh.trisCnt = 0;
+				rmesh.vcDataNumReg = 0;
+				rmesh.vcDataOffset = 0;
 			}
 		}//endfuntcion
 
