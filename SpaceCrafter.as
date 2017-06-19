@@ -1542,10 +1542,10 @@
 							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,ship,interceptV);
 							if (targObj!=null && ship.energy>m.damage)
 							{
-								playSound(turX,turY,turZ,m.type);
-								launch4Missiles(targObj,m,ship);
 								m.ttf = m.fireDelay+1;
 								ship.energy -= m.damage;
+								playSound(turX,turY,turZ,m.type);
+								launch4Missiles(targObj,m,ship);
 							}
 						}
 					}
@@ -1788,8 +1788,8 @@
 					var vx:Number = shp.vel.x+T.ab*m.speed;	// vel straight up from launcher
 					var vy:Number = shp.vel.y+T.bb*m.speed;
 					var vz:Number = shp.vel.z+T.cb*m.speed;
-					var mp:Missile = new Missile(tpx, tpy, tpz,	vx,vy,vz, targObj, BulletFXs[m.type], m.damage, m.range/m.speed, m.type);
-					muzzleFlash(tpx,tpy,tpz, vx,vy,vz,0.1,m.damage);
+					var mp:Missile = new Missile(tpx, tpy, tpz,	vx,vy,vz, targObj, BulletFXs[m.type], m.damage/4, m.range/m.speed, m.type);
+					muzzleFlash(tpx,tpy,tpz, vx,vy,vz,0.1,m.damage/4);
 					Projectiles.push(mp);
 				}
 				if (delay==0)
@@ -3161,7 +3161,7 @@ class ShipHUD
 		healthBar.skin.material.setAmbient(0,1,0.2);
 		healthBar.skin.material.setSpecular(0.2);
 		energyBar = new MeshParticles(cube);
-		energyBar.skin.material.setAmbient(0,0.2,1);
+		energyBar.skin.material.setAmbient(0,0.3,1);
 		energyBar.skin.material.setSpecular(0.2);
 		depletedBase = new MeshParticles(cube);
 		depletedBase.skin.material.setAmbient(0.2,0.2,0.2);
@@ -4321,8 +4321,8 @@ class Module		// data class
 		{
 			fireDelay=1000;
 			speed=0.2;		// only initial launch speed. missiles have accel
-			damage=50;
-			range=50;
+			damage=200;
+			range=40;
 		}
 		else if (kind=="gunAutoS")
 		{
