@@ -188,6 +188,8 @@
 		public function update(lx:Number,ly:Number,lz:Number,isPaused:Boolean=false) : void
 		{
 			if (Mesh.context3d==null) return;
+			if (Mesh.context3d.profile.indexOf("standard")!=-1)
+				numPerMesh = 240;
 
 			// ----- transform look at point to local coordinates ---
 			var pt:Vector3D = new Vector3D(lx,ly,lz);

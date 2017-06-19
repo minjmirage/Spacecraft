@@ -241,6 +241,7 @@
 				Assets[id].material.setSpecular(0);
 			}
 			Assets["shipsWheel"].setLightingParameters(1,1,1,1);
+			ShipHUD.init(stage,world,Assets["shipsWheel"]);
 
 			// ----- initialize turrets particles
 			frameS_MP = new MeshParticles(Assets['frameS']);
@@ -863,13 +864,13 @@
 			var sh:int = stage.stageHeight;
 			if (mainTitle!=null && mainTitle.parent!=null)
 				mainTitle.parent.removeChild(mainTitle);
-			mainTitle = MenuUI.createTypeOutTextBmp("Jumping In",sh*MenuUI.fontScale*2);
+			mainTitle = MenuUI.createTypeOutTextBmp("Jumping In",sh*MenuUI.fontScale*1.3);
 			mainTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*2*0.35+sh*MenuUI.margF*0.3;
 			mainTitle.y = MenuUI.margF*sh;
 			addChild(mainTitle);
 			if (subTitle!=null && subTitle.parent!=null)
 				subTitle.parent.removeChild(subTitle);
-			subTitle = MenuUI.createTypeOutTextBmp("Location : "+MenuUI.randomPlanetName(),sh*MenuUI.fontScale);
+			subTitle = MenuUI.createTypeOutTextBmp("Location : "+MenuUI.randomPlanetName(),sh*MenuUI.fontScale*0.7);
 			subTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*0.35+sh*MenuUI.margF*0.3;
 			subTitle.y = mainTitle.y+mainTitle.height*0.8;
 			addChild(subTitle);
@@ -1139,22 +1140,8 @@
 			Mesh.setCamera(camPosn.x,camPosn.y,camPosn.z,lookPt.x,lookPt.y,lookPt.z,1,0.01);
 			sky.transform = new Matrix4x4().translate(lookPt.x,lookPt.y,lookPt.z);
 
-			// ----- hack to show shipsWheel animation of focusedShip
-			if (focusedShip!=null)
-			{
-				var sT:Matrix4x4 = focusedShip.skin.transform;
-				var bearing:Number = Math.acos(Math.max(-1,Math.min(1,sT.cc)));		// ship bearing
-				if (sT.ac>0)	bearing*=-1;
-
-				var invVT:Matrix4x4 = Mesh.viewT.inverse();
-				var r:VertexData = Mesh.cursorRay(stage.stageWidth/2,stage.stageHeight*0.95,0.1,0.2);;
-				var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
-				var wheel:Mesh = Assets["shipsWheel"];
-				wheel.transform = invVT.mult(new Matrix4x4().rotZ(bearing*10).translate(lp.x,lp.y,lp.z));
-				world.addChild(wheel);
-			}
-			else
-				world.removeChild(Assets["shipsWheel"]);
+			// ----- show ship HUD of focusedShip
+			ShipHUD.update(focusedShip);
 
 			// ----- play sound FXs
 			soundsStep(camPosn);
@@ -1197,8 +1184,8 @@
 					mainTitle.name = focusedShip.name;
 				else
 					mainTitle.name = "Hostile : " + focusedShip.name;
-				shipHUD = MenuUI.createShipHUD(focusedShip, stage);
-				addChild(shipHUD);
+				//shipHUD = MenuUI.createShipHUD(focusedShip, stage);
+				//addChild(shipHUD);
 			}
 			// ----- shows appropriate menu for different focused entity
 			if (optionsMenu!=null && optionsMenu.parent!=null)
@@ -1553,11 +1540,12 @@
 						{
 							// ----- seek nearest target hull posn ----------------------------
 							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,ship,interceptV);
-							if (targObj!=null)
+							if (targObj!=null && ship.energy>m.damage)
 							{
 								playSound(turX,turY,turZ,m.type);
 								launch4Missiles(targObj,m,ship);
 								m.ttf = m.fireDelay+1;
+								ship.energy -= m.damage;
 							}
 						}
 					}
@@ -3153,6 +3141,109 @@ import flash.events.AccelerometerEvent;
 
 TweenPlugin.activate([GlowFilterPlugin]); //activation is permanent in the SWF, so this line only needs to be run once.
 
+class ShipHUD
+{
+	private static var healthBar:MeshParticles = null;
+	private static var energyBar:MeshParticles = null;
+	private static var depletedBase:MeshParticles = null;
+
+	private static var shipsWheel:Mesh = null;
+	private static var world:Mesh = null;
+	private static var stage:Stage = null;
+
+	/**
+	* init
+	*/
+	public static function init(_stage:Stage,_world:Mesh,_shipsWheel:Mesh):void
+	{
+		var cube:Mesh = Mesh.createPlane(0.001,0.0016,null);
+		healthBar = new MeshParticles(cube);
+		healthBar.skin.material.setAmbient(0,1,0.2);
+		healthBar.skin.material.setSpecular(0.2);
+		energyBar = new MeshParticles(cube);
+		energyBar.skin.material.setAmbient(0,0.2,1);
+		energyBar.skin.material.setSpecular(0.2);
+		depletedBase = new MeshParticles(cube);
+		depletedBase.skin.material.setAmbient(0.2,0.2,0.2);
+		depletedBase.skin.material.setSpecular(0.2);
+
+		stage = _stage;
+		world = _world;
+		shipsWheel = _shipsWheel;
+	}//endfunction
+
+	/**
+	* HUD update step
+	*/
+	public static function update(hull:Hull):void
+	{
+		if (stage==null)
+		{
+			throw new Error("ShipHUD not initialized!");
+			return;
+		}
+
+		if (!(hull is Ship))
+		{
+			world.removeChild(healthBar.skin);
+			world.removeChild(energyBar.skin);
+			world.removeChild(depletedBase.skin);
+			world.removeChild(shipsWheel);
+			return;
+		}
+
+		var shp:Ship = (Ship)(hull);
+		var sT:Matrix4x4 = shp.skin.transform;
+		var bearing:Number = Math.acos(Math.max(-1,Math.min(1,sT.cc)));		// ship bearing
+		if (sT.ac>0)	bearing*=-1;
+
+		var invVT:Matrix4x4 = Mesh.viewT.inverse();
+		var r:VertexData = Mesh.cursorRay(stage.stageWidth/2,stage.stageHeight*0.95,0.1,0.2);;
+		var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
+		var wheel:Mesh = shipsWheel;
+		wheel.transform = invVT.mult(new Matrix4x4().rotZ(bearing*10).translate(lp.x,lp.y,lp.z));
+		world.addChild(wheel);
+
+		healthBar.reset();
+		energyBar.reset();
+		depletedBase.reset();
+
+		var integPerBlk:Number = shp.maxIntegrity/shp.hullConfig.length;
+		var unitInteg:Number = integPerBlk;
+
+		for (var i:int=shp.maxIntegrity/unitInteg-1; i>-1; i--)
+		{
+			var iT:Matrix4x4 = invVT.mult(new Matrix4x4().translate(lp.x-int(i/2)*0.0014-0.03,lp.y+(i%2)*0.002-0.001,lp.z));
+			if (i*unitInteg<=shp.integrity)
+				healthBar.nextLocRotScale(iT, 1);
+			else
+				depletedBase.nextLocRotScale(iT, 0.7);
+		}
+
+		var energPerBlk:Number = shp.maxEnergy/shp.hullConfig.length;
+		var unitEnerg:Number = energPerBlk;
+
+		for (var e:int=shp.maxEnergy/unitEnerg-1; e>-1; e--)
+		{
+			var eT:Matrix4x4 = invVT.mult(new Matrix4x4().translate(lp.x+int(e/2)*0.0014+0.03,lp.y+(e%2)*0.002-0.001,lp.z));
+			if (e*unitEnerg<=shp.energy)
+				energyBar.nextLocRotScale(eT, 1);
+			else
+				depletedBase.nextLocRotScale(eT, 0.7);
+		}
+
+		//throw new Error("shp maxIntegrity="+shp.maxIntegrity+" maxEnergy="+shp.maxEnergy+"  in="+(shp.maxIntegrity/unitInteg-1));
+
+		healthBar.update();
+		energyBar.update();
+		depletedBase.update();
+		world.addChild(healthBar.skin);
+		world.addChild(energyBar.skin);
+		world.addChild(depletedBase.skin);
+
+	}//endfunction
+}//endclass
+
 class Input
 {
 	public static var zoomF:Number = 1;
@@ -4279,7 +4370,7 @@ class Module		// data class
 			fireDelay=80;
 			speed=0.3;
 			damage=160;
-			turnRate = 0.01;
+			turnRate = 0.02;
 			range=30;
 			muzzleLen=0.7;
 		}
@@ -4288,7 +4379,7 @@ class Module		// data class
 			fireDelay=100;
 			speed=0.6;
 			damage=200;
-			turnRate = 0.01;
+			turnRate = 0.02;
 			range=40;
 			muzzleLen=0.7;
 		}
@@ -4297,7 +4388,7 @@ class Module		// data class
 			fireDelay=100;
 			speed=0.15;
 			damage=400;
-			turnRate = 0.01;
+			turnRate = 0.02;
 			range=30;
 			muzzleLen=0.7;
 		}
@@ -5178,7 +5269,7 @@ class Ship extends Hull
 	public override function updateStep():void
 	{
 		// ----- increment energy
-		energy += hullConfig.length/10;
+		energy += hullConfig.length/30;
 		if (energy>maxEnergy) energy = maxEnergy;
 
 		// ----- calculate ship banking

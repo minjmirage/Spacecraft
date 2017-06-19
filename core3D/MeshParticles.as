@@ -38,7 +38,7 @@ package core3D
 			}
 
 			skin = new Mesh();
-			skin.material = m.material;			// copy texture/lighting info
+			skin.material = m.material.clone();			// copy texture/lighting info
 			MData = new Vector.<VertexData>();
 			MDataBytes = new ByteArray();
 			MDataBytes.endian = "littleEndian";
@@ -55,8 +55,13 @@ package core3D
 			// ----- set as 0 drawn by default
 			numLiveParticles = 0;
 			trisPerParticle = oI.length/3;
-			particlesPerMesh = Math.min(60,65535/(oV.length/11));
-			if (particlesPerMesh<60)	Mesh.debugTrace("MeshParticles rendered per batch:"+particlesPerMesh+"\n");
+
+			var maxPerMesh:int=60;
+			if (Mesh.context3d.profile.indexOf("standard")!=-1)
+				maxPerMesh=120;
+
+			particlesPerMesh = Math.min(maxPerMesh,65535/(oV.length/11));
+			if (particlesPerMesh<maxPerMesh)	Mesh.debugTrace("MeshParticles rendered per batch:"+particlesPerMesh+"\n");
 
 			var V:Vector.<Number> = new Vector.<Number>();
 			var I:Vector.<uint> = new Vector.<uint>();
@@ -167,6 +172,8 @@ package core3D
 		*/
 		public function update() : int
 		{
+			if (Mesh.context3d==null) return 0;
+
 			// ----- write particles positions data -----------------
 			var T:ByteArray = MDataBytes;
 			T.position = 0;
