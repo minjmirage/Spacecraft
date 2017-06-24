@@ -482,22 +482,11 @@
 					showAsteroidMineMenu();
 			}
 
-			focusOn(Friendlies[0]);
-
-			// ----- spin view around focused ship
-			var rotAroundShip:Function = function():void
-			{
-				velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);
-				velDBER.y = Math.PI/288;
-				// stop immediately on interraction
-				if (Input.downPts.length>0)
-					stepFns.splice(stepFns.indexOf(rotAroundShip),1);
-			}//endfunction
-			stepFns.push(rotAroundShip);
+			focusAndRotateAround(Friendlies[0]);
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// NEED TO REFINE!!!
 		//===============================================================================================
 		private function battleScene(shipsConf:String):void
 		{
@@ -530,57 +519,79 @@
 			for (var i:int=4; i>-1; i--)
 				addShipToScene(false);	// hostile
 
-			// ----- face ship jump in direction
-			var slowF:Number = 0.9;
-			lookVel = new Vector3D((0-lookPt.x)*(1-slowF),(0-lookPt.y)*(1-slowF),(-1-lookPt.z)*(1-slowF));
-			velDBER.x = (10-lookDBER.x)*(1-slowF);								// set dist to 8
-			lookDBER.y = Math.PI;
-			velDBER.y = 0;
-
-			// ----- align view to ship fn
-			var alignViewToShip:Function = function():void
+			// ----- focus to each hostile ship
+			var hFocusCnt:int=0;
+			function hFocusNext():void
 			{
-				var shp:Ship = (Ship)(Friendlies[0]);
-				var sinB:Number = Math.sin(lookDBER.y);
-				var cosB:Number = Math.cos(lookDBER.y);
-				var facing:Vector3D = shp.getFacing();
-				var bDiff:Number = Math.acos(Math.max(-1,Math.min(1,facing.x*sinB + facing.z*cosB)));
-				if (facing.x*cosB - facing.z*sinB<0)
-					bDiff *=-1;			// bDiff is the difference in bearing
-				var bearingCorrection:Number = Math.max(-0.002,Math.min(0.002,bDiff*(1-0.9)-velDBER.y));
-				velDBER.y += bearingCorrection;
-				if (Input.downPts.length>0 && stepFns.indexOf(alignViewToShip)!=-1)
-					stepFns.splice(stepFns.indexOf(alignViewToShip),1);
+				if (hFocusCnt>=Hostiles.length)
+					jumpInPlayerShip();	// jump in friendly ship
+				else
+				{
+					Hostiles[hFocusCnt].engageEnemy = false;		// prevent attack at jump in
+					focusAndRotateAround(Hostiles[hFocusCnt++],hFocusNext,90);
+				}
+			}//endfunction
+			hFocusNext();
+
+			// ----- face ship jump in direction
+			function jumpInPlayerShip():void
+			{
+				var slowF:Number = 0.9;
+				lookVel = new Vector3D((0-lookPt.x)*(1-slowF),(0-lookPt.y)*(1-slowF),(-1-lookPt.z)*(1-slowF));
+				velDBER.x = (10-lookDBER.x)*(1-slowF);								// set dist to 8
+				lookDBER.y = Math.PI;
+				velDBER.y = 0;
+
+				// ----- align view to ship fn
+				var alignViewToShip:Function = function():void
+				{
+					var shp:Ship = (Ship)(Friendlies[0]);
+					var sinB:Number = Math.sin(lookDBER.y);
+					var cosB:Number = Math.cos(lookDBER.y);
+					var facing:Vector3D = shp.getFacing();
+					var bDiff:Number = Math.acos(Math.max(-1,Math.min(1,facing.x*sinB + facing.z*cosB)));
+					if (facing.x*cosB - facing.z*sinB<0)
+						bDiff *=-1;			// bDiff is the difference in bearing
+					var bearingCorrection:Number = Math.max(-0.002,Math.min(0.002,bDiff*(1-0.9)-velDBER.y));
+					velDBER.y += bearingCorrection;
+					if (Input.downPts.length>0 && stepFns.indexOf(alignViewToShip)!=-1)
+						stepFns.splice(stepFns.indexOf(alignViewToShip),1);
+				}//endfunction
+
+				var jumpInTime:int = 0;
+				var Conf:Array = shipsConf.split(";");
+				var friendlySpawn:Function = function():void
+				{
+					if (Conf.length>0)
+					{
+						if (jumpInTime%100==40)
+							mainTitle.name = "ETA 2s";
+						else if (jumpInTime%100==70)
+							mainTitle.name = "ETA 1s";
+						else if (jumpInTime%100==0)
+						{
+							addShipToScene(true,0,Conf.pop());		// friendly
+							jumpIn((Ship)(Friendlies[0]),0,0,0,function():void {stepFns.push(alignViewToShip);});
+							focusOn(Friendlies[0]);
+							(Ship)(Friendlies[0]).engageEnemy = false;
+							stepFns.push(battleStep);
+							delayedCall(function():void
+							{
+								var shp:Ship = null;
+								for each (shp in Friendlies)	shp.engageEnemy = true;
+								for each (shp in Hostiles)	shp.engageEnemy = true;
+							},150);
+						}
+					}
+					else
+						stepFns.splice(stepFns.indexOf(friendlySpawn),1);
+				};
+				stepFns.push(friendlySpawn);
 			}//endfunction
 
-			var battleTime:int = 0;
-			var Conf:Array = shipsConf.split(";");
-			var friendlySpawn:Function = function():void
+			function battleStep():void
 			{
-				if (Conf.length>0)
-				{
-					if (battleTime%100==40)
-						mainTitle.name = "ETA 2s";
-					else if (battleTime%100==70)
-						mainTitle.name = "ETA 1s";
-					else if (battleTime%100==0)
-					{
-						addShipToScene(true,0,Conf.pop());		// friendly
-						jumpIn((Ship)(Friendlies[0]),0,0,0,function():void {stepFns.push(alignViewToShip);});
-						focusOn(Friendlies[0]);
-					}
-				}
-				else
-					stepFns.splice(stepFns.indexOf(friendlySpawn),1);
-			};
-			stepFns.push(friendlySpawn);
-
-			var battleStep:Function = function():void
-			{
-				battleTime++;
-
-				if (battleTime>100 &&
-						Exploding.length==0 &&
+				if (Exploding.length==0 &&
 						(Friendlies.length==0 || Hostiles.length==0))
 				{
 					stepFns.splice(stepFns.indexOf(battleStep),1);
@@ -596,8 +607,24 @@
 						optionsMenu.parent.removeChild(optionsMenu);
 				}
 			};
+		}//endfunction
 
-			stepFns.push(battleStep);
+		//===============================================================================================
+		// convenience function to callback after specified frames delay
+		//===============================================================================================
+		private function delayedCall(callBack:Function,delay:int=1):void
+		{
+			function delayCall():void
+			{
+				if (delay<=0)
+				{
+					if (callBack!=null)	callBack();
+					stepFns.splice(stepFns.indexOf(delayCall),1);
+				}
+				else
+					delay--;
+			}//endfunction
+			stepFns.push(delayCall);
 		}//endfunction
 
 		//===============================================================================================
@@ -626,8 +653,9 @@
 				var expl:Ship = Exploding.pop();
 				world.removeChild(expl.skin);
 			}
-			while (Friendlies.length>0)	Friendlies.pop();
 			while (Hostiles.length>0)		Hostiles.pop();
+			while (Friendlies.length>0)	Friendlies.pop();
+			while (DropItems.length>0)	DropItems.pop();
 			while (Projectiles.length>0)	Projectiles.pop();
 
 			var oldViewStep:Function = viewStep;
@@ -1180,10 +1208,10 @@
 				shipHUD.parent.removeChild(shipHUD);
 			if (focusedShip!=null)
 			{
-				if (Friendlies.indexOf(focusedShip)!=-1)
-					mainTitle.name = focusedShip.name;
-				else
+				if (Hostiles.indexOf(focusedShip)!=-1)
 					mainTitle.name = "Hostile : " + focusedShip.name;
+				else
+					mainTitle.name = focusedShip.name;
 				//shipHUD = MenuUI.createShipHUD(focusedShip, stage);
 				//addChild(shipHUD);
 			}
@@ -1198,6 +1226,30 @@
 				velDBER.x = (entity.radius*4-lookDBER.x)*(1-0.9);	// zoom to radius * 4
 
 			stage.focus = stage;
+		}//endfunction
+
+		//===============================================================================================
+		// convenience function to focus on entity and rotate around it
+		//===============================================================================================
+		private function focusAndRotateAround(entity:Hull,callBack:Function=null,ttr:int=-1):void
+		{
+			focusOn(entity);
+
+			// ----- spin view around focused ship
+			var rotAroundShip:Function = function():void
+			{
+				velDBER.x = (focusedEntity.radius*4-lookDBER.x)*(1-0.9);
+				velDBER.y = Math.PI/288;
+				// stop immediately on interraction
+				if (Input.upPts.length>0 || ttr==0)
+				{
+					stepFns.splice(stepFns.indexOf(rotAroundShip),1);
+					if (callBack!=null)	callBack();
+				}
+
+				ttr--;
+			}//endfunction
+			stepFns.push(rotAroundShip);
 		}//endfunction
 
 		//===============================================================================================
@@ -1536,7 +1588,7 @@
 
 					if (m.type=="launcherS")
 					{
-						if (m.ttf<=0)
+						if (m.ttf<=0 && active)
 						{
 							// ----- seek nearest target hull posn ----------------------------
 							targObj = nearestTargShipHull(turX,turY,turZ,m.speed,ship,interceptV);
@@ -2314,11 +2366,6 @@
 				// ----- move towards target keeping targDist
 				if (targ!=null)
 				{
-					if (ship.energy<ship.maxEnergy*0.1)
-						ship.engageEnemy = false;
-					if (ship.energy==ship.maxEnergy)
-						ship.engageEnemy = true;
-
 					var targDist:Number = (ship.radius+other.radius)*10;
 					if (ship.engageEnemy)
 						targDist = (ship.radius+other.radius)*2;
