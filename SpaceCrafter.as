@@ -21,7 +21,7 @@
 
 		private var Projectiles:Vector.<Projectile> = null;
 		private var Entities:Vector.<Hull> = null;
-		private var DropItems:Vector.<Projectile> = null;
+		private var DropItems:Vector.<DropItem> = null;
 		private var Hostiles:Vector.<Hull> = null;
 		private var Friendlies:Vector.<Hull> = null;
 		private var Exploding:Vector.<Ship> = null;
@@ -408,7 +408,7 @@
 			gridMesh.material.setAmbient(1,1,1);
 
 			Projectiles = new Vector.<Projectile>();
-			DropItems = new Vector.<Projectile>();
+			DropItems = new Vector.<DropItem>();
 			Entities = new Vector.<Hull>();
 			Hostiles = new Vector.<Hull>();
 			Friendlies = new Vector.<Hull>();
@@ -1483,8 +1483,8 @@
 		{
 			for (var i:int=DropItems.length-1; i>-1; i--)
 			{
-				var p:Projectile = DropItems[i];
-				if (p.ttl<1)	// reached target flak point
+				var p:DropItem = DropItems[i];
+				if (p.ttl<1)	// reached time to live
 				{
 					DropItems.splice(i,1);
 				}
@@ -1495,9 +1495,9 @@
 					p.px+=p.vx;	// move projectile
 					p.py+=p.vy;
 					p.pz+=p.vz;
-					p.vx*=0.97;
-					p.vy*=0.97;
-					p.vz*=0.97;
+					p.vx*=p.damp;
+					p.vy*=p.damp;
+					p.vz*=p.damp;
 					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
 						p.renderFn(p);
 				}
@@ -1647,16 +1647,13 @@
 								m.ttf = m.fireDelay + 1;
 								if (targObj is HullBlock)
 									Projectiles.push(new Projectile(turX, turY, turZ,	interceptV.x, interceptV.y, interceptV.z, targObj, BulletFXs[m.type], m.damage, m.range / m.speed, m.type));
-								else if (m.type=="tractorS" && targObj is Projectile)
+								else if (m.type=="tractorS" && targObj is DropItem)
 								{
-									if (interceptV.w*m.speed<1)
-										DropItems.splice(DropItems.indexOf((Projectile)(targObj)),1);
-									else
+									EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
+									if ((DropItem)(targObj).tractorIn(interceptV,turX,turY,turZ))
 									{
-										targObj.vx=-interceptV.x;
-										targObj.vy=-interceptV.y;
-										targObj.vz=-interceptV.z;
-										EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
+										EffectEMs["wave"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,5/100);
+										DropItems.splice(DropItems.indexOf((DropItem)(targObj)),1);
 									}
 								}
 								else if (targObj is Projectile)
@@ -1785,31 +1782,31 @@
 		}//endfunction
 
 		//===============================================================================================
-		// finds direction to nearest drop item, returns drop item
+		// finds direction to nearest drop item, returns drop item, modifies interceptV
 		//===============================================================================================
 		[Inline]
 		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,pspeed:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
-			var targObj:Projectile = null;	// targ current position & vel
+			var targObj:DropItem = null;	// targ current position & vel
 
 			for (var j:int=DropItems.length-1; j>-1; j--)
 			{
-				var pp:Projectile = DropItems[j];
+				var pp:DropItem = DropItems[j];
 				if (pp.projIntegrity==1)
 				{
 					var iV:Vector3D =
 					interceptVector3(pspeed,	// tractorBeam speed
-									turX-pp.px,turY-pp.py,turZ-pp.pz,	// turret posn from item
-									ship.vel.x,ship.vel.y,ship.vel.z,	// target vel from turret
+									pp.px-turX,pp.py-turY,pp.pz-turZ,	// item position from turret
+									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z,	// target vel from turret
 									interceptV.w);		// cutoff time
 					if (iV!=null && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,pp.px-turX,pp.py-turY,pp.pz-turZ,ship.skin.transform))
 					{
 						if (targObj!=null) targObj.projIntegrity = 1;
 						targObj = pp;
 						pp.projIntegrity = 0;
-						interceptV.x = -iV.x;
-						interceptV.y = -iV.y;
-						interceptV.z = -iV.z;
+						interceptV.x = iV.x;
+						interceptV.y = iV.y;
+						interceptV.z = iV.z;
 						interceptV.w = iV.w;
 					}//endif
 				}//endif
@@ -2143,17 +2140,16 @@
 
 			var oQ:Vector3D = new Vector3D(0,0,0,1);	// starting identity quaternion
 
-			var p:Projectile = new Projectile(px,py,pz,vx,vy,vz,null,
+			var p:DropItem = new DropItem(px,py,pz,vx,vy,vz,
 			function():void {
 				oQ = Matrix4x4.quatMult(rvQ,oQ);		// increment rotation
 				var T:Matrix4x4 = Matrix4x4.quaternionToMatrix(oQ.w,oQ.x,oQ.y,oQ.z);
 				T.ad = p.px;
 				T.bd = p.py;
 				T.cd = p.pz;
-				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);			// item icon
-				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);		//
-			},0,500,"Raw"+type);
-			p.ttl = 1000;
+				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);				// item icon
+				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);	//
+			},0,1000,"Raw"+type);
 
 			DropItems.push(p);
 			return p;
@@ -4362,7 +4358,7 @@ class Module		// data class
 		{
 			range=30;
 			turnRate=0.2;
-			speed=0.2;
+			speed=0.1;
 		}
 		else if (kind=="launcherS")
 		{
@@ -5316,7 +5312,7 @@ class Ship extends Hull
 	public override function updateStep():void
 	{
 		// ----- increment energy
-		energy += hullConfig.length/30;
+		energy += hullConfig.length;
 		if (energy>maxEnergy) energy = maxEnergy;
 
 		// ----- calculate ship banking
@@ -5614,6 +5610,38 @@ class Projectile	// data class
 		this.ttl = ttl;
 		this.targ = targ;
 		this.type = type;
+	}//endfunction
+}//endclass
+
+class DropItem extends Projectile
+{
+	public var accel:Number = 0.025;
+	public var damp:Number = 0.97;
+
+	public function DropItem(px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number,renderFn:Function=null,dmg:Number=1,ttl:Number=120,type:String=null):void
+	{
+		super(px,py,pz,vx,vy,vz,null,renderFn,dmg,ttl*1.2,type);
+	}//endfunction
+
+	public function tractorIn(interceptV:Vector3D,tpx:Number,tpy:Number,tpz:Number):Boolean
+	{
+		var dx:Number = tpx-px;
+		var dy:Number = tpy-py;
+		var dz:Number = tpz-pz;
+		if ((dx*vx+dy*vy+dz*vz)>(dx*dx+dy*dy+dz*dz) || (dx*dx+dy*dy+dz*dz)<10)
+		{
+			px = tpx;
+			py = tpy;
+			pz = tpz;
+			return true;
+		}
+		else
+		{
+			vx-=interceptV.x;
+			vy-=interceptV.y;
+			vz-=interceptV.z;
+			return false;
+		}
 	}//endfunction
 }//endclass
 
