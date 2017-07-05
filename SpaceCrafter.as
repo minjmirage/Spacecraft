@@ -1650,7 +1650,7 @@
 								else if (m.type=="tractorS" && targObj is DropItem)
 								{
 									EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
-									if ((DropItem)(targObj).tractorIn(interceptV,turX,turY,turZ))
+									if ((DropItem)(targObj).tractorIn(turX,turY,turZ))
 									{
 										EffectEMs["wave"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,5/100);
 										DropItems.splice(DropItems.indexOf((DropItem)(targObj)),1);
@@ -5615,7 +5615,7 @@ class Projectile	// data class
 
 class DropItem extends Projectile
 {
-	public var accel:Number = 0.025;
+	public var accel:Number = 0.05;
 	public var damp:Number = 0.97;
 
 	public function DropItem(px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number,renderFn:Function=null,dmg:Number=1,ttl:Number=120,type:String=null):void
@@ -5623,25 +5623,29 @@ class DropItem extends Projectile
 		super(px,py,pz,vx,vy,vz,null,renderFn,dmg,ttl*1.2,type);
 	}//endfunction
 
-	public function tractorIn(interceptV:Vector3D,tpx:Number,tpy:Number,tpz:Number):Boolean
+	public function tractorIn(tpx:Number,tpy:Number,tpz:Number):Boolean
 	{
+		// ----- remove perpenticular component and add aceel towards point
 		var dx:Number = tpx-px;
 		var dy:Number = tpy-py;
 		var dz:Number = tpz-pz;
-		if ((dx*vx+dy*vy+dz*vz)>(dx*dx+dy*dy+dz*dz) || (dx*dx+dy*dy+dz*dz)<10)
+		var dl:Number = Math.sqrt(dx*dx+dy*dy+dz*dz);
+		dx/=dl;
+		dy/=dl;
+		dz/=dl;
+		var dp:Number = dx*vx+dy*vy+dz*vz;
+		vx = dx*dp + dx*accel;
+		vy = dy*dp + dy*accel;
+		vz = dz*dp + dz*accel;
+
+		if ((dx*vx+dy*vy+dz*vz)>2*(dx*dx+dy*dy+dz*dz))
 		{
 			px = tpx;
 			py = tpy;
 			pz = tpz;
 			return true;
 		}
-		else
-		{
-			vx-=interceptV.x;
-			vy-=interceptV.y;
-			vz-=interceptV.z;
-			return false;
-		}
+		else return false;
 	}//endfunction
 }//endclass
 
