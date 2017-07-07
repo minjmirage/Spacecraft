@@ -5638,7 +5638,7 @@ class DropItem extends Projectile
 		vy = dy*dp + dy*accel;
 		vz = dz*dp + dz*accel;
 
-		if ((dx*vx+dy*vy+dz*vz)>2*(dx*dx+dy*dy+dz*dz))
+		if ((dx*vx+dy*vy+dz*vz)>=dl)
 		{
 			px = tpx;
 			py = tpy;
