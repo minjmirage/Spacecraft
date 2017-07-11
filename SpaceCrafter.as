@@ -1117,15 +1117,15 @@
 
 				// ----- simulate turrets
 				time=getTimer();
+				projectilesStep();	debugTxt += " projT:"+(getTimer()-time); time=getTimer();
+				explodingStep();	debugTxt += " explT:"+(getTimer()-time); time=getTimer();
+				dropItemsStep();	debugTxt += " itmsT:"+(getTimer()-time); time=getTimer();
 				var turretsCnt:int = 0;
 				for (i=Friendlies.length-1; i>-1; i--)
 					turretsCnt+=simulateShipTurrets((Ship)(Friendlies[i]),(Ship)(Friendlies[i]).engageEnemy);
 				for (i=Hostiles.length-1; i>-1; i--)
 					turretsCnt+=simulateShipTurrets((Ship)(Hostiles[i]),(Ship)(Hostiles[i]).engageEnemy);
 				debugTxt += " Turrets:"+turretsCnt+"    turrT:"+(getTimer()-time); time=getTimer();
-				projectilesStep();	debugTxt += " projT:"+(getTimer()-time); time=getTimer();
-				explodingStep();	debugTxt += " explT:"+(getTimer()-time); time=getTimer();
-				dropItemsStep();	debugTxt += " itmsT:"+(getTimer()-time); time=getTimer();
 
 				// ----- update mesh particles
 				var frameSShown:int = frameS_MP.update();
@@ -1651,6 +1651,7 @@
 								{
 									EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
 									if ((DropItem)(targObj).tractorIn(turX,turY,turZ))
+									//if ((DropItem)(targObj).tractorTo(interceptV))
 									{
 										EffectEMs["wave"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,5/100);
 										DropItems.splice(DropItems.indexOf((DropItem)(targObj)),1);
@@ -1785,7 +1786,7 @@
 		// finds direction to nearest drop item, returns drop item, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,pspeed:Number,ship:Ship,interceptV:Vector3D):Projectile
+		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,accel:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
 			var targObj:DropItem = null;	// targ current position & vel
 
@@ -1794,8 +1795,9 @@
 				var pp:DropItem = DropItems[j];
 				if (pp.projIntegrity==1)
 				{
+					var pspeed:Number = Math.sqrt(pp.vx*pp.vx+pp.vy*pp.vy+pp.vz*pp.vz);
 					var iV:Vector3D =
-					interceptVector3(pspeed,	// tractorBeam speed
+					interceptVector3(pspeed+accel,	// tractorBeam speed
 									pp.px-turX,pp.py-turY,pp.pz-turZ,	// item position from turret
 									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z,	// target vel from turret
 									interceptV.w);		// cutoff time
@@ -2149,7 +2151,7 @@
 				T.cd = p.pz;
 				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);				// item icon
 				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);	//
-			},0,1000,"Raw"+type);
+			},0,100000,"Raw"+type);
 
 			DropItems.push(p);
 			return p;
@@ -4358,7 +4360,7 @@ class Module		// data class
 		{
 			range=30;
 			turnRate=0.2;
-			speed=0.1;
+			speed=0.05;
 		}
 		else if (kind=="launcherS")
 		{
@@ -5623,9 +5625,25 @@ class DropItem extends Projectile
 		super(px,py,pz,vx,vy,vz,null,renderFn,dmg,ttl*1.2,type);
 	}//endfunction
 
+	public function tractorTo(iV:Vector3D):Boolean
+	{
+		// ----- remove perpenticular component and add accel towards point
+		if (iV.w<1)
+		{
+			return true;
+		}
+		else
+		{
+			vx = -iV.x;
+			vy = -iV.y;
+			vz = -iV.z;
+			return false;
+	 	}
+	}//endfunction
+
 	public function tractorIn(tpx:Number,tpy:Number,tpz:Number):Boolean
 	{
-		// ----- remove perpenticular component and add aceel towards point
+		// ----- remove perpenticular component and add accel towards point
 		var dx:Number = tpx-px;
 		var dy:Number = tpy-py;
 		var dz:Number = tpz-pz;
@@ -5634,18 +5652,20 @@ class DropItem extends Projectile
 		dy/=dl;
 		dz/=dl;
 		var dp:Number = dx*vx+dy*vy+dz*vz;
-		vx = dx*dp + dx*accel;
-		vy = dy*dp + dy*accel;
-		vz = dz*dp + dz*accel;
-
-		if ((dx*vx+dy*vy+dz*vz)>=dl)
+		if (dp*10>=dl)
 		{
 			px = tpx;
 			py = tpy;
 			pz = tpz;
 			return true;
 		}
-		else return false;
+		else
+		{
+			vx = dx*dp + dx*accel;
+			vy = dy*dp + dy*accel;
+			vz = dz*dp + dz*accel;
+			return false;
+	 	}
 	}//endfunction
 }//endclass
 
