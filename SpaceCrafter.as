@@ -1605,7 +1605,7 @@
 					{
 						// ----- seek nearest target projectile/hull posn -------------------
 						if (m.type=="tractorS")
-							targObj = nearestTargDropItem(turX,turY,turZ,m.speed,ship,interceptV);
+							targObj = nearestTargDropItem(turX,turY,turZ,ship,interceptV);
 						else if (m.type=="gunAutoS" || m.type=="gunFlakS")
 							targObj = nearestTargProjectile(turX,turY,turZ,m.speed,ship,interceptV);
 						else if (active)
@@ -1617,9 +1617,6 @@
 						var localPosn:Vector3D = invT.transform(new Vector3D(interceptV.x*interceptV.w+turX,
 																							interceptV.y*interceptV.w+turY,
 																							interceptV.z*interceptV.w+turZ));
-						interceptV.x+=ship.vel.x;
-						interceptV.y+=ship.vel.y;
-						interceptV.z+=ship.vel.z;
 
 						var nx:Number = localPosn.x;
 						var nz:Number = localPosn.z;
@@ -1650,7 +1647,7 @@
 								else if (m.type=="tractorS" && targObj is DropItem)
 								{
 									EffectEMs["flash"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,1);
-									if ((DropItem)(targObj).tractorIn(turX,turY,turZ))
+									if ((DropItem)(targObj).tractorIn(turX,turY,turZ,ship))
 									//if ((DropItem)(targObj).tractorTo(interceptV))
 									{
 										EffectEMs["wave"].emit(targObj.px,targObj.py,targObj.pz,0,0,0,5/100);
@@ -1664,6 +1661,7 @@
 									if (m.type=="gunFlakS") setAsFlakProjectile(ship,p);
 									Projectiles.push(p);
 								}
+
 								ship.energy -= m.damage;
 								muzzleFlash(turX,turY,turZ,interceptV.x,interceptV.y,interceptV.z,m.muzzleLen,m.damage);
 								playSound(turX,turY,turZ,m.type);
@@ -1738,9 +1736,9 @@
 						if (iV!=null &&	!ship.hullSkin.lineHitsMesh(turX,turY,turZ,iV.x*iV.w,iV.y*iV.w,iV.z*iV.w,ship.skin.transform))	// does not hit self
 						{
 							targObj = tPt;
-							interceptV.x = iV.x;
-							interceptV.y = iV.y;
-							interceptV.z = iV.z;
+							interceptV.x = iV.x+ship.vel.x;
+							interceptV.y = iV.y+ship.vel.y;
+							interceptV.z = iV.z+ship.vel.z;
 							interceptV.w = iV.w;
 						}
 					}//endfor j
@@ -1771,9 +1769,9 @@
 						!ship.hullSkin.lineHitsMesh(turX,turY,turZ,ipV.x*ipV.w,ipV.y*ipV.w,ipV.z*ipV.w,ship.skin.transform))	// does not hit self
 					{
 						targObj = pp;
-						interceptV.x = ipV.x;
-						interceptV.y = ipV.y;
-						interceptV.z = ipV.z;
+						interceptV.x = ipV.x+ship.vel.x;
+						interceptV.y = ipV.y+ship.vel.y;
+						interceptV.z = ipV.z+ship.vel.z;
 						interceptV.w = ipV.w;
 					}
 				}
@@ -1786,30 +1784,29 @@
 		// finds direction to nearest drop item, returns drop item, modifies interceptV
 		//===============================================================================================
 		[Inline]
-		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,accel:Number,ship:Ship,interceptV:Vector3D):Projectile
+		private final function nearestTargDropItem(turX:Number,turY:Number,turZ:Number,ship:Ship,interceptV:Vector3D):Projectile
 		{
 			var targObj:DropItem = null;	// targ current position & vel
+			interceptV.w = 10000;
 
 			for (var j:int=DropItems.length-1; j>-1; j--)
 			{
 				var pp:DropItem = DropItems[j];
 				if (pp.projIntegrity==1)
 				{
-					var pspeed:Number = Math.sqrt(pp.vx*pp.vx+pp.vy*pp.vy+pp.vz*pp.vz);
-					var iV:Vector3D =
-					interceptVector3(pspeed+accel,	// tractorBeam speed
-									pp.px-turX,pp.py-turY,pp.pz-turZ,	// item position from turret
-									pp.vx-ship.vel.x,pp.vy-ship.vel.y,pp.vz-ship.vel.z,	// target vel from turret
-									interceptV.w);		// cutoff time
-					if (iV!=null && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,pp.px-turX,pp.py-turY,pp.pz-turZ,ship.skin.transform))
+					var dx:Number = pp.px-turX;
+					var dy:Number = pp.py-turY;
+					var dz:Number = pp.pz-turZ;
+					var dl:Number = Math.sqrt(dx*dx+dy*dy+dz*dz);
+					if (dl<interceptV.w && !ship.hullSkin.lineHitsMesh(turX,turY,turZ,pp.px-turX,pp.py-turY,pp.pz-turZ,ship.skin.transform))
 					{
 						if (targObj!=null) targObj.projIntegrity = 1;
 						targObj = pp;
 						pp.projIntegrity = 0;
-						interceptV.x = iV.x;
-						interceptV.y = iV.y;
-						interceptV.z = iV.z;
-						interceptV.w = iV.w;
+						interceptV.x = dx;
+						interceptV.y = dy;
+						interceptV.z = dz;
+						interceptV.w = dl;
 					}//endif
 				}//endif
 			}//endfor
@@ -5641,9 +5638,8 @@ class DropItem extends Projectile
 	 	}
 	}//endfunction
 
-	public function tractorIn(tpx:Number,tpy:Number,tpz:Number):Boolean
+	public function tractorIn(tpx:Number,tpy:Number,tpz:Number,shp:Ship):Boolean
 	{
-		// ----- remove perpenticular component and add accel towards point
 		var dx:Number = tpx-px;
 		var dy:Number = tpy-py;
 		var dz:Number = tpz-pz;
@@ -5652,7 +5648,7 @@ class DropItem extends Projectile
 		dy/=dl;
 		dz/=dl;
 		var dp:Number = dx*vx+dy*vy+dz*vz;
-		if (dp*10>=dl)
+		if (dp*5>=dl)
 		{
 			px = tpx;
 			py = tpy;
@@ -5661,9 +5657,10 @@ class DropItem extends Projectile
 		}
 		else
 		{
-			vx = dx*dp + dx*accel;
-			vy = dy*dp + dy*accel;
-			vz = dz*dp + dz*accel;
+			// ----- remove perpenticular component and add accel towards point
+			vx = dx*dp + dx*accel + shp.vel.x;	// tweak to make it travel in vel of ship
+			vy = dy*dp + dy*accel + shp.vel.y;
+			vz = dz*dp + dz*accel + shp.vel.z;
 			return false;
 	 	}
 	}//endfunction
