@@ -2303,32 +2303,54 @@
 		/**
 		* create a transformable bmp plane in space default at origin perpenticular to z axis
 		*/
-		public static function createPlane(w:Number=1,h:Number=1,tex:BitmapData=null) : Mesh
+		public static function createPlane(w:Number=1,h:Number=1,tex:BitmapData=null,u0:Number=0,v0:Number=0,u1:Number=1,v1:Number=1) : Mesh
 		{
 			var VData:Vector.<Number> = new Vector.<Number>();
 			VData.push( w/2,-h/2,0,		// tr
 						0,0,-1,			// tr normal
-						1,1,			// tr UV
+						u1,v1,			// tr UV
 						-w/2,-h/2,0,	// tl
 						0,0,-1,			// tl normal
-						0,1,			// tl UV
+						u0,v1,			// tl UV
 						-w/2, h/2,0,	// bl
 						0,0,-1,			// bl normal
-						0,0);			// bl UV
+						u0,v0);			// bl UV
 			VData.push(	w/2,-h/2,0,		// tr
 						0,0,-1,			// tr normal
-						1,1,			// tr UV
+						u1,v1,			// tr UV
 						-w/2, h/2,0,	// bl
 						0,0,-1,			// bl normal
-						0,0,			// bl UV
+						u0,v0,			// bl UV
 						w/2, h/2,0,		// br
 						0,0,-1,			// br normal
-						1,0);			// br UV
+						u1,v0);			// br UV
 			var m:Mesh = new Mesh();
 			m.createGeometry(VData);
 			m.material.setTexMap(tex);
 			return m;
 		}//endfunction
+
+		/**
+		* create a transformable bmp plane in space default at origin perpenticular to z axis
+		*/
+		public static function create9SlicePlane(w:Number=1,h:Number=1,u:Number=0.5,d:Number=0.5,l:Number=0.5,r:Number=0.5,tex:BitmapData=null) : Mesh
+		{
+			var m:Mesh = new Mesh();
+			createPlane(l,u,				tex,	0,0,	l,u);		// tl
+			createPlane(1-l-r,u,		tex,	l,0,	r,u);		// tm
+			createPlane(r,u,				tex,	r,0,	1,u);		// tr
+			createPlane(l,1-u-d,		tex,	0,u,	);		// ml
+			createPlane(1-l-r,1-u-d,tex,	l,u,	);		// mm
+			createPlane(r,1-u-d,		tex,	r,u,	);		// mr
+			createPlane(l,d,				tex,	0,d,	l,1);		// bl
+			createPlane(1-l-r,d,		tex,	l,d,	r,1);		// bm
+			createPlane(r,d,				tex,	r,d,	1,1);		// br
+
+			m.addChild();
+			m.material.setTexMap(tex);
+			return m;
+		}//endfunction
+
 
 		/**
 		* returns rows*cols number of mesh m and distribute uv to rows and cols
