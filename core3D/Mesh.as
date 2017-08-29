@@ -2333,24 +2333,47 @@
 		/**
 		* create a transformable bmp plane in space default at origin perpenticular to z axis
 		*/
-		public static function create9SlicePlane(w:Number=1,h:Number=1,u:Number=0.5,d:Number=0.5,l:Number=0.5,r:Number=0.5,tex:BitmapData=null) : Mesh
+		public static function create9SlicePlane(w:Number=1,h:Number=1,u:Number=0.25,d:Number=0.25,l:Number=0.25,r:Number=0.25,tex:BitmapData=null) : Mesh
 		{
+			d = 1-d;
+			r = 1-r;
 			var m:Mesh = new Mesh();
-			createPlane(l,u,				tex,	0,0,	l,u);		// tl
-			createPlane(1-l-r,u,		tex,	l,0,	r,u);		// tm
-			createPlane(r,u,				tex,	r,0,	1,u);		// tr
-			createPlane(l,1-u-d,		tex,	0,u,	);		// ml
-			createPlane(1-l-r,1-u-d,tex,	l,u,	);		// mm
-			createPlane(r,1-u-d,		tex,	r,u,	);		// mr
-			createPlane(l,d,				tex,	0,d,	l,1);		// bl
-			createPlane(1-l-r,d,		tex,	l,d,	r,1);		// bm
-			createPlane(r,d,				tex,	r,d,	1,1);		// br
+			var p:Mesh = null;
 
-			m.addChild();
+			p = createPlane(l,u,				tex,	0,0,	l,u);		// tl
+			p.transform = p.transform.translate((0+l)/2,(0+u)/2,0);
+			m.addChild(p);
+			p = createPlane(1-l-r,u,		tex,	l,0,	r,u);		// tm
+			p.transform = p.transform.translate((l+r)/2,(0+u)/2,0);
+			m.addChild(p);
+			p = createPlane(r,u,				tex,	r,0,	1,u);		// tr
+			p.transform = p.transform.translate((r+1)/2,(0+u)/2,0);
+			m.addChild(p);
+
+			p = createPlane(l,1-u-d,		tex,	0,u,	l,d);		// ml
+			p.transform = p.transform.translate((0+l)/2,(u+d)/2,0);
+			m.addChild(p);
+			p = createPlane(1-l-r,1-u-d,tex,	l,u,	r,d);		// mm
+			p.transform = p.transform.translate((l+r)/2,(u+d)/2,0);
+			m.addChild(p);
+			p = createPlane(r,1-u-d,		tex,	r,u,	1,d);		// mr
+			p.transform = p.transform.translate((r+1)/2,(u+d)/2,0);
+			m.addChild(p);
+
+			p = createPlane(l,d,				tex,	0,d,	l,1);		// bl
+			p.transform = p.transform.translate((0+l)/2,(d+1)/2,0);
+			m.addChild(p);
+			p = createPlane(1-l-r,d,		tex,	l,d,	r,1);		// bm
+			p.transform = p.transform.translate((l+r)/2,(d+1)/2,0);
+			m.addChild(p);
+			p = createPlane(r,d,				tex,	r,d,	1,1);		// br
+			p.transform = p.transform.translate((r+1)/2,(d+1)/2,0);
+			m.addChild(p);
+
+			m = m.mergeTree();
 			m.material.setTexMap(tex);
 			return m;
 		}//endfunction
-
 
 		/**
 		* returns rows*cols number of mesh m and distribute uv to rows and cols
