@@ -2340,34 +2340,34 @@
 			var m:Mesh = new Mesh();
 			var p:Mesh = null;
 
-			p = createPlane(l,u,				tex,	0,0,	l,u);		// tl
-			p.transform = p.transform.translate((0+l)/2,(0+u)/2,0);
+			p = createPlane(l,u,				tex,	0,d,	l,1);		// tl
+			p.transform = p.transform.scale(w,h,1).translate(w*(0+l-1)/2,h*(0+u-1)/2,0);
 			m.addChild(p);
-			p = createPlane(1-l-r,u,		tex,	l,0,	r,u);		// tm
-			p.transform = p.transform.translate((l+r)/2,(0+u)/2,0);
+			p = createPlane(r-l,u,			tex,	l,d,	r,1);		// tm
+			p.transform = p.transform.scale(w,h,1).translate(w*(l+r-1)/2,h*(0+u-1)/2,0);
 			m.addChild(p);
-			p = createPlane(r,u,				tex,	r,0,	1,u);		// tr
-			p.transform = p.transform.translate((r+1)/2,(0+u)/2,0);
-			m.addChild(p);
-
-			p = createPlane(l,1-u-d,		tex,	0,u,	l,d);		// ml
-			p.transform = p.transform.translate((0+l)/2,(u+d)/2,0);
-			m.addChild(p);
-			p = createPlane(1-l-r,1-u-d,tex,	l,u,	r,d);		// mm
-			p.transform = p.transform.translate((l+r)/2,(u+d)/2,0);
-			m.addChild(p);
-			p = createPlane(r,1-u-d,		tex,	r,u,	1,d);		// mr
-			p.transform = p.transform.translate((r+1)/2,(u+d)/2,0);
+			p = createPlane(1-r,u,			tex,	r,d,	1,1);		// tr
+			p.transform = p.transform.scale(w,h,1).translate(w*(r+1-1)/2,h*(0+u-1)/2,0);
 			m.addChild(p);
 
-			p = createPlane(l,d,				tex,	0,d,	l,1);		// bl
-			p.transform = p.transform.translate((0+l)/2,(d+1)/2,0);
+			p = createPlane(l,d-u,			tex,	0,u,	l,d);		// ml
+			p.transform = p.transform.scale(w,h,1).translate(w*(0+l-1)/2,h*(u+d-1)/2,0);
 			m.addChild(p);
-			p = createPlane(1-l-r,d,		tex,	l,d,	r,1);		// bm
-			p.transform = p.transform.translate((l+r)/2,(d+1)/2,0);
+			p = createPlane(r-l,d-u,		tex,	l,u,	r,d);		// mm
+			p.transform = p.transform.scale(w,h,1).translate(w*(l+r-1)/2,h*(u+d-1)/2,0);
 			m.addChild(p);
-			p = createPlane(r,d,				tex,	r,d,	1,1);		// br
-			p.transform = p.transform.translate((r+1)/2,(d+1)/2,0);
+			p = createPlane(1-r,d-u,		tex,	r,u,	1,d);		// mr
+			p.transform = p.transform.scale(w,h,1).translate(w*(r+1-1)/2,h*(u+d-1)/2,0);
+			m.addChild(p);
+
+			p = createPlane(l,1-d,			tex,	0,0,	l,u);		// bl
+			p.transform = p.transform.scale(w,h,1).translate(w*(0+l-1)/2,h*(d+1-1)/2,0);
+			m.addChild(p);
+			p = createPlane(r-l,1-d,		tex,	l,0,	r,u);		// bm
+			p.transform = p.transform.scale(w,h,1).translate(w*(l+r-1)/2,h*(d+1-1)/2,0);
+			m.addChild(p);
+			p = createPlane(1-r,1-d,		tex,	r,0,	1,u);		// br
+			p.transform = p.transform.scale(w,h,1).translate(w*(r+1-1)/2,h*(d+1-1)/2,0);
 			m.addChild(p);
 
 			m = m.mergeTree();
