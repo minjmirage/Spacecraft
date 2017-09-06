@@ -3160,16 +3160,16 @@
 
 		/**
 		* Batch rendering particles Vertex Shader Code		(36 instructions)
-		* inputs:		va0 = vx,vy,vz	 					// position for this vertex
-		*				va1 = texU,texV,idx					// vertex UV and transform idx
+		* inputs:		va0 = vx,vy,vz	 					  // position for this vertex
+		*				    va1 = texU,texV,idx					// vertex UV and transform idx
 		* constants:	vc0=[nearClip,farClip,focalL,aspectRatio], vc1-vc4=TransformMatrix
-		*				vc5 = 0,1,2,n						// useful constants, n=num of rows or cols
-		* 				vc6 = lx,ly,lz,0.001			 	// look at point
-		*				vc7 = tx,ty,tz,idx+scale			// translation
-		*				...
-		*				vci = tx,ty,tz,idx+scale			// translation
+		*				      vc5 = 0,1,2,n						  // useful constants, n=num of rows or cols
+		* 				    vc6 = lx,ly,lz,0.001			// look at point
+		*				      vc7 = tx,ty,tz,idx+scale	// translation
+		*				      ...
+		*				      vci = tx,ty,tz,idx+scale	// translation
 		* outputs:		vt0 = vx,vy,vz,1	vertex
-		*				vt2 = texU,texV
+		*				      vt2 = texU,texV
 		*/
 		private static function _particlesVertSrc() : String
 		{
@@ -3222,29 +3222,28 @@
 
 		/**
 		* Batch meshes rendering Vertex Shader Code
-		* inputs:		va0 = vx,vy,vz			//	vertex data
-		*				va1 = nx,ny,nz			//	normal data
-		*				va2 = tx,ty,tz			//	tangent data
-		*				va3 = texU,texV,i,i+1	//	UV data + constants index
-		* constants:	vc[i] = qx,qy,qz,sc, 	// orientation quaternion
-		*				vc[i+1] = tx,ty,tz,0	// translation
+		* inputs:		va0 = vx,vy,vz        //	vertex data
+		*			    	va1 = nx,ny,nz        //	normal data
+		*			    	va2 = tx,ty,tz			  //	tangent data
+		*			    	va3 = texU,texV,i,i+1	//	UV data + constants index
+		* constants:	vc[i] = qx,qy,qz,0, 	// orientation quaternion
+		*			      	vc[i+1] = tx,ty,tz,sc	// translation and scale
 		* outputs:		vt0 = vertex	vt1 = normal  	vt2 = texU,texV		vt3 = tangent
 		*/
 		private static function _meshesVertSrc(hasLights:Boolean=true,hasNorm:Boolean=false) : String
 		{
 			var s:String =
-			"mov vt0.xyzw, vc4.xyzw\n"+				// vt0 = 0,0,0,1
-			"mov vt2, va3\n"+						// vt2 = texU,texV,idx,idx+1
+			"mov vt0.xyzw, vc4.xyzw\n"+			// vt0 = 0,0,0,1
+			"mov vt2, va3\n"+					    	// vt2 = texU,texV,idx,idx+1
 
 			// ----- orientate vertex
-			"mov vt3, vc[vt2.z]\n"+					// vt3 = qx,qy,qz,sc quaternion axis component + obj scale
-			"mov vt4, va0\n"+						// vt4.xyz = vx,vy,vz	vertex to transform
-			"mul vt4.xyz, vt4.xyz, vt3.www\n"+		// vt4.xyz = vx*sc,vy*sc,vz*sc
-			"dp3 vt3.w, vt3.xyz, vt3.xyz\n"+		// vt3.w = xx+yy+zz
-			"sub vt3.w, vt0.w, vt3.w\n"+			// vt3.w = 1-xx-yy-zz
-			"sqt vt3.w, vt3.w\n"+					// vt3.w = sqrt(1-xx-yy-zz) quat real component
-			"mov vt7, vt3\n"+						// vt7 = qx,qy,qz,w	quaternion copy
-			_quatRotVertSrc()+						// vt4.xyz = rotated vx,vy,vz
+			"mov vt3, vc[vt2.z]\n"+					// vt3 = qx,qy,qz, quaternion axis component
+			"dp3 vt3.w, vt3.xyz, vt3.xyz\n"+// vt3.w = qx*qx+qy*qy+qz*qz
+			"sub vt3.w, vt0.w, vt3.w\n"+		// vt3.w = 1 - (qx*qx+qy*qy+qz*qz)
+			"sqt vt3.w, vt3.w\n"+						// vt3.w = quaternion real component
+			"mul vt4, va0, vc[vt2.w].wwww\n"+		// vt4.xyz = vx*sc,vy*sc,vz*sc
+			"mov vt7, vt3\n"+					    	// vt7 = qx,qy,qz,w	quaternion copy
+			_quatRotVertSrc()+					  	// vt4.xyz = rotated vx,vy,vz
 			"add vt0.xyz, vt4.xyz, vc[vt2.w].xyz\n";// vt0 = nvx,nvy,nvz,1 rotated translated vertex
 
 			// ----- orientate normal
@@ -3253,17 +3252,17 @@
 				s+=
 				"mov vt3, vt7\n"+					// vt3 = qx,qy,qz,a quaternion
 				"mov vt4, va1\n"+					// vt4.xyz = nx,ny,nz	normal to rotate
-				_quatRotVertSrc()+					// vt4.xyz=rotated nx,ny,nz
+				_quatRotVertSrc()+				// vt4.xyz=rotated nx,ny,nz
 				"mov vt1, vt4\n"+					// vt1 = nnx,nny,nnz rotated normal
-				"mov vt1.w, vc4.x\n";				// vt1 = nnx,nny,nnz,0 rotated normal
+				"mov vt1.w, vc4.x\n";			// vt1 = nnx,nny,nnz,0 rotated normal
 				if (hasNorm)
 				s+=
 				"mov vt3, vt7\n"+					// vt3 = qx,qy,qz,a quaternion
 				"mov vt4, va2\n"+					// vt4.xyz = tx,ty,tz	tangent to rotate
-				"mov vt4.w, vc4.x\n"+				//
-				_quatRotVertSrc()+					// vt4.xyz = rotated tx,ty,tz
+				"mov vt4.w, vc4.x\n"+			//
+				_quatRotVertSrc()+				// vt4.xyz = rotated tx,ty,tz
 				"mov vt3, vt4\n"+					// vt3.xyz = rotated tx,ty,tz
-				"mov vt3.w, vc4.x\n";				// vt3 = nnx,nny,nnz,0 rotated normal
+				"mov vt3.w, vc4.x\n";			// vt3 = nnx,nny,nnz,0 rotated normal
 			}
 			return s;
 		}//endfunction
@@ -3333,9 +3332,9 @@
 		/**
 		* Quaternion rotation (17 instructions)
 		* inputs:	vt3=ux,uy,uz,a	// rotation quaternion
-		*			vt4=px,py,pz,0	// point to rotate
+		*			    vt4=px,py,pz,0	// point to rotate
 		* output:	vt4.xyz=rotated point
-		* 			vt6.xyz=quatMul vt3 vt4
+		* 			  vt6.xyz=quatMul vt3 vt4
 		*/
 		private static function _quatRotVertSrc() : String
 		{
@@ -3349,9 +3348,9 @@
 		/**
 		* Quaternion multiplication (8 instructions)
 		* inputs:  	vti0=ux,uy,uz,a	// a,b,c are the real components
-		*			vti1=vx,vy,vz,b
+		*			      vti1=vx,vy,vz,b
 		* output:	vto0=wx,wy,wz,c	// multiplication result
-		* 			vti0=ux,uy,uz,a	// unchanged from input!
+		* 			  vti0=ux,uy,uz,a	// unchanged from input!
 		*/
 		private static function _quatMulVertSrc(i0:uint,i1:uint,o0:uint,w0:uint) : String
 		{

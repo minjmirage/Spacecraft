@@ -224,11 +224,11 @@ package core3D
 				T.writeFloat(m.nx);		// nx,ny,nz	quaternion
 				T.writeFloat(m.ny);
 				T.writeFloat(m.nz);
+				T.writeFloat(0);			// 0
+				T.writeFloat(m.vx);		// translation x
+				T.writeFloat(m.vy);		// translation y
+				T.writeFloat(m.vz);		// translation z
 				T.writeFloat(m.w);		// scale
-				T.writeFloat(m.vx);		// vx,vy,vz	translation
-				T.writeFloat(m.vy);
-				T.writeFloat(m.vz);
-				T.writeFloat(0);
 			}
 
 			// ----- calculate num tris to draw and send orientation data

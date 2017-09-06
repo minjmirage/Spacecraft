@@ -188,16 +188,16 @@ package core3D
 				T.writeFloat(m.nx);	// quaternion x
 				T.writeFloat(m.ny);	// quaternion y
 				T.writeFloat(m.nz);	// quaternion z
-				T.writeFloat(m.w);	// scale
+				T.writeFloat(0);		// 0 
 				T.writeFloat(m.vx);	// translation x
 				T.writeFloat(m.vy);	// translation y
 				T.writeFloat(m.vz);	// translation z
-				T.writeFloat(0);
+				T.writeFloat(m.w);	// scale
 				pcnt++;
 
 				if (pcnt>=particlesPerMesh || i==0)
 				{
-					if (skin.numChildren()<=mcnt)
+					if (skin.numChildren()==mcnt)
 						skin.addChild(createNewRenderMesh());
 					rmesh = skin.getChildAt(mcnt);
 					rmesh.trisCnt = trisPerParticle*pcnt;
