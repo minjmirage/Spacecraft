@@ -1551,7 +1551,7 @@
 				{
 					if (M.stdProgram==null) 	M.setContext3DBuffers(shadows); // build shader prog if incorrect
 
-					if (M.dataType==_typeV || M.vcData!=null)	// if plain geometry or joints data is valid
+					if ((M.dataType==_typeV && _withinRenderFustrum(M)) || M.vcData!=null)	// if plain geometry or joints data is valid
 					{
 						var T:Matrix4x4 = M.workingTransform;		// transform for current mesh to be rendered
 						// ----- set transform parameters for this mesh to context3d ----
@@ -1664,6 +1664,57 @@
 					}
 				}//endelse
 			}//endfor
+		}//endfunction
+
+		/**
+		* hacky fustrum culling for normal mesh type
+		*/
+		private static function _withinRenderFustrum(M:Mesh):Boolean
+		{
+			if (context3d==null) return false;
+			var sw:uint = context3d.backBufferWidth;
+			var sh:uint = context3d.backBufferHeight;
+			var T:Matrix4x4 = M.workingTransform;
+
+			var AA:Vector3D = M.collisionGeom.minXYZ;
+			var BB:Vector3D = M.collisionGeom.maxXYZ;
+
+			// ----- check bounding box corners within fustrum
+			var P:Array = [	AA.x,AA.y,AA.z, BB.x,AA.y,AA.z, AA.x,BB.y,AA.z, BB.x,BB.y,AA.z,
+											AA.x,AA.y,BB.z, BB.x,AA.y,BB.z, AA.x,BB.y,BB.z, BB.x,BB.y,BB.z,
+											(AA.x+BB.x)/2,(AA.y+BB.y)/2,AA.z, (AA.x+BB.x)/2,(AA.y+BB.y)/2,BB.z,
+											(AA.x+BB.x)/2,AA.y,(AA.z+BB.z)/2, (AA.x+BB.x)/2,BB.y,(AA.z+BB.z)/2,
+											AA.x,(AA.y+BB.y)/2,(AA.z+BB.z)/2, BB.x,(AA.y+BB.y)/2,(AA.z+BB.z)/2];
+			var _u:Boolean = false;
+			var _d:Boolean = false;
+			var _l:Boolean = false;
+			var _r:Boolean = false;
+			var _ud:Boolean = false;
+			var _lr:Boolean = false;
+			for (var i:int=0; i<P.length; i+=3)
+			{
+				var px:Number = P[i];
+				var py:Number = P[i+1];
+				var pz:Number = P[i+2];
+				var nx:Number = T.aa*px+T.ab*py+T.ac*pz+T.ad;
+				var ny:Number = T.ba*px+T.bb*py+T.bc*pz+T.bd;
+				var nz:Number = T.ca*px+T.cb*py+T.cc*pz+T.cd;
+				if (nz>0)
+				{
+					var sx:Number = nx/nz*focalL*sw/2;
+					var sy:Number = -ny/nz*focalL*sw/2;
+					if (sx*sx*4<sw*sw) _lr = true;	// point within left right
+					if (sy*sy*4<sh*sh) _ud = true;	// point within up down
+					if (_lr && _ud)		return true;
+					if (sy<0) _u = true;	// check point falls up
+					if (sy>0) _d = true;	// check point falls down
+					if (sx<0) _l = true;	// check point falls left
+					if (sx>0) _r = true;	// check point falls right
+				}
+			}
+
+			//
+			return (_u && _d && _lr) || (_l && _r && _ud);	// if points fall on either side
 		}//endfunction
 
 		/**
