@@ -110,6 +110,12 @@
 		[Embed(source='3D/RawR.rmf', mimeType='application/octet-stream')] 						private static var RawR_Rmf:Class;
 		[Embed(source='3D/RawT.rmf', mimeType='application/octet-stream')] 						private static var RawT_Rmf:Class;
 		[Embed(source='3D/hullPosnMkr.rmf', mimeType='application/octet-stream')] 		private static var HullPosnMkr_Rmf:Class;
+
+		[Embed(source='3D/thrusterSmallExt.rmf', mimeType='application/octet-stream')] 	private static var ThrusterExtS_Rmf:Class;
+		[Embed(source='3D/launcherSmallExt.rmf', mimeType='application/octet-stream')] 	private static var LauncherExtS_Rmf:Class;
+		[Embed(source='3D/mountSmallExt.rmf', mimeType='application/octet-stream')] 		private static var MountExtS_Rmf:Class;
+		[Embed(source='3D/mountMediumExt.rmf', mimeType='application/octet-stream')] 		private static var MountExtM_Rmf:Class;
+
 		[Embed(source='3D/thrusterSmall.rmf', mimeType='application/octet-stream')] 	private static var ThrusterS_Rmf:Class;
 		[Embed(source='3D/tractorSmall.rmf', mimeType='application/octet-stream')] 		private static var TractorS_Rmf:Class;
 		[Embed(source='3D/missileSmall.rmf', mimeType='application/octet-stream')] 		private static var MissileS_Rmf:Class;
@@ -217,8 +223,9 @@
 
 			// ----- initialize 3D model assets
 			Assets = { shipsWheel:ShipsWheel_Rmf,RawM:RawM_Rmf,RawR:RawR_Rmf,RawT:RawT_Rmf,
-						buildMkr:HullPosnMkr_Rmf, thrusterS:ThrusterS_Rmf,
-						tractorS:TractorS_Rmf,missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
+						buildMkr:HullPosnMkr_Rmf,
+						thrusterSExt:ThrusterExtS_Rmf,launcherSExt:LauncherExtS_Rmf,mountSExt:MountExtS_Rmf, mountMExt:MountExtM_Rmf,
+						thrusterS:ThrusterS_Rmf,tractorS:TractorS_Rmf,missileS:MissileS_Rmf,launcherS:LauncherS_Rmf,
 						mountS:MountS_Rmf, frameS:FrameS_Rmf, mountM:MountM_Rmf, frameM:FrameM_Rmf,
 						gunAutoS:GunAutoS_Rmf, gunFlakS:GunFlakS_Rmf, gunIonS:GunIonS_Rmf, gunPlasmaS:GunPlasmaS_Rmf, gunRailS:GunRailS_Rmf,
 						gunIonM:BlasterM_Rmf, gunPlasmaM:LaserM_Rmf, gunRailM:RailGunM_Rmf };
@@ -2440,6 +2447,10 @@
 																									{
 																										if (confirm)
 																										convToRmf(['3D/shipsWheel.obj','3D/RawM.obj','3D/RawR.obj','3D/RawT.obj',
+																													'3D/launcherSmallExt.obj',
+																													'3D/thrusterSmallExt.obj',
+																													'3D/mountSmallExt.obj',
+																													'3D/mountMediumExt.obj',
 																													'3D/tractorSmall.obj',
 																													'3D/missileSmall.obj',
 																													'3D/launcherSmall.obj',
@@ -5494,16 +5505,16 @@ class Ship extends Hull
 			var mt:Mesh = null;
 			if (m.type.indexOf("thruster")!=-1)	// thruster
 			{
-				mt = modelAssets[m.type].clone();
+				mt = modelAssets["thrusterSExt"].clone();
 				thrustCnt++;
 				rotMoment += Math.sqrt((m.x-pivot.x)*(m.x-pivot.x) + (m.y-pivot.y)*(m.y-pivot.y) + (m.z-pivot.z)*(m.z-pivot.z));
 			}
-			else if (m.type.indexOf("launcher")!=-1)	// missile luncher
-				mt = modelAssets[m.type].clone();
+			else if (m.type.indexOf("launcherS")!=-1)	// missile luncher
+				mt = modelAssets["launcherSExt"].clone();
 			else if (m.type.charAt(m.type.length-1)=='S')		// small gun
-				mt = modelAssets['mountS'].clone();
+				mt = modelAssets['mountSExt'].clone();
 			else if (m.type.charAt(m.type.length-1)=='M')		// medium gun
-				mt = modelAssets['mountM'].clone();
+				mt = modelAssets['mountMExt'].clone();
 			mt.transform = new Matrix4x4().rotFromTo(0, 1, 0, m.nx, m.ny, m.nz).translate(m.x, m.y, m.z);
 			tmp.addChild(mt);
 		}
