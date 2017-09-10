@@ -2507,7 +2507,6 @@
 				if (oldCallBack!=null) oldCallBack();
 			}
 
-
 			velDBER.x = (focusedShip.radius*2-lookDBER.x)*(1-0.9);		// zoom closer to ship
 
 			var tickBmd:BitmapData = new icoTick().bitmapData;
@@ -2625,9 +2624,11 @@
 
 			var itmsSc:Number = 0;
 			var rotOff:Number = 0;		// the carousel rotation state
-			var selIdx:int = 0;
+			var prevSelIdx:int =0;
+			var selIdx:Number = 0;
+			var selRotVel:Number = 0;
 			var itmRot:Vector3D = new Vector3D(0,0,0,1);	// the rotation quaternion
-			var rotVel:Vector3D = new Vector3D(0,0,0,1);	// rotation vel of item
+			var itmRotVel:Vector3D = new Vector3D(0,0,0,1);	// rotation vel of item
 
 			var oldViewStep:Function = viewStep;	// hijack viewStep
 
@@ -2640,14 +2641,14 @@
 				// ----- apply rotation to selected item
 				var px:Number = Math.sin(rotOff);								// current rotoff vect
 				var py:Number = Math.cos(rotOff);
-				var qx:Number = Math.sin(-selIdx/n*Math.PI*2);	// target rotoff vect
-				var qy:Number = Math.cos(-selIdx/n*Math.PI*2);
+				var qx:Number = Math.sin(-Math.round(selIdx)/n*Math.PI*2);	// target rotoff vect
+				var qy:Number = Math.cos(-Math.round(selIdx)/n*Math.PI*2);
 				var ang:Number = Math.acos(Math.max(-1,Math.min(1,px*qx+py*qy)));
 				if (px*qy-qx*py>0)	ang*=-1;
 				rotOff += Math.max(-0.1,Math.min(0.1,ang*0.2));	// spin carousel
-				itmRot = Matrix4x4.quatMult(rotVel,itmRot);
-				rotVel.scaleBy(0.93);	// reduce item rotation speed
-				rotVel.w = Math.sqrt(1 - rotVel.x*rotVel.x-rotVel.y*rotVel.y-rotVel.z*rotVel.z);
+				itmRot = Matrix4x4.quatMult(itmRotVel,itmRot);
+				itmRotVel.scaleBy(0.93);	// reduce item rotation speed
+				itmRotVel.w = Math.sqrt(1 - itmRotVel.x*itmRotVel.x-itmRotVel.y*itmRotVel.y-itmRotVel.z*itmRotVel.z);
 
 				// ----- arrange items in carousel fashion
 				for (var i:int=n-1; i>-1; i--)
@@ -2656,14 +2657,14 @@
 					qx = Math.sin(-i/n*Math.PI*2);
 					qy = Math.cos(-i/n*Math.PI*2);
 					var angDiff:Number = Math.acos(Math.max(-1,Math.min(1,px*qx+py*qy)));
-					var sc:Number = 1+(1+Math.cos(Math.min(Math.PI,Math.max(-Math.PI,angDiff*10))));					// scale larger for selected
+					var sc:Number = 1.5+2*(1+Math.cos(Math.min(Math.PI,Math.max(-Math.PI,angDiff*10))));					// scale larger for selected
 					sc *= itmsSc;
 					var elevOff:Number = Math.PI*0.7;
 					var tiltTo:Vector3D = new Vector3D(	Math.cos(lookDBER.z+elevOff)*Math.sin(lookDBER.y),
 																							Math.sin(lookDBER.z+elevOff),
 																							Math.cos(lookDBER.z+elevOff)*Math.cos(lookDBER.y));
-					if (i==selIdx)
-						m.transform = Matrix4x4.quaternionToMatrix(itmRot.w,itmRot.x,itmRot.y,itmRot.z).scale(sc,sc,sc).translate(0,0,focusedShip.radius*(2-(sc-1)/3));
+					if (i==Math.round(selIdx))
+						m.transform = Matrix4x4.quaternionToMatrix(itmRot.w,itmRot.x,itmRot.y,itmRot.z).scale(sc,sc,sc).translate(0,0,focusedShip.radius*(2-(sc-1)/6));
 					else
 						m.transform = new Matrix4x4().scale(sc,sc,sc).translate(0,0,focusedShip.radius*2);
 					m.transform = m.transform.rotY(i/n*Math.PI*2+rotOff+Math.PI+lookDBER.y).rotFromTo(0,1,0,tiltTo.x,tiltTo.y,tiltTo.z).translate(lookPt.x,lookPt.y,lookPt.z);
@@ -2680,7 +2681,7 @@
 						{
 							if (Models[i].lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz))
 							{
-								if (selIdx==i)
+								if (Math.round(selIdx)==i)
 								{		// do addModule
 									optionsMenu.parent.removeChild(optionsMenu);
 									viewStep = oldViewStep;
@@ -2693,13 +2694,25 @@
 									});
 									return;
 								}
-								selIdx = i;
-								optionsMenu.y = subTitle.y+subTitle.height;
-								mainTitle.name = focusedShip.name+" : Outfit "+Ids[i].name;
+								else
+								{
+									selIdx = i;
+									prevSelIdx = i;
+									selRotVel = 0;
+									optionsMenu.y = subTitle.y+subTitle.height;
+									mainTitle.name = focusedShip.name+" : Outfit "+Ids[prevSelIdx].name;
+								}
 							}
 						}
 					}
 				}//endif
+
+				if (prevSelIdx!=Math.round(selIdx))
+				{
+					prevSelIdx = Math.round(selIdx);
+					optionsMenu.y = subTitle.y+subTitle.height;
+					mainTitle.name = focusedShip.name+" : Outfit "+Ids[prevSelIdx].name;
+				}
 
 				// ----- enable drag to pan view interraction
 				if (Input.downPts.length==1)	// one finger
@@ -2707,8 +2720,14 @@
 					var downPt:InputPt = Input.downPts[0];
 					velDBER.y+=(downPt.x-downPt.ox)/5000;	// bearing change
 					velDBER.z-=(downPt.y-downPt.oy)/5000;	// elevation change
-					rotVel = Matrix4x4.quatMult(new Matrix4x4().rotFromTo(0,0,1,(downPt.x-downPt.ox)/1000,-(downPt.y-downPt.oy)/1000,1).rotationQuaternion(),rotVel);
+					itmRotVel = Matrix4x4.quatMult(new Matrix4x4().rotFromTo(0,0,1,(downPt.x-downPt.ox)/1000,-(downPt.y-downPt.oy)/1000,1).rotationQuaternion(),itmRotVel);
+					selRotVel += (downPt.x-downPt.ox)/3000;
 				}
+				selIdx+=selRotVel;
+				while (Math.round(selIdx)<0)	selIdx+=n;
+				while (Math.round(selIdx)>n-1)	selIdx-=n;
+				selRotVel*=0.96;
+				if (selRotVel*selRotVel<0.004) selRotVel=0;
 
 				// ----- calculate cam lookPt easing
 				if (focusedShip!=null)
