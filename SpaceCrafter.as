@@ -464,7 +464,7 @@
 		{
 			if (sky!=null) world.removeChild(sky);
 			randScenery();
-			randAsteroids(10+Math.floor(Math.random()*10));
+			randAsteroids(10);
 
 			// ----- load user ships
 			var shipDat:String = loadShipsData();
@@ -2184,6 +2184,7 @@
 				setDumbAI(ship);
 			}
 			ship.modulesSkin.material.setTexMap(Mtls["Tex"]);
+			ship.modulesSkinExt.material.setTexMap(Mtls["Tex"]);
 			world.addChild(ship.skin);
 			Entities.push(ship);
 			var ang:Number = Math.random()*Math.PI*2;
@@ -2488,12 +2489,21 @@
 			var planets:Mesh = sky.getChildAt(0);
 			planets.setLightingParameters(0.2,0.2,0.2,0,0,false,true);
 			sky.material.setAmbient(0.2,0.2,0.2);
+			var prevHideShipsWheel:Boolean = ShipHUD.hideShipsWheel;
+			ShipHUD.hideShipsWheel = true;
+			focusedShip.hullSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
+			focusedShip.skin.removeChild(focusedShip.modulesSkinExt);
+			focusedShip.skin.addChild(focusedShip.modulesSkin);
 			var oldCallBack:Function = callBack;
 			callBack = function():void
 			{
 				playAmbientLoop("spaceAmbience");
 				planets.setLightingParameters(0,0,0,0,0,true,true);
 				sky.material.setAmbient(1,1,1);
+				ShipHUD.hideShipsWheel = prevHideShipsWheel;
+				focusedShip.hullSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
+				focusedShip.skin.removeChild(focusedShip.modulesSkin);
+				focusedShip.skin.addChild(focusedShip.modulesSkinExt);
 				if (oldCallBack!=null) oldCallBack();
 			}
 
@@ -2575,6 +2585,7 @@
 		//===============================================================================================
 		private function modulesSelectMenu(callBack:Function):void
 		{
+			ShipHUD.hideShipsWheel = true;
 			var planets:Mesh = sky.getChildAt(0);
 			planets.setLightingParameters(0.2,0.2,0.2,0,0,false,true);
 			sky.material.setAmbient(0.2,0.2,0.2);
@@ -2676,10 +2687,8 @@
 									for (var j:int=Models.length-1; j>-1; j--)
 										world.removeChild(Models[j]);
 									var addModStep:Function = addModuleFn(Ids[i].id);
-									focusedShip.hullSkin.material.setTexMap(Mtls["TexTrans"]);		// set hull skin transparent
 									showShipEditMenu("Place "+Ids[i].name,addModStep,function():void
 									{
-										focusedShip.hullSkin.material.setTexMap(Mtls["TexPanel"]); // set back hull skin
 										modulesSelectMenu(callBack);
 									});
 									return;
@@ -2718,6 +2727,7 @@
 				viewStep = oldViewStep;
 				for (var i:int=Models.length-1; i>-1; i--)
 					world.removeChild(Models[i]);
+				ShipHUD.hideShipsWheel = false;
 				if (callBack!=null) callBack();
 			}//endfunction
 
@@ -3204,6 +3214,8 @@ class ShipHUD
 	private static var world:Mesh = null;
 	private static var stage:Stage = null;
 
+	public static var hideShipsWheel:Boolean = false;
+
 	/**
 	* init
 	*/
@@ -3255,7 +3267,10 @@ class ShipHUD
 		var lp:Vector3D = Mesh.viewT.transform(new Vector3D(r.vx,r.vy,r.vz));
 		var wheel:Mesh = shipsWheel;
 		wheel.transform = invVT.mult(new Matrix4x4().rotZ(bearing*10).translate(lp.x,lp.y,lp.z));
-		world.addChild(wheel);
+		if (hideShipsWheel)
+			world.removeChild(wheel);
+		else
+			world.addChild(wheel);
 
 		healthBar.reset();
 		energyBar.reset();
@@ -5121,6 +5136,7 @@ class Ship extends Hull
 
 	public var modulesConfig:Vector.<Module> = null;	// mounted modules configuration
 
+	public var modulesSkinExt:Mesh = null;
 	public var modulesSkin:Mesh = null;
 
 	public var maxIntegrity:Number = 1;
@@ -5165,7 +5181,9 @@ class Ship extends Hull
 		hullSkin.material.setSpecular(5,2);
 		modulesSkin = new Mesh();
 		modulesSkin.material.setSpecular(0.2);
-		skin.addChild(modulesSkin);
+		modulesSkinExt = new Mesh();
+		modulesSkinExt.material.setSpecular(0.2);
+		skin.addChild(modulesSkinExt);
 
 		hullConfig = new Vector.<HullBlock>();
 		modulesConfig = new Vector.<Module>();
@@ -5499,24 +5517,38 @@ class Ship extends Hull
 		var thrustCnt:int = 0;
 		var rotMoment:Number = 0;
 		var tmp:Mesh = new Mesh();
+		var tmpExt:Mesh = new Mesh();
 		for (var i:int=modulesConfig.length-1; i>=0; i--)
 		{
 			var m:Module = modulesConfig[i];
 			var mt:Mesh = null;
+			var mtExt:Mesh = null;
 			if (m.type.indexOf("thruster")!=-1)	// thruster
 			{
-				mt = modelAssets["thrusterSExt"].clone();
+				mt = modelAssets["thrusterS"].clone();
+				mtExt = modelAssets["thrusterSExt"].clone();
 				thrustCnt++;
 				rotMoment += Math.sqrt((m.x-pivot.x)*(m.x-pivot.x) + (m.y-pivot.y)*(m.y-pivot.y) + (m.z-pivot.z)*(m.z-pivot.z));
 			}
 			else if (m.type.indexOf("launcherS")!=-1)	// missile luncher
-				mt = modelAssets["launcherSExt"].clone();
+			{
+				mt = modelAssets["launcherS"].clone();
+				mtExt = modelAssets["launcherSExt"].clone();
+			}
 			else if (m.type.charAt(m.type.length-1)=='S')		// small gun
-				mt = modelAssets['mountSExt'].clone();
+			{
+				mt = modelAssets['mountS'].clone();
+				mtExt = modelAssets['mountSExt'].clone();
+			}
 			else if (m.type.charAt(m.type.length-1)=='M')		// medium gun
-				mt = modelAssets['mountMExt'].clone();
+			{
+				mt = modelAssets['mountM'].clone();
+				mtExt = modelAssets['mountMExt'].clone();
+			}
 			mt.transform = new Matrix4x4().rotFromTo(0, 1, 0, m.nx, m.ny, m.nz).translate(m.x, m.y, m.z);
+			mtExt.transform = new Matrix4x4().rotFromTo(0, 1, 0, m.nx, m.ny, m.nz).translate(m.x, m.y, m.z);
 			tmp.addChild(mt);
+			tmpExt.addChild(mtExt);
 		}
 
 		maxRotAccel = thrustCnt/rotMoment*0.001;
@@ -5524,7 +5556,9 @@ class Ship extends Hull
 		maxSpeed = maxAccel/(1/slowF-1);
 
 		tmp = tmp.mergeTree();
+		tmpExt = tmpExt.mergeTree();
 		modulesSkin.setGeometry(tmp.vertData, tmp.idxsData);
+		modulesSkinExt.setGeometry(tmpExt.vertData, tmpExt.idxsData);
 	}//endfunction
 
 	//===============================================================================================
