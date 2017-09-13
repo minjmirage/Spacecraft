@@ -2035,7 +2035,7 @@
 						rand.scaleBy(0.1*Math.random()/rand.length);
 						(ParticlesEmitter)(EffectEMs["blast"]).emit(hb.extPosn.x,hb.extPosn.y,hb.extPosn.z,rand.x,rand.y,rand.z,Math.random()*0.2+0.8);
 					}
-					(ParticlesEmitter)(EffectEMs["wave"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*5/100);
+					(ParticlesEmitter)(EffectEMs["wave"]).emit(ship.posn.x,ship.posn.y,ship.posn.z,0,0,0,ship.radius*10/100);
 					world.removeChild(ship.skin);
 					Exploding.splice(j,1);
 				}
