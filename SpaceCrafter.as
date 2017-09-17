@@ -66,6 +66,8 @@
 		private var gridMesh:Mesh = null;
 		private var viewStep:Function = shipViewStep;
 
+		private var userData:UserData = null;
+
 		[Embed(source="3D/textures/tex.jpg")] 					private static var Tex:Class;
 		[Embed(source="3D/textures/TexPanel.jpg")] 			private static var TexPanel:Class;
 		[Embed(source="3D/textures/TexTransPanel.png")] private static var TexTransPanel:Class;
@@ -307,7 +309,7 @@
 						blast:new ParticlesEmitter(new FxBlastSheet().bitmapData, 25, 10,"add"),
 						wave:new ParticlesEmitter(new FxWaveSheet().bitmapData, 25, 100,"add"),
 						hyperspace:new ParticlesEmitter(new FxHyperSheet().bitmapData, 16, 100, "add"),
-						reticle:new ParticlesEmitter(new TexReticleR().bitmapData, 1, 1, "add")};
+						reticle:new ParticlesEmitter(new TexReticleR().bitmapData, 1, 3, "add")};
 			for (key in EffectEMs)
 				world.addChild(EffectEMs[key].skin);
 
@@ -1260,7 +1262,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// default focus on ship view
+		// default focus on ship view, allows
 		//===============================================================================================
 		private function shipViewStep():void
 		{
@@ -1484,10 +1486,22 @@
 		}//endfunction
 
 		//===============================================================================================
-		//
+		// simulate drop items, player tap to pick up
 		//===============================================================================================
+		private var dropItmHitDetect:Mesh = Mesh.createSphere(2,6,4); 	// radius 2
 		private function dropItemsStep():void
 		{
+			// ----- enable user focus on selection
+			var ray:VertexData = null;
+			if (Input.upPts.length==1)
+			{
+				var upPt:InputPt = Input.upPts[0];
+				// enable ship selection on mouse click
+				if (upPt.endT - upPt.startT<300)
+					ray = Mesh.cursorRay(upPt.x,upPt.y,0.01,1000);
+			}//endif
+
+			var pickedUp:DropItem = null;
 			for (var i:int=DropItems.length-1; i>-1; i--)
 			{
 				var p:DropItem = DropItems[i];
@@ -1497,17 +1511,34 @@
 				}
 				else
 				{
-					p.ttl-=1;
-					p.projIntegrity=1;
-					p.px+=p.vx;	// move projectile
-					p.py+=p.vy;
-					p.pz+=p.vz;
-					p.vx*=p.damp;
-					p.vy*=p.damp;
-					p.vz*=p.damp;
-					if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
-						p.renderFn(p);
+					if (ray!=null && dropItmHitDetect.lineHitsMesh(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,new Matrix4x4().translate(p.px,p.py,p.pz)))
+					{	// ----- pick up item
+						pickedUp = p;
+						var hit:VertexData = dropItmHitDetect.lineMeshIntersection(ray.vx,ray.vy,ray.vz,ray.nx,ray.ny,ray.nz,new Matrix4x4().translate(p.px,p.py,p.pz));
+						ray.nx = hit.vx - ray.vx;		// modify line ray to end at hitpoint
+						ray.ny = hit.vy - ray.vy;
+						ray.nz = hit.vz - ray.vz;
+					}
+					else
+					{
+						p.ttl-=1;
+						p.projIntegrity=1;
+						p.px+=p.vx;	// move projectile
+						p.py+=p.vy;
+						p.pz+=p.vz;
+						p.vx*=p.damp;
+						p.vy*=p.damp;
+						p.vz*=p.damp;
+						if (posnIsOnScreen(p.px,p.py,p.pz))	// offscreen culling
+							p.renderFn(p);
+					}
 				}
+			}
+
+			if (pickedUp!=null)
+			{
+				pickedUp.ttl=-1;
+				EffectEMs["wave"].emit(pickedUp.px,pickedUp.py,pickedUp.pz,0,0,0,0.1);
 			}
 		}//endfunction
 
@@ -2082,13 +2113,14 @@
 
 			var dropFn:Function = function():void
 			{
+				var A:Array = ["RawM","RawR","RawT"];
 				// ----- drop RawM items
 				if (itmI>-1)
 				{
 					var h:HullBlock = ship.hullConfig[itmI--];
 					var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
 					v.scaleBy(0.6*Math.random()/v.length);
-					addDropItemToScene("M",h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+					addDropItemToScene(A[int(A.length*Math.random())],h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
 				}//endfor
 
 				// ----- drop RawT/RawR items
@@ -2096,17 +2128,9 @@
 				{
 					var m:Module = ship.modulesConfig[modI--];
 					v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-					v.scaleBy(1/v.length);
-					var type:String = "T";
-					if (m.type.indexOf("gun")==-1)		type = "R";
-					var n:int=1;
-					if (m.type.indexOf("M")!=-1)		n=4;
-					for (var j:int=0; j<n; j++)
-					{
-						v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-						v.scaleBy(0.6*Math.random()/v.length);
-						addDropItemToScene(type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
-					}
+					v.scaleBy(0.6*Math.random()/v.length);
+					if (EffectMPs[m.type]!=null)	// drops the mounted gun
+						addDropItemToScene(m.type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
 				}//endfor
 
 				if (itmI<=-1 && modI<=-1)
@@ -2137,7 +2161,7 @@
 		//===============================================================================================
 		// drop pickUp items
 		//===============================================================================================
-		private function addDropItemToScene(type:String,px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number) : Projectile
+		private function addDropItemToScene(itmId:String,px:Number,py:Number,pz:Number,vx:Number,vy:Number,vz:Number) : Projectile
 		{
 			var rvQ:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);			// tumbling quaternion
 			var rotSpeed:Number = Math.random()*0.2;
@@ -2145,7 +2169,11 @@
 			rvQ.w = Math.cos(rotSpeed/2);
 
 			var oQ:Vector3D = new Vector3D(0,0,0,1);	// starting identity quaternion
-
+			var itmMp:MeshParticles = null;
+			if (TurretMPs[itmId]!=null)
+				itmMp = TurretMPs[itmId];
+			else
+				itmMp = EffectMPs[itmId];
 			var p:DropItem = new DropItem(px,py,pz,vx,vy,vz,
 			function():void {
 				oQ = Matrix4x4.quatMult(rvQ,oQ);		// increment rotation
@@ -2153,9 +2181,9 @@
 				T.ad = p.px;
 				T.bd = p.py;
 				T.cd = p.pz;
-				EffectMPs["Raw"+type].nextLocRotScale(T,0.9);				// item icon
+				itmMp.nextLocRotScale(T,1);				// item icon
 				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);	//
-			},0,100000,"Raw"+type);
+			},0,100000,itmId);
 
 			DropItems.push(p);
 			return p;
@@ -3220,8 +3248,109 @@ import flash.ui.Multitouch;
 import flash.ui.MultitouchInputMode;
 import flash.sensors.Accelerometer;
 import flash.events.AccelerometerEvent;
+import flash.net.SharedObject;
 
 TweenPlugin.activate([GlowFilterPlugin]); //activation is permanent in the SWF, so this line only needs to be run once.
+
+class UserData
+{
+	public var uid:String=null;						// user unique id string
+	public var credits:int = 0;						// current user credits
+	public var inventory:Object=null;			// current user inventory Object dictionary
+	public var shipsConfig:Vector.<String>=null;	// current user ships data
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function UserData():void
+	{
+		uid = toBase62(new Date().getTime()*100 + int(Math.random()*100));
+		credits = 0;
+		inventory = new Object();
+		shipsConfig = new Vector.<String>();
+	}//endfunction
+
+	//===============================================================================================
+	// some homebrew conversion to make uid short
+	//===============================================================================================
+	private function toBase62(x:int):String
+	{
+		var r:String = "";
+		var cs:String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";	// base62
+		while (x<0)
+		{
+			r = cs.charAt(x%cs.length) + r;
+			x = int(x/cs.length);
+		}
+		return r;
+	}//endfunction
+
+	//===============================================================================================
+	// Saves all given user ships data
+	//===============================================================================================
+	public function saveDataToLocalObject():void
+	{
+		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
+		so.data.currentUser = toString();
+		so.flush();
+	}//endfunction
+
+	//===============================================================================================
+	// string representation of user save data
+	//===============================================================================================
+	public function toString():String
+	{
+		var invStr:String = "";
+		for(var id:String in inventory)
+			invStr += id+","+inventory[id]+",";
+		if (invStr.length>0) invStr = invStr.substr(0,invStr.length-1);
+
+		var shpStr:String = "";
+		for (var i:int=0; i<shipsConfig.length; i++)
+			shpStr += shipsConfig[i]+";";
+		if (shpStr.length>0) shpStr = shpStr.substr(0,shpStr.length-1);
+
+		return uid+"&"+credits+"&"+invStr+"&"+shpStr;
+	}//endfunction
+
+	//===============================================================================================
+	// Load user ship data return config string in ";" delimited form
+	//===============================================================================================
+	private static function loadDataFromLocalObject():UserData
+	{
+		var usrDat:UserData = new UserData();
+		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
+
+		if (so.data.hasOwnProperty("ships"))
+		{	// parse legacy ship config
+			var lS:Array = so.data.split(";");
+			for (var ls:int=0; ls<lS.length; ls++)
+				usrDat.shipsConfig.push(lS[ls]);
+			delete so.data.ships;
+		}
+
+		if (so.data.hasOwnProperty("currentUser"))
+		{
+			var A:Array = so.data.currentUser.split("&");
+
+			usrDat.uid = A[0];
+
+			usrDat.credits = parseInt(A[1]);
+
+			// ----- parse inventory
+			var I:Array = A[2].split(",");
+			for (var i:int=0; i<I.length; i+=2)
+				usrDat.inventory[I[i]] = parseInt(I[i+1]);
+
+			// ----- parse ships config
+			var S:Array = A[3].split(";");
+			for (var s:int=0; s<S.length; s++)
+				usrDat.shipsConfig.push(S[s]);
+		}
+
+		return usrDat;
+	}//endfunction
+}//endclass
 
 class ShipHUD
 {
