@@ -433,54 +433,29 @@
 			Input.init(stage);
 
 			playAmbientLoop("spaceAmbience",1);
-			homeBaseScene();
-		}//endfunction
-
-		//===============================================================================================
-		// Saves all given user ships data
-		//===============================================================================================
-		private function saveShipsData(S:Vector.<Hull>):void
-		{
-			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
-			var s:String = "";
-			for (var i:int=0; i<S.length; i++)
-				s += S[i].toString()+";";
-			if (s.length>0) s = s.substr(0,s.length-1);
-			so.data.ships = s;
-			so.flush();
-		}//endfunction
-
-		//===============================================================================================
-		// Load user ship data return config string in ";" delimited form
-		//===============================================================================================
-		private function loadShipsData():String
-		{
-			var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
-			return so.data.ships;
+			userData = UserData.loadDataFromLocalObject();
+			homeBaseScene(userData.shipsConfig);
 		}//endfunction
 
 		//===============================================================================================
 		// shows your Level, your ships, option to build/modify Resource Units
 		//===============================================================================================
-		private function homeBaseScene():void
+		private function homeBaseScene(shipsConfig:Vector.<String>):void
 		{
 			if (sky!=null) world.removeChild(sky);
 			randScenery();
 			randAsteroids(10);
 
 			// ----- load user ships
-			var shipDat:String = loadShipsData();
-			if (shipDat!=null)
+			if (shipsConfig.length>0)
 			{
-				var shipStrs:Array = shipDat.split(";");
-				if (shipStrs.length>0)
-					for (var i:int=shipStrs.length-1; i>-1; i--)
-						addShipToScene(true,0,shipStrs[i]);		// adds user configured ship to scene
+					for (var i:int=shipsConfig.length-1; i>-1; i--)
+						addShipToScene(true,0,shipsConfig[i]);		// adds user configured ship to scene
 			}
 			else
 			{
 				addShipToScene(true,0);			// creates a new random ship for user
-				saveShipsData(Friendlies);
+				userData.saveShipsData(Friendlies);
 			}
 
 			optionsMenuSelector = function(entity:Hull):void
@@ -497,7 +472,7 @@
 		//===============================================================================================
 		// NEED TO REFINE!!!
 		//===============================================================================================
-		private function battleScene(shipsConf:String):void
+		private function battleScene(shipsConfig:Vector.<String>):void
 		{
 			var thisRef:SpaceCrafter = this;
 			randScenery();	// random sky and planets
@@ -567,11 +542,11 @@
 						stepFns.splice(stepFns.indexOf(alignViewToShip),1);
 				}//endfunction
 
+				shipsConfig = shipsConfig.slice();
 				var jumpInTime:int = 0;
-				var Conf:Array = shipsConf.split(";");
 				var friendlySpawn:Function = function():void
 				{
-					if (Conf.length>0)
+					if (shipsConfig.length>0)
 					{
 						if (jumpInTime%100==40)
 							mainTitle.name = "ETA 2s";
@@ -579,7 +554,7 @@
 							mainTitle.name = "ETA 1s";
 						else if (jumpInTime%100==0)
 						{
-							addShipToScene(true,0,Conf.pop());		// friendly
+							addShipToScene(true,0,shipsConfig.pop());		// friendly
 							jumpIn((Ship)(Friendlies[0]),0,0,0,function():void {stepFns.push(alignViewToShip);});
 							focusOn(Friendlies[0]);
 							(Ship)(Friendlies[0]).engageEnemy = false;
@@ -2450,7 +2425,7 @@
 			optionsMenu =
 			MenuUI.createLeftStyleMenu(thisRef,
 					new < String > ["Find Opponent","Configure Ship"],
-					new < Function>[function ():void	{galaxyScene(function():void {battleScene(loadShipsData());});},
+					new < Function>[function ():void	{galaxyScene(function():void {battleScene(userData.shipsConfig);});},
 													showShipModifyMenu]);
 			optionsMenu.y = subTitle.y+subTitle.height;
 			mainTitle.name = focusedShip.name+" : Home Base";
@@ -2571,7 +2546,7 @@
 						{
 							if (yes)
 							{
-								saveShipsData(Friendlies);
+								userData.saveShipsData(Friendlies);
 								callBack();
 							}
 							else
@@ -3255,6 +3230,7 @@ TweenPlugin.activate([GlowFilterPlugin]); //activation is permanent in the SWF, 
 class UserData
 {
 	public var uid:String=null;						// user unique id string
+	public var userName:String=null;
 	public var credits:int = 0;						// current user credits
 	public var inventory:Object=null;			// current user inventory Object dictionary
 	public var shipsConfig:Vector.<String>=null;	// current user ships data
@@ -3286,6 +3262,17 @@ class UserData
 	}//endfunction
 
 	//===============================================================================================
+	// override user ships data with this one
+	//===============================================================================================
+	public function saveShipsData(S:Vector.<Hull>):void
+	{
+		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
+		shipsConfig = new Vector.<String>();
+		for (var i:int=0; i<S.length; i++)
+			shipsConfig.push(S[i].toString());
+	}//endfunction
+
+	//===============================================================================================
 	// Saves all given user ships data
 	//===============================================================================================
 	public function saveDataToLocalObject():void
@@ -3310,13 +3297,13 @@ class UserData
 			shpStr += shipsConfig[i]+";";
 		if (shpStr.length>0) shpStr = shpStr.substr(0,shpStr.length-1);
 
-		return uid+"&"+credits+"&"+invStr+"&"+shpStr;
+		return uid+"&"+userName+"&"+credits+"&"+invStr+"&"+shpStr;
 	}//endfunction
 
 	//===============================================================================================
 	// Load user ship data return config string in ";" delimited form
 	//===============================================================================================
-	private static function loadDataFromLocalObject():UserData
+	public static function loadDataFromLocalObject():UserData
 	{
 		var usrDat:UserData = new UserData();
 		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
@@ -3334,16 +3321,16 @@ class UserData
 			var A:Array = so.data.currentUser.split("&");
 
 			usrDat.uid = A[0];
-
-			usrDat.credits = parseInt(A[1]);
+			usrDat.userName = A[1];
+			usrDat.credits = parseInt(A[2]);
 
 			// ----- parse inventory
-			var I:Array = A[2].split(",");
+			var I:Array = A[3].split(",");
 			for (var i:int=0; i<I.length; i+=2)
 				usrDat.inventory[I[i]] = parseInt(I[i+1]);
 
 			// ----- parse ships config
-			var S:Array = A[3].split(";");
+			var S:Array = A[4].split(";");
 			for (var s:int=0; s<S.length; s++)
 				usrDat.shipsConfig.push(S[s]);
 		}
