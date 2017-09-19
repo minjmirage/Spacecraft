@@ -3310,7 +3310,7 @@ class UserData
 
 		if (so.data.hasOwnProperty("ships"))
 		{	// parse legacy ship config
-			var lS:Array = so.data.split(";");
+			var lS:Array = so.data.ships.split(";");
 			for (var ls:int=0; ls<lS.length; ls++)
 				usrDat.shipsConfig.push(lS[ls]);
 			delete so.data.ships;
