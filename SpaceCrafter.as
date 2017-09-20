@@ -455,7 +455,8 @@
 			else
 			{
 				addShipToScene(true,0);			// creates a new random ship for user
-				userData.saveShipsData(Friendlies);
+				userData.updateShipsData(Friendlies);
+				userData.saveDataToLocalObject();
 			}
 
 			optionsMenuSelector = function(entity:Hull):void
@@ -1163,7 +1164,7 @@
 			for (key in EffectEMs)	EffectEMs[key].update(camPosn.x,camPosn.y,camPosn.z,simulationPaused);
 			debugTxt+=" particlesT:"+(getTimer()-time); time=getTimer();
 			debugTxt+="   frameS:"+frameSShown+" frameM:"+frameMShown+" camDist:"+int(lookDBER.x*10)/10;
-			debugTf.text = debugTxt;
+			debugTf.text = debugTxt+"\n"+userData.toString();
 			// ----- render 3D
 			//Mesh.setPointLighting(new <Number>[lookPt.x+100,lookPt.y+100,lookPt.z+100,1,1,1]);
 			Mesh.renderBranch(stage, world, false);
@@ -1995,7 +1996,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// force ship to move away
+		// force ships to move away
 		//===============================================================================================
 		[Inline]
 		private final function doShipSeparation(ship:Ship):void
@@ -2145,8 +2146,12 @@
 
 			var oQ:Vector3D = new Vector3D(0,0,0,1);	// starting identity quaternion
 			var itmMp:MeshParticles = null;
+			var itmSc:Number = 1;
 			if (TurretMPs[itmId]!=null)
+			{
 				itmMp = TurretMPs[itmId];
+				itmSc = 3;
+			}
 			else
 				itmMp = EffectMPs[itmId];
 			var p:DropItem = new DropItem(px,py,pz,vx,vy,vz,
@@ -2156,7 +2161,7 @@
 				T.ad = p.px;
 				T.bd = p.py;
 				T.cd = p.pz;
-				itmMp.nextLocRotScale(T,1);				// item icon
+				itmMp.nextLocRotScale(T,itmSc);				// item icon
 				EffectEMs["reticle"].emit(p.px,p.py,p.pz,0,0,0,1);	//
 			},0,100000,itmId);
 
@@ -2546,7 +2551,8 @@
 						{
 							if (yes)
 							{
-								userData.saveShipsData(Friendlies);
+								userData.updateShipsData(Friendlies);
+								userData.saveDataToLocalObject();
 								callBack();
 							}
 							else
@@ -2886,8 +2892,10 @@
 						if (upPt.endT-upPt.startT<300)
 						{
 							undoStk.push(focusedShip.toString());
-							focusedShip.extendHull(localPt.x,localPt.y,localPt.z);
-							focusedShip.rebuildShip();
+							if (focusedShip.extendHull(localPt.x,localPt.y,localPt.z))
+								focusedShip.rebuildShip();
+							else
+								undoStk.pop();
 						}
 					}
 				}
@@ -3241,6 +3249,7 @@ class UserData
 	public function UserData():void
 	{
 		uid = toBase62(new Date().getTime()*100 + int(Math.random()*100));
+		userName = "";
 		credits = 0;
 		inventory = new Object();
 		shipsConfig = new Vector.<String>();
@@ -3249,11 +3258,11 @@ class UserData
 	//===============================================================================================
 	// some homebrew conversion to make uid short
 	//===============================================================================================
-	private function toBase62(x:int):String
+	private function toBase62(x:uint):String
 	{
 		var r:String = "";
 		var cs:String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";	// base62
-		while (x<0)
+		while (x>0)
 		{
 			r = cs.charAt(x%cs.length) + r;
 			x = int(x/cs.length);
@@ -3262,9 +3271,31 @@ class UserData
 	}//endfunction
 
 	//===============================================================================================
+	//
+	//===============================================================================================
+	public function addToInventory(itmId:String):void
+	{
+		if (inventory[itmId]==null)
+			inventory[itmId] =1;
+		else
+			inventory[itmId]++;
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public function getInventory(itmId:String):int
+	{
+		if (inventory[itmId]==null)
+			return 0;
+		else
+			return 1;
+	}//endfunction
+
+	//===============================================================================================
 	// override user ships data with this one
 	//===============================================================================================
-	public function saveShipsData(S:Vector.<Hull>):void
+	public function updateShipsData(S:Vector.<Hull>):void
 	{
 		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
 		shipsConfig = new Vector.<String>();
@@ -3289,7 +3320,8 @@ class UserData
 	{
 		var invStr:String = "";
 		for(var id:String in inventory)
-			invStr += id+","+inventory[id]+",";
+			if (!isNaN((int)(inventory[id])))
+				invStr += id+","+inventory[id]+",";
 		if (invStr.length>0) invStr = invStr.substr(0,invStr.length-1);
 
 		var shpStr:String = "";
@@ -3297,7 +3329,7 @@ class UserData
 			shpStr += shipsConfig[i]+";";
 		if (shpStr.length>0) shpStr = shpStr.substr(0,shpStr.length-1);
 
-		return uid+"&"+userName+"&"+credits+"&"+invStr+"&"+shpStr;
+		return uid+"|"+userName+"|"+credits+"|"+invStr+"|"+shpStr;
 	}//endfunction
 
 	//===============================================================================================
@@ -3308,17 +3340,9 @@ class UserData
 		var usrDat:UserData = new UserData();
 		var so:SharedObject = SharedObject.getLocal("SpaceCrafter");
 
-		if (so.data.hasOwnProperty("ships"))
-		{	// parse legacy ship config
-			var lS:Array = so.data.ships.split(";");
-			for (var ls:int=0; ls<lS.length; ls++)
-				usrDat.shipsConfig.push(lS[ls]);
-			delete so.data.ships;
-		}
-
 		if (so.data.hasOwnProperty("currentUser"))
 		{
-			var A:Array = so.data.currentUser.split("&");
+			var A:Array = so.data.currentUser.split("|");
 
 			usrDat.uid = A[0];
 			usrDat.userName = A[1];
@@ -3326,7 +3350,7 @@ class UserData
 
 			// ----- parse inventory
 			var I:Array = A[3].split(",");
-			for (var i:int=0; i<I.length; i+=2)
+			for (var i:int=0; i<I.length-1; i+=2)
 				usrDat.inventory[I[i]] = parseInt(I[i+1]);
 
 			// ----- parse ships config
@@ -4759,6 +4783,7 @@ class Hull
 		if (adjacentToHull(px,py,pz))
 		{
 			hullConfig.push(new HullBlock(px, py, pz,this));
+
 			return true;
 		}
 		return false;
@@ -5496,6 +5521,31 @@ class Ship extends Hull
 
 		// ----- update ship transform
 		updateHullBlocksWorldPosns();	// calculate global positions for each hull space
+	}//endfunction
+
+	//===============================================================================================
+	//
+	//===============================================================================================
+	public override function extendHull(px:int,py:int,pz:int) : Boolean
+	{
+		if (adjacentToHull(px,py,pz))
+		{
+			// ----- checks if the new hull extension hides a turret module
+			for (var i:int=modulesConfig.length-1; i>-1; i--)
+			{
+				var m:Module = modulesConfig[i];
+				var size:int=1;
+				if (m.type.indexOf("M")!=-1) size = 2;
+				var occupied:Vector.<Vector3D> = surfaceToOccupy(m.x,m.y,m.z,new Vector3D(m.nx,m.ny,m.nz),size);
+				for (var j:int=occupied.length-1; j>-1; j--)
+					if (occupied[j].x==px && occupied[j].y==py && occupied[j].z==pz)
+						return false;
+			}//endfor
+
+			hullConfig.push(new HullBlock(px, py, pz,this));
+			return true;
+		}
+		return false;
 	}//endfunction
 
 	//===============================================================================================
