@@ -970,7 +970,7 @@
 				if (dist>100)
 				{
 					p.transform = p.transform.rotY(0.1/dist);
-					v.w += 0.1/Math.sqrt(dist+100);
+					v.w += 0.02/Math.sqrt(dist+100);
 				}
 				else
 					v.w += 0.0001;
@@ -2706,10 +2706,7 @@
 								else
 								{
 									selIdx = i;
-									prevSelIdx = i;
 									selRotVel = 0;
-									optionsMenu.y = subTitle.y+subTitle.height;
-									mainTitle.name = focusedShip.name+" : Outfit "+Ids[prevSelIdx].name;
 								}
 							}
 						}
@@ -2720,7 +2717,8 @@
 				{
 					prevSelIdx = Math.round(selIdx);
 					optionsMenu.y = subTitle.y+subTitle.height;
-					mainTitle.name = focusedShip.name+" : Outfit "+Ids[prevSelIdx].name;
+					mainTitle.name = focusedShip.name+": Outfit "+Ids[prevSelIdx].name;
+					subTitle.name = Module.printStats(Ids[prevSelIdx].id);
 				}
 
 				// ----- enable drag to pan view interraction
@@ -2738,13 +2736,12 @@
 				selRotVel*=0.96;
 				if (selRotVel*selRotVel<0.004) selRotVel=0;
 
-				// ----- calculate cam lookPt easing
+				// ----- 	force view dist to ship radius*4
 				if (focusedShip!=null)
 				{
-					velDBER.x = (focusedShip.radius*4-lookDBER.x)*(1-0.8);	// fix dist to radius*4
+					velDBER.x = (focusedShip.radius*4-lookDBER.x)*(1-0.8);
 					lookVel = focusedShip.posn.subtract(lookPt);
 					lookVel.scaleBy(1-0.9);
-					lookDBER.x = Math.max(focusedShip.radius*1.1, lookDBER.x);
 				}
 			}//endfunction
 
@@ -2762,6 +2759,7 @@
 			optionsMenu =	MenuUI.createLeftStyleMenu(this,new <String>["back"],new <Function>[cleanUp]);
 			optionsMenu.y = subTitle.y+subTitle.height;
 			mainTitle.name = focusedShip.name+" : Outfit Modules";
+			subTitle.name = "Select an available module to outfit";
 		}//endfunction
 
 		//===============================================================================================
@@ -4620,6 +4618,19 @@ class Module		// data class
 			muzzleLen=0.7;
 		}
 	}//endconstr
+
+	public static function printStats(moduleType:String):String
+	{
+		if (moduleType.indexOf("thruster")!=-1)
+			return "Thrust Unit : 1";
+		var m:Module = new Module(0,0,0,0,0,-1,moduleType);
+		if (moduleType.indexOf("tractor")!=-1)
+			return "Range : "+m.range;
+		else if (moduleType.indexOf("launcher")!=-1)
+			return "Range : "+m.range+"   Power : "+m.damage+"   Reload time : "+m.fireDelay;
+		else
+			return "Range : "+m.range+"   Power : "+m.damage+"   Turn rate : "+(m.turnRate*100)+"   Reload time : "+m.fireDelay;
+	}//endfunction
 
 	public function toString():String
 	{
