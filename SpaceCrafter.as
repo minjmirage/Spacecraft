@@ -4112,6 +4112,7 @@ class MenuUI
 
 		bmp.name = s;
 		var targTxt:String = "";
+		var prevTxtLen:int = -1; // used to clear off last char highlight
 
 		function enterFrameHandler(ev:Event):void
 		{
@@ -4148,12 +4149,14 @@ class MenuUI
 					tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
 					tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
 				}
+				prevTxtLen = txt.length;
 				tf.htmlText = txt + "<font color='#FFFFFF'>"+targTxt.substr(txt.length,1)+"</font>";
 				bmp.bitmapData.fillRect(rect,0);
 				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
 			}
-			else if (tf.htmlText!=txt)
+			else if (prevTxtLen!=txt.length)
 			{
+				prevTxtLen = txt.length;
 				tf.htmlText = txt;
 				bmp.bitmapData.fillRect(rect,0);
 				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
