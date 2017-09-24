@@ -160,27 +160,46 @@
 		public function SpaceCrafter() : void
 		{
 			var ppp:Sprite = this;
+			var overlay:Bitmap = null;
+			var ttl:int = 200;
 
 			function initHandler(ev:Event) : void
 			{
 				if (stage==null) return;
 
-				var readout:TextField = Mesh.createFPSReadout();
-
-				stage.addChild(readout);
-				debugTf = new TextField();
-				debugTf.defaultTextFormat = new TextFormat("arial",13,0xFFFFFF);
-				debugTf.autoSize = "left";
-				debugTf.wordWrap = false;
-				stage.addChild(debugTf);
-				debugTf.x = 600;
-
-				ppp.removeEventListener(Event.ENTER_FRAME,initHandler);
-				stage.scaleMode = StageScaleMode.NO_SCALE;
-				stage.align = StageAlign.TOP_LEFT;
-
-				init();
-			}
+				if (ttl==200)
+				{
+					stage.scaleMode = StageScaleMode.NO_SCALE;
+					stage.align = StageAlign.TOP_LEFT;
+					overlay = new Bitmap(new BitmapData(stage.stageWidth,stage.stageHeight,false,0));
+					ppp.addChild(overlay);
+					mainTitle = MenuUI.createTypeOutTextBmp("Initializing Uplink...",stage.stageHeight*MenuUI.fontScale*2);
+					ppp.addChild(mainTitle);
+				}
+				else if (ttl==100)
+				{
+					debugTf = new TextField();
+					debugTf.defaultTextFormat = new TextFormat("arial",13,0xFFFFFF);
+					debugTf.autoSize = "left";
+					debugTf.wordWrap = false;
+					debugTf.x = 600;
+					mainTitle.name = "";
+					init();
+				}
+				else if (ttl<100)
+				{
+					overlay.alpha -= 0.01;
+					if (overlay.alpha<=0)
+					{
+						overlay.parent.removeChild(overlay);
+						var readout:TextField = Mesh.createFPSReadout();
+						stage.addChild(readout);
+						stage.addChildAt(debugTf,0);
+						ppp.removeEventListener(Event.ENTER_FRAME,initHandler);
+					}
+				}
+				ttl--;
+			}//endfunction
 			ppp.addEventListener(Event.ENTER_FRAME,initHandler);
 		}//endfunction
 
@@ -586,7 +605,7 @@
 							new <String>["% Hostile Fleet Destroyed","% Friendly Fleet Destroyed","Resources Gained","Tech Gained"],
 							new <int>[54,88,34,223],
 							function():void {
-								galaxyScene(homeBaseScene);
+								galaxyScene(function ():void {homeBaseScene(userData.shipsConfig);});
 							});
 					if (optionsMenu.parent!=null)
 						optionsMenu.parent.removeChild(optionsMenu);
@@ -1164,7 +1183,7 @@
 			for (key in EffectEMs)	EffectEMs[key].update(camPosn.x,camPosn.y,camPosn.z,simulationPaused);
 			debugTxt+=" particlesT:"+(getTimer()-time); time=getTimer();
 			debugTxt+="   frameS:"+frameSShown+" frameM:"+frameMShown+" camDist:"+int(lookDBER.x*10)/10;
-			debugTf.text = debugTxt+"\n"+userData.toString();
+			debugTf.text = debugTxt;
 			// ----- render 3D
 			//Mesh.setPointLighting(new <Number>[lookPt.x+100,lookPt.y+100,lookPt.z+100,1,1,1]);
 			Mesh.renderBranch(stage, world, false);
@@ -3827,7 +3846,7 @@ class MenuUI
 			TweenLite.to(addBtn, 0.3, { x:margF*sw, alpha:1, delay:0.1*i+0.1 } );
 		}
 
-		targ.addChild(s);
+		targ.addChildAt(s,0);
 		return s;
 	}//endfunction
 
