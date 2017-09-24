@@ -173,20 +173,29 @@
 					stage.align = StageAlign.TOP_LEFT;
 					overlay = new Bitmap(new BitmapData(stage.stageWidth,stage.stageHeight,false,0));
 					ppp.addChild(overlay);
-					mainTitle = MenuUI.createTypeOutTextBmp("Initializing Uplink...",stage.stageHeight*MenuUI.fontScale*2);
+
+					// ----- create main and sub title
+					var sw:int = stage.stageWidth;
+					var sh:int = stage.stageHeight;
+					mainTitle = MenuUI.createTypeOutTextBmp(" Initializing Uplink",sh*MenuUI.fontScale*1.3);
+					mainTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*2*0.35+sh*MenuUI.margF*0.3;
+					mainTitle.y = MenuUI.margF*sh;
 					ppp.addChild(mainTitle);
+					subTitle = MenuUI.createTypeOutTextBmp(" Locating your Ship...",sh*MenuUI.fontScale*0.7);
+					subTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*0.35+sh*MenuUI.margF*0.3;
+					subTitle.y = mainTitle.y+mainTitle.height*0.8;
+					ppp.addChild(subTitle);
 				}
-				else if (ttl==100)
+				else if (ttl==90)
 				{
 					debugTf = new TextField();
 					debugTf.defaultTextFormat = new TextFormat("arial",13,0xFFFFFF);
 					debugTf.autoSize = "left";
 					debugTf.wordWrap = false;
 					debugTf.x = 600;
-					mainTitle.name = "";
 					init();
 				}
-				else if (ttl<100)
+				else if (ttl<90)
 				{
 					overlay.alpha -= 0.01;
 					if (overlay.alpha<=0)
@@ -801,8 +810,8 @@
 			// ----- zoom in view and do callback
 			function zoomInAndCallBack():void
 			{
-				mainTitle.name = "";
-				subTitle.name = "";
+				mainTitle.name = " ";
+				subTitle.name = " ";
 
 				var slowF:Number = 0.9;
 				velDBER.x = (8-lookDBER.x)*(1-slowF);		// set dist to 1
@@ -891,21 +900,8 @@
 			planet.addChild(rings);
 			rings.setLightingParameters(1,1,1,0,0,false,true);
 
-			// ----- create main and sub title
-			var sw:int = stage.stageWidth;
-			var sh:int = stage.stageHeight;
-			if (mainTitle!=null && mainTitle.parent!=null)
-				mainTitle.parent.removeChild(mainTitle);
-			mainTitle = MenuUI.createTypeOutTextBmp("Jumping In",sh*MenuUI.fontScale*1.3);
-			mainTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*2*0.35+sh*MenuUI.margF*0.3;
-			mainTitle.y = MenuUI.margF*sh;
-			addChild(mainTitle);
-			if (subTitle!=null && subTitle.parent!=null)
-				subTitle.parent.removeChild(subTitle);
-			subTitle = MenuUI.createTypeOutTextBmp("Location : "+MenuUI.randomPlanetName(),sh*MenuUI.fontScale*0.7);
-			subTitle.x = MenuUI.margF*sw*1.1-sh*MenuUI.fontScale*0.35+sh*MenuUI.margF*0.3;
-			subTitle.y = mainTitle.y+mainTitle.height*0.8;
-			addChild(subTitle);
+			subTitle.name = "Location : "+MenuUI.randomPlanetName();
+
 			return sky;
 		}//
 
@@ -1428,7 +1424,7 @@
 				if (entity.integrity<=0)
 				{
 					if (entity is Ship)
-						destroyShip((Ship)(entity));
+						destroyShip((Ship)(entity),Hostiles.indexOf(entity)!=-1);
 					else
 						removeEntity(entity);
 				}
@@ -2095,7 +2091,7 @@
 		//===============================================================================================
 		// kill and remove ship from world
 		//===============================================================================================
-		private function destroyShip(ship:Ship):void
+		private function destroyShip(ship:Ship,doDropItems:Boolean=true):void
 		{
 			ship.vel = randV3values(0.01);
 			Exploding.push(ship);
@@ -2103,35 +2099,38 @@
 			removeEntity(ship);
 			world.addChild(ship.skin);	// add back ship skin for explosion fx
 
-			var itmI:int = ship.hullConfig.length-1;
-			var modI:int = ship.modulesConfig.length-1;
-
-			var dropFn:Function = function():void
+			if (doDropItems)
 			{
-				var A:Array = ["RawM","RawR","RawT"];
-				// ----- drop RawM items
-				if (itmI>-1)
-				{
-					var h:HullBlock = ship.hullConfig[itmI--];
-					var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-					v.scaleBy(0.6*Math.random()/v.length);
-					addDropItemToScene(A[int(A.length*Math.random())],h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
-				}//endfor
+				var itmI:int = ship.hullConfig.length-1;
+				var modI:int = ship.modulesConfig.length-1;
 
-				// ----- drop RawT/RawR items
-				if (modI>-1)
+				var dropFn:Function = function():void
 				{
-					var m:Module = ship.modulesConfig[modI--];
-					v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
-					v.scaleBy(0.6*Math.random()/v.length);
-					if (EffectMPs[m.type]!=null)	// drops the mounted gun
-						addDropItemToScene(m.type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
-				}//endfor
+					var A:Array = ["RawM","RawR","RawT"];
+					// ----- drop RawM items
+					if (itmI>-1)
+					{
+						var h:HullBlock = ship.hullConfig[itmI--];
+						var v:Vector3D = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+						v.scaleBy(0.6*Math.random()/v.length);
+						addDropItemToScene(A[int(A.length*Math.random())],h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+					}//endfor
 
-				if (itmI<=-1 && modI<=-1)
-					stepFns.splice(stepFns.indexOf(dropFn),1);
-			}//endfunction
-			stepFns.push(dropFn);
+					// ----- drop RawT/RawR items
+					if (modI>-1)
+					{
+						var m:Module = ship.modulesConfig[modI--];
+						v = new Vector3D(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5);
+						v.scaleBy(0.6*Math.random()/v.length);
+						if (EffectMPs[m.type]!=null)	// drops the mounted gun
+							addDropItemToScene(m.type,h.extPosn.x,h.extPosn.y,h.extPosn.z,v.x,v.y,v.z);
+					}//endfor
+
+					if (itmI<=-1 && modI<=-1)
+						stepFns.splice(stepFns.indexOf(dropFn),1);
+				}//endfunction
+				stepFns.push(dropFn);
+			}
 		}//endfunction
 
 		//===============================================================================================
@@ -3706,7 +3705,7 @@ class MenuUI
 	public static var fontScale:Number = 30/700;
 	public static var margF:Number = 0.01;
 	public static var clickSfx:Function = null;
-	public static var colorTone:uint = 0x99FFFF;		// overridden externally as needed
+	public static var colorTone:uint = 0xFFFFFF;		// overridden externally as needed
 
 	public static var starPrefix:Vector.<String> =
 	Vector.<String>([	"Alpha","Beta","Gamma","Delta","Epsilon","Zeta","Eta","Theta","Iota","Kappa","Lambda","Mu","Nu",
@@ -4144,6 +4143,11 @@ class MenuUI
 			}
 			else if (txt.length<targTxt.length)
 			{	// ----- type chars out
+				if (tf.text.length==0)
+				{	// checks and sets color again if retyping everything
+					tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
+					tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
+				}
 				tf.text = targTxt.substr(0,txt.length+1);
 				bmp.bitmapData.fillRect(rect,0);
 				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
