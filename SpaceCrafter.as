@@ -837,7 +837,7 @@
 			// ----- create skybox
 			if (sky!=null) world.removeChild(sky);
 			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
-			var colorTones:Vector.<uint> = new <uint> [0xeeeeee,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
+			var colorTones:Vector.<uint> = new <uint> [0xdddddd,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
 			var skyIdx:int = int(spaceTex.length*Math.random());
 			sky = new Mesh();
 			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
@@ -3705,7 +3705,7 @@ class MenuUI
 	public static var fontScale:Number = 30/700;
 	public static var margF:Number = 0.01;
 	public static var clickSfx:Function = null;
-	public static var colorTone:uint = 0xFFFFFF;		// overridden externally as needed
+	public static var colorTone:uint = 0x666666;		// overridden externally as needed
 
 	public static var starPrefix:Vector.<String> =
 	Vector.<String>([	"Alpha","Beta","Gamma","Delta","Epsilon","Zeta","Eta","Theta","Iota","Kappa","Lambda","Mu","Nu",
@@ -4102,7 +4102,7 @@ class MenuUI
 		tf.autoSize = "left";
 		tf.wordWrap = false;
 		tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
-		tf.text = " ";
+		tf.htmlText = " ";
 		tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
 
 		var bmd:BitmapData = new BitmapData(1,tf.height+borderWidth*2,true,0x00000000);
@@ -4137,18 +4137,24 @@ class MenuUI
 
 			if (txt.length>targTxt.length || targTxt.substr(0,txt.length)!=txt)
 			{	// ----- delete chars from behind
-				tf.text = txt.substr(0,txt.length-1);
+				tf.htmlText = txt.substr(0,txt.length-1);
 				bmp.bitmapData.fillRect(rect,0);
 				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
 			}
 			else if (txt.length<targTxt.length)
 			{	// ----- type chars out
-				if (tf.text.length==0)
+				if (tf.htmlText.length==0)
 				{	// checks and sets color again if retyping everything
 					tf.defaultTextFormat = new TextFormat("arial bold",size,colorTone,null,null,null,null,null,null,marg,marg);
 					tf.filters = [new GlowFilter(colorTone, 1, borderWidth, borderWidth, 1, 1)];
 				}
-				tf.text = targTxt.substr(0,txt.length+1);
+				tf.htmlText = txt + "<font color='#FFFFFF'>"+targTxt.substr(txt.length,1)+"</font>";
+				bmp.bitmapData.fillRect(rect,0);
+				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
+			}
+			else if (tf.htmlText!=txt)
+			{
+				tf.htmlText = txt;
 				bmp.bitmapData.fillRect(rect,0);
 				bmp.bitmapData.draw(tf, mat);	// draw textField on bmd
 			}
