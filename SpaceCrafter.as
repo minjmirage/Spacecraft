@@ -829,16 +829,42 @@
 		}//endfunction
 
 		//===============================================================================================
-		// generate random sky and planets scenery
+		// generate the data need to recreate the skybox, planet, moon and rings
 		//===============================================================================================
-		private var planetsDat:Vector.<Vector3D> = null;	// axis x,y,z and w=rotAng
-		private function randScenery():Mesh
+		private function randomSceneryConstructionData():Array
+		{
+			var A:Array = [int(5*Math.random())];	// random space texture
+			A.push((Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2 , 0,-100,0);	// planet system rotX, rotY, translate x,y,z
+
+			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
+			for (i=0; i<8; i++)
+				R.splice(Math.floor(Math.random()*R.length),0,i);
+
+			A.push(R[0],50,0,0);				// mainplanet type, planet rad, orbit rad, orbit ang,
+
+			for (var i:int=1; i<8; i++)
+			{
+				if (Math.random()<0.7)
+				{
+					var moonRad:int = 75/(i*2+1);
+					var orbitRad:int = i*100 + 200/(i+1) + Math.random()*50;
+					A.push(R[i],moonRad,orbitRad,Math.random()*Math.PI*2);			// moon type, moon rad, orbit rad, orbit ang,
+				}
+			}
+
+			return A;
+		}//endfunction
+
+		//===============================================================================================
+		// generate skybox and planet meshes from data A
+		//===============================================================================================
+		private function sceneryFromData(A:Array):Mesh
 		{
 			// ----- create skybox
 			if (sky!=null) world.removeChild(sky);
 			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
 			var colorTones:Vector.<uint> = new <uint> [0xdddddd,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
-			var skyIdx:int = int(spaceTex.length*Math.random());
+			var skyIdx:int = A[0];
 			sky = new Mesh();
 			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
 			MenuUI.colorTone = colorTones[skyIdx];
@@ -855,29 +881,22 @@
 
 			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
-			planet.transform = planet.transform.rotX((Math.random()-0.5)*Math.PI*0.9).rotY(Math.random()*Math.PI*2).translate(0,-100,0);
+			planet.transform = planet.transform.rotX(A[1]).rotY(A[2]).translate(A[3],A[4],A[5]);
 			planetsDat = new Vector.<Vector3D>();
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
-			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
-			for (i=0; i<8; i++)
-				R.splice(Math.floor(Math.random()*R.length),0,i);
-			for (i=0; i<8; i++)
+
+			for (i=6; i<A.length; i+=4)
 			{
-				if (Math.random()<0.7 || i==0)
-				{
-					var r:int = Math.floor(Math.random()*8);
-					var planetRad:Number = 75/(i*2+1);
-					var orbitRad:Number = 0;
-					if (i>0)	orbitRad =i*100 + 200/(i+1)+Math.random()*50;
-					p = createPlanetMesh(planetRad,R[i],Mtls["TexPlanets"]);
-					var ang:Number = Math.random()*Math.PI*2;
+					var planetRad:Number = A[i+1];
+					var orbitRad:Number = A[i+2];
+					var ang:Number = A[i+3];
+					p = createPlanetMesh(planetRad,A[i],Mtls["TexPlanets"]);
 					p.transform = p.transform.translate(orbitRad*Math.sin(ang),0,orbitRad*Math.cos(ang));
 					p.material.setSpecular(0);
 					p.material.setAmbient(0,0,0);
 					planet.addChild(p);
 					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
 					ringsGap.push(orbitRad-planetRad,orbitRad+planetRad);
-				}
 			}//endfor
 			sky.addChild(planet);
 
@@ -903,6 +922,15 @@
 			subTitle.name = "Location : "+MenuUI.randomPlanetName();
 
 			return sky;
+		}//endfunction
+
+		//===============================================================================================
+		// generate random sky and planets scenery
+		//===============================================================================================
+		private var planetsDat:Vector.<Vector3D> = null;	// axis x,y,z and w=rotAng
+		private function randScenery():Mesh
+		{
+			return sceneryFromData(randomSceneryConstructionData());
 		}//
 
 		//===============================================================================================
