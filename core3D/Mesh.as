@@ -86,7 +86,7 @@
 
 		private static var outTex:Texture;				// GLOBAL for post processing filters support
 
-		private static var antiAliasing:uint = 2;		// render result antialiasing
+		private static var antiAliasing:uint = 0;		// render result antialiasing
 		public static var context3d:Context3D;			// reference to the shared context3D for rendering onto stage3D
 
 		// ----- remembers previous assets used in render to skip resetting buffers
@@ -722,7 +722,7 @@
 		/**
 		* returns existing Texture for given bmd, else creates and returns a new Texture, if bmd==null return null
 		*/
-		private static function uploadTextureBuffer(bmd:BitmapData,update:Boolean=false,mip:Boolean=false,optimizeForRender:Boolean=false) : Texture
+		private static function uploadTextureBuffer(bmd:BitmapData,update:Boolean=false,mip:Boolean=false) : Texture
 		{
 			if (context3d==null) return null;
 			var buff:Texture = null;
@@ -742,7 +742,7 @@
 			}
 			else
 			{
-				buff = context3d.createTexture(bmd.width,bmd.height,Context3DTextureFormat.BGRA, optimizeForRender);
+				buff = context3d.createTexture(bmd.width,bmd.height,Context3DTextureFormat.BGRA, false);
 				uploadedTextures.push(bmd,buff);
 				debugTrace("uploading new Texture w:"+bmd.width+"h:"+bmd.height+" , total="+uploadedTextures.length/2);
 				if (mip)
@@ -784,9 +784,9 @@
 			}
 
 			// ----- upload texture and specmap ---------------------
-			textureBuffer = uploadTextureBuffer(material.texMap,mipMapping!=MIP_NONE,true);		// no update upload mips
-			normMapBuffer = uploadTextureBuffer(material.normMap,mipMapping!=MIP_NONE,true);	// no update upload mips
-			specMapBuffer = uploadTextureBuffer(material.specMap,mipMapping!=MIP_NONE,true);	// no update upload mips
+			textureBuffer = uploadTextureBuffer(material.texMap,true,mipMapping!=MIP_NONE);		// no update upload mips
+			normMapBuffer = uploadTextureBuffer(material.normMap,true,mipMapping!=MIP_NONE);	 	// no update upload mips
+			specMapBuffer = uploadTextureBuffer(material.specMap,true,mipMapping!=MIP_NONE);		// no update upload mips
 
 			// ----- create mesh custom shader program --------------
 			if (lightsConst==null)	lightsConst = Vector.<Number>();

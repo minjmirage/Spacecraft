@@ -1127,6 +1127,7 @@
 		//===============================================================================================
 		private function worldStep(ev:Event=null) : void
 		{
+			var worldStepT:uint = getTimer();
 			var i:int=0;
 			var key:String;
 			var debugTxt:String = "";
@@ -1205,7 +1206,7 @@
 			// ----- update Mesh Particles/particle emitters
 			for (key in EffectMPs)	EffectMPs[key].update();
 			for (key in EffectEMs)	EffectEMs[key].update(camPosn.x,camPosn.y,camPosn.z,simulationPaused);
-			debugTxt+=" particlesT:"+(getTimer()-time); time=getTimer();
+			debugTxt+=" particlesT:"+(getTimer()-time)+" worldStepT:"+(worldStepT-getTimer());
 			debugTxt+="   frameS:"+frameSShown+" frameM:"+frameMShown+" camDist:"+int(lookDBER.x*10)/10;
 			debugTf.text = debugTxt;
 			// ----- render 3D
