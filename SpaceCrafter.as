@@ -829,12 +829,97 @@
 		}//endfunction
 
 		//===============================================================================================
+		// zoom out to galaxy find opponents screen
+		//===============================================================================================
+		private function solarSystemScene(callBack:Function=null):void
+		{
+			mainTitle.name = "Scanning...";
+			subTitle.name = "Detecting other fleet signatures";
+
+			if (optionsMenu!=null && optionsMenu.parent!=null)
+				optionsMenu.parent.removeChild(optionsMenu);
+
+			playSound(lookPt.x,lookPt.y,lookPt.z,"zoomOut");
+			world.removeChild(sky);
+
+			// ----- remove all ships and HUD
+			focusOn(null);
+			while (Entities.length>0)
+			{
+				var entity:Hull = Entities.pop();
+				world.removeChild(entity.skin);
+			}
+			while (Exploding.length>0)
+			{
+				var expl:Ship = Exploding.pop();
+				world.removeChild(expl.skin);
+			}
+			while (Hostiles.length>0)		Hostiles.pop();
+			while (Friendlies.length>0)	Friendlies.pop();
+			while (DropItems.length>0)	DropItems.pop();
+			while (Projectiles.length>0)	Projectiles.pop();
+
+			var oldViewStep:Function = viewStep;
+
+
+
+			// ----- draws a spiral galaxy
+			function solarSysStep():void
+			{
+
+				if (Input.upPts.length>0)
+				{
+
+					viewStep = zoomInAndCallBack;
+				}
+			}
+			stepFns.push(solarSysStep);
+
+			// ----- zoom out view
+			viewStep = function():Vector3D
+			{
+				var slowF:Number = 0.9;
+
+				lookVel.x = -lookPt.x*(1-slowF);		// center to (0,0,0)
+				lookVel.y = -lookPt.y*(1-slowF);
+				lookVel.z = -lookPt.z*(1-slowF);
+
+				velDBER.x = (50-lookDBER.x)*(1-slowF);									// set dist to 50
+				if (Math.sin(lookDBER.y)<0)
+					velDBER.y = Math.acos(Math.cos(lookDBER.y))*(1-slowF);	// set bearing to face north
+				else
+					velDBER.y =-Math.acos(Math.cos(lookDBER.y))*(1-slowF);	// set bearing to face north
+				velDBER.z = (-Math.PI*0.4-lookDBER.z)*(1-slowF);				// look from top down
+			}//endfunction
+
+			// ----- zoom in view and do callback
+			function zoomInAndCallBack():void
+			{
+				mainTitle.name = " ";
+				subTitle.name = " ";
+
+				var slowF:Number = 0.9;
+				velDBER.x = (8-lookDBER.x)*(1-slowF);		// set dist to 1
+				velDBER.y += 0.01;												// spin
+				velDBER.z = (-Math.PI*0.1-lookDBER.z)*(1-slowF);				// look sideways
+
+				// ----- exit condition
+				if (lookDBER.x<8.5)
+				{
+					stepFns.splice(stepFns.indexOf(solarSysStep),1);
+					viewStep = oldViewStep;
+					if (callBack!=null)		callBack();
+				}
+			}//endfunction
+		}//endfunction
+
+		//===============================================================================================
 		// generate the data need to recreate the skybox, planet, moon and rings
 		//===============================================================================================
-		private function randomSceneryConstructionData():Array
+		private function randomPlanetData():Array
 		{
 			var A:Array = [int(5*Math.random())];	// random space texture
-			A.push((Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2 , 0,-100,0);	// planet system rotX, rotY, translate x,y,z
+			A.push((Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2);	// planet system rotX, rotY
 
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
@@ -858,39 +943,20 @@
 		//===============================================================================================
 		// generate skybox and planet meshes from data A
 		//===============================================================================================
-		private function sceneryFromData(A:Array):Mesh
+		private function planetFromData(A:Array):Mesh
 		{
-			// ----- create skybox
-			if (sky!=null) world.removeChild(sky);
-			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
-			var colorTones:Vector.<uint> = new <uint> [0xdddddd,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
-			var skyIdx:int = A[0];
-			sky = new Mesh();
-			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
-			MenuUI.colorTone = colorTones[skyIdx];
-			for (var i:int=0; i<4; i++)
-			{
-				var p:Mesh = Mesh.createPlane(3000,3000,skyTex);
-				p.transform = new Matrix4x4().rotY(Math.PI/2*i).translate(Math.sin(Math.PI/2*i)*1500,0,Math.cos(Math.PI/2*i)*1500);
-				sky.addChild(p);
-			}
-			sky = sky.mergeTree();
-			sky.setLightingParameters(1,1,1,0,0,false,true);
-			sky.depthWrite = false;
-			world.addChild(sky);
-
 			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
-			planet.transform = planet.transform.rotX(A[1]).rotY(A[2]).translate(A[3],A[4],A[5]);
+			planet.transform = planet.transform.rotX(A[1]).rotY(A[2]);
 			planetsDat = new Vector.<Vector3D>();
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
 
-			for (i=6; i<A.length; i+=4)
+			for (var i:int=3; i<A.length; i+=4)
 			{
 					var planetRad:Number = A[i+1];
 					var orbitRad:Number = A[i+2];
 					var ang:Number = A[i+3];
-					p = createPlanetMesh(planetRad,A[i],Mtls["TexPlanets"]);
+					var p:Mesh = createPlanetMesh(planetRad,A[i],Mtls["TexPlanets"]);
 					p.transform = p.transform.translate(orbitRad*Math.sin(ang),0,orbitRad*Math.cos(ang));
 					p.material.setSpecular(0);
 					p.material.setAmbient(0,0,0);
@@ -898,7 +964,6 @@
 					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
 					ringsGap.push(orbitRad-planetRad,orbitRad+planetRad);
 			}//endfor
-			sky.addChild(planet);
 
 			// ----- create planetary rings
 			ringsGap.shift();
@@ -921,7 +986,7 @@
 
 			subTitle.name = "Location : "+MenuUI.randomPlanetName();
 
-			return sky;
+			return planet;
 		}//endfunction
 
 		//===============================================================================================
@@ -930,7 +995,33 @@
 		private var planetsDat:Vector.<Vector3D> = null;	// axis x,y,z and w=rotAng
 		private function randScenery():Mesh
 		{
-			return sceneryFromData(randomSceneryConstructionData());
+			var A:Array = randomPlanetData();
+
+			// ----- create skybox
+			if (sky!=null) world.removeChild(sky);
+			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
+			var colorTones:Vector.<uint> = new <uint> [0xdddddd,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
+			var skyIdx:int = A[0];
+			sky = new Mesh();
+			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
+			MenuUI.colorTone = colorTones[skyIdx];
+			for (var i:int=0; i<4; i++)
+			{
+				var p:Mesh = Mesh.createPlane(3000,3000,skyTex);
+				p.transform = new Matrix4x4().rotY(Math.PI/2*i).translate(Math.sin(Math.PI/2*i)*1500,0,Math.cos(Math.PI/2*i)*1500);
+				sky.addChild(p);
+			}
+			sky = sky.mergeTree();
+			sky.setLightingParameters(1,1,1,0,0,false,true);
+			sky.depthWrite = false;
+
+			var planet:Mesh = planetFromData(A);
+			planet.transform = planet.transform.translate(0,-100,0);
+			sky.addChild(planet);
+
+			world.addChild(sky);
+
+			return sky;
 		}//
 
 		//===============================================================================================
