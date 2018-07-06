@@ -829,7 +829,7 @@
 		}//endfunction
 
 		//===============================================================================================
-		// zoom out to galaxy find opponents screen
+		// zoom out to solar system find opponents screen
 		//===============================================================================================
 		private function solarSystemScene(callBack:Function=null):void
 		{
@@ -918,8 +918,7 @@
 		//===============================================================================================
 		private function randomPlanetData():Array
 		{
-			var A:Array = [int(5*Math.random())];	// random space texture
-			A.push((Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2);	// planet system rotX, rotY
+			var A:Array = [(Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2];	// planet system rotX, rotY
 
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
@@ -947,11 +946,11 @@
 		{
 			// ----- create planet and moons
 			var planet:Mesh = new Mesh();
-			planet.transform = planet.transform.rotX(A[1]).rotY(A[2]);
+			planet.transform = planet.transform.rotX(A[0]).rotY(A[1]);
 			planetsDat = new Vector.<Vector3D>();
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
 
-			for (var i:int=3; i<A.length; i+=4)
+			for (var i:int=2; i<A.length; i+=4)
 			{
 					var planetRad:Number = A[i+1];
 					var orbitRad:Number = A[i+2];
@@ -1001,7 +1000,7 @@
 			if (sky!=null) world.removeChild(sky);
 			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
 			var colorTones:Vector.<uint> = new <uint> [0xdddddd,0xff8c8c,0x91ffa7,0x7cd7ff,0xffeb7c];
-			var skyIdx:int = A[0];
+			var skyIdx:int = Math.random()*spaceTex.length;
 			sky = new Mesh();
 			var skyTex:BitmapData = Mtls[spaceTex[skyIdx]];
 			MenuUI.colorTone = colorTones[skyIdx];
@@ -4642,6 +4641,53 @@ class MenuUI
 
 		canvas.buttonMode = true;
 		return canvas;
+	}//endfunction
+}//endclass
+
+class Planet
+{
+	private var ax:Number=0;	// planet axis
+	private var ay:Number=0;
+	private var az:Number=0;
+
+	private var aw:Number=0;	// current orbit rotation
+
+	private var px:Number=0;	// planet local position in orbit
+	private var py:Number=0;
+	private var pz:Number=0;
+
+	private var m:Mesh = null;
+
+	public var Moons:Vector.<Planet> = null;
+
+	public function Planet(planetMesh:Mesh,axisX:Number,axisY:Number,axisZ:Number,w:Number,posnX:Number,posnY:Number,posnZ:Number):void
+	{
+		Moons = new Vector.<Planet>();
+		m = planetMesh;
+		ax = axisX;
+		ay = axisY;
+		az = axisZ;
+		aw = w;
+		px = posnX;
+		py = posnY;
+		pz = posnZ;
+	}//endconstr
+
+	public function posnRotationUpdate(t:Number=1):void
+	{
+			var dist:Number = Math.sqrt(px*px+py*py+pz*pz);
+			p.transform = new Matrix4x4().rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(px,py,pz);
+			if (dist>100)
+			{
+				p.transform = p.transform.rotY(0.1/dist);
+				aw += 0.02/Math.sqrt(dist+100);
+			}
+			else
+				aw += 0.0001;
+		}
+		// ----- update all its moons
+		for (var i:int=Moons.length-1; i>-1; i--)
+			Moons[i].posnRotationUpdate(t);
 	}//endfunction
 }//endclass
 
