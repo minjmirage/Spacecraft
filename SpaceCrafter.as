@@ -948,7 +948,7 @@
 			var planet:Mesh = new Mesh();
 			planet.transform = planet.transform.rotX(A[0]).rotY(A[1]);
 			planetsDat = new Vector.<Vector3D>();
-			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by planets
+			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by moons
 
 			for (var i:int=2; i<A.length; i+=4)
 			{
@@ -956,11 +956,10 @@
 					var orbitRad:Number = A[i+2];
 					var ang:Number = A[i+3];
 					var p:Mesh = createPlanetMesh(planetRad,A[i],Mtls["TexPlanets"]);
-					p.transform = p.transform.translate(orbitRad*Math.sin(ang),0,orbitRad*Math.cos(ang));
 					p.material.setSpecular(0);
 					p.material.setAmbient(0,0,0);
 					planet.addChild(p);
-					planetsDat.push(new Vector3D(Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2));
+					planetsDat.push(new Planet(p,Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2,ang,orbitRad);
 					ringsGap.push(orbitRad-planetRad,orbitRad+planetRad);
 			}//endfor
 
@@ -991,7 +990,7 @@
 		//===============================================================================================
 		// generate random sky and planets scenery
 		//===============================================================================================
-		private var planetsDat:Vector.<Vector3D> = null;	// axis x,y,z and w=rotAng
+		private var planetsDat:Vector.<Planet> = null;	// axis x,y,z and w=rotAng
 		private function randScenery():Mesh
 		{
 			var A:Array = randomPlanetData();
@@ -1093,20 +1092,7 @@
 			var planet:Mesh = sky.getChildAt(0);
 			for (var i:int=planetsDat.length-1; i>-1; i--)
 			{
-				var v:Vector3D = planetsDat[i];
-				var p:Mesh = planet.getChildAt(i);
-				var ox:Number = p.transform.ad;
-				var oy:Number = p.transform.bd;
-				var oz:Number = p.transform.cd;
-				var dist:Number = Math.sqrt(ox*ox+oy*oy+oz*oz);
-				p.transform = new Matrix4x4().rotFromTo(0,0,1,v.x,v.y,v.z).rotAbout(v.x,v.y,v.z,v.w).translate(ox,oy,oz);
-				if (dist>100)
-				{
-					p.transform = p.transform.rotY(0.1/dist);
-					v.w += 0.02/Math.sqrt(dist+100);
-				}
-				else
-					v.w += 0.0001;
+				planetsDat[i].posnRotationUpdate();
 			}
 		}//endfunction
 
@@ -4652,15 +4638,13 @@ class Planet
 
 	private var aw:Number=0;	// current orbit rotation
 
-	private var px:Number=0;	// planet local position in orbit
-	private var py:Number=0;
-	private var pz:Number=0;
+	private var r:Number=0;		// planet orbit radius
 
 	private var m:Mesh = null;
 
 	public var Moons:Vector.<Planet> = null;
 
-	public function Planet(planetMesh:Mesh,axisX:Number,axisY:Number,axisZ:Number,w:Number,posnX:Number,posnY:Number,posnZ:Number):void
+	public function Planet(planetMesh:Mesh,axisX:Number,axisY:Number,axisZ:Number,w:Number,orbitRad:Number):void
 	{
 		Moons = new Vector.<Planet>();
 		m = planetMesh;
@@ -4668,20 +4652,16 @@ class Planet
 		ay = axisY;
 		az = axisZ;
 		aw = w;
-		px = posnX;
-		py = posnY;
-		pz = posnZ;
+		r = orbitRad;
+
+		posnRotationUpdate(0);
 	}//endconstr
 
 	public function posnRotationUpdate(t:Number=1):void
 	{
-			var dist:Number = Math.sqrt(px*px+py*py+pz*pz);
-			p.transform = new Matrix4x4().rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(px,py,pz);
-			if (dist>100)
-			{
-				p.transform = p.transform.rotY(0.1/dist);
+			m.transform = new Matrix4x4().rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(r*Math.cos(aw),0,r*Math.sin(aw));
+			if (r>100)
 				aw += 0.02/Math.sqrt(dist+100);
-			}
 			else
 				aw += 0.0001;
 		}
