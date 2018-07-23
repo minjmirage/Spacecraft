@@ -914,54 +914,40 @@
 		}//endfunction
 
 		//===============================================================================================
-		// generate the data need to recreate the skybox, planet, moon and rings
+		// generate a random planet system with moons and rings
 		//===============================================================================================
-		private function randomPlanetData():Array
+		private function randomPlanet(planetRad:Number=50):Mesh
 		{
-			var A:Array = [(Math.random()-0.5)*Math.PI*0.9 , Math.random()*Math.PI*2];	// planet system rotX, rotY
+			var planetSpace:Mesh = new Mesh();
+			planetSpace.transform = planetSpace.transform.rotX((Math.random()-0.5)*Math.PI*0.9).rotY(Math.random()*Math.PI*2); // planet system rotX, rotY
 
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
 				R.splice(Math.floor(Math.random()*R.length),0,i);
 
-			A.push(R[0],50,0,0);				// mainplanet type, planet rad, orbit rad, orbit ang,
+			var planetM:Mesh = createPlanetMesh(planetRad,R[0],Mtls["TexPlanets"]);	// create planet sphere of radius 50
+			planetM.material.setSpecular(0);
+			planetM.material.setAmbient(0,0,0);
+			planetSpace.addChild(planetM);
+			var p:Planet = new Planet(planetM,0,1,0,Math.random()*Math.PI*2,0);	//mesh, axisXYZ, rotation, orbit rad
+			planetsDat = new Vector.<Planet>();
+			planetsDat.push(p);
 
+			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by moons
 			for (var i:int=1; i<8; i++)
 			{
 				if (Math.random()<0.7)
 				{
 					var moonRad:int = 75/(i*2+1);
 					var orbitRad:int = i*100 + 200/(i+1) + Math.random()*50;
-					A.push(R[i],moonRad,orbitRad,Math.random()*Math.PI*2);			// moon type, moon rad, orbit rad, orbit ang,
+					var moonM:Mesh = createPlanetMesh(moonRad,R[i],Mtls["TexPlanets"]);	// create planet sphere of radius 50
+					moonM.material.setSpecular(0);
+					moonM.material.setAmbient(0,0,0);
+					planetSpace.addChild(moonM);
+					p.Moons.push(new Planet(moonM,Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2,orbitRad));
+					ringsGap.push(orbitRad-moonRad,orbitRad+moonRad);
 				}
 			}
-
-			return A;
-		}//endfunction
-
-		//===============================================================================================
-		// generate skybox and planet meshes from data A
-		//===============================================================================================
-		private function planetFromData(A:Array):Mesh
-		{
-			// ----- create planet and moons
-			var planet:Mesh = new Mesh();
-			planet.transform = planet.transform.rotX(A[0]).rotY(A[1]);
-			planetsDat = new Vector.<Vector3D>();
-			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by moons
-
-			for (var i:int=2; i<A.length; i+=4)
-			{
-					var planetRad:Number = A[i+1];
-					var orbitRad:Number = A[i+2];
-					var ang:Number = A[i+3];
-					var p:Mesh = createPlanetMesh(planetRad,A[i],Mtls["TexPlanets"]);
-					p.material.setSpecular(0);
-					p.material.setAmbient(0,0,0);
-					planet.addChild(p);
-					planetsDat.push(new Planet(p,Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2,ang,orbitRad);
-					ringsGap.push(orbitRad-planetRad,orbitRad+planetRad);
-			}//endfor
 
 			// ----- create planetary rings
 			ringsGap.shift();
@@ -979,12 +965,10 @@
 			rings = rings.mergeTree();
 			rings.material.setBlendMode("add");
 			rings.depthWrite = false;
-			planet.addChild(rings);
+			planetSpace.addChild(rings);
 			rings.setLightingParameters(1,1,1,0,0,false,true);
 
-			subTitle.name = "Location : "+MenuUI.randomPlanetName();
-
-			return planet;
+			return planetSpace;
 		}//endfunction
 
 		//===============================================================================================
@@ -993,8 +977,6 @@
 		private var planetsDat:Vector.<Planet> = null;	// axis x,y,z and w=rotAng
 		private function randScenery():Mesh
 		{
-			var A:Array = randomPlanetData();
-
 			// ----- create skybox
 			if (sky!=null) world.removeChild(sky);
 			var spaceTex:Array= ["TexSpace1","TexSpace2","TexSpace3","TexSpace4","TexSpace5"];
@@ -1013,11 +995,13 @@
 			sky.setLightingParameters(1,1,1,0,0,false,true);
 			sky.depthWrite = false;
 
-			var planet:Mesh = planetFromData(A);
+			var planet:Mesh = randomPlanet();
 			planet.transform = planet.transform.translate(0,-100,0);
 			sky.addChild(planet);
 
 			world.addChild(sky);
+
+			subTitle.name = "Location : "+MenuUI.randomPlanetName();
 
 			return sky;
 		}//
@@ -4636,7 +4620,7 @@ class Planet
 	private var ay:Number=0;
 	private var az:Number=0;
 
-	private var aw:Number=0;	// current orbit rotation
+	private var aw:Number=0;	// current planet rotation
 
 	private var r:Number=0;		// planet orbit radius
 
@@ -4661,10 +4645,10 @@ class Planet
 	{
 			m.transform = new Matrix4x4().rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(r*Math.cos(aw),0,r*Math.sin(aw));
 			if (r>100)
-				aw += 0.02/Math.sqrt(dist+100);
+				aw += 0.002/Math.sqrt(r+100);
 			else
 				aw += 0.0001;
-		}
+
 		// ----- update all its moons
 		for (var i:int=Moons.length-1; i>-1; i--)
 			Moons[i].posnRotationUpdate(t);
