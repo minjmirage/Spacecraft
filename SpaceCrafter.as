@@ -1081,9 +1081,9 @@
 		}//endfunction
 
 		//===============================================================================================
-		// create a sphere of given texture
+		// create a sphere of given texture with uv mapped within uv rectangle (ux,uy, uw,uh)
 		//===============================================================================================
-		private static function createPlanetMesh(r:Number,planetType:uint,tex:BitmapData) : Mesh
+		private static function createPlanetMesh(r:Number,ux:Number,uy:Number,uw:Number,uh:Number,tex:BitmapData) : Mesh
 		{
 			if (planetType>=8)	planetType = planetType%8;
 			var lon:uint=32;
@@ -1114,10 +1114,8 @@
 					A[j+3]=nx; A[j+4]=ny; A[j+5]=nz;
 					// ----- adjust UVs
 					A[j+7]=i/lat+A[j+7]/lat;
-					var ux:Number = int(planetType/4)/2;
-					var uy:Number = (planetType%4)/4;
-					A[j+6] = ux + 0.0005 + A[j+6]*0.499;		// prevent UV bleed to other planet texture area
-					A[j+7] = uy + A[j+7]*0.25;
+					A[j+6] = ux + A[j+6]*uw;
+					A[j+7] = uy + A[j+7]*uh;
 				}
 				S = S.concat(A);
 				i++;
