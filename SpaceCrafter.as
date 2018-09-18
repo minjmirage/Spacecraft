@@ -925,7 +925,7 @@
 			for (i=0; i<8; i++)
 				R.splice(Math.floor(Math.random()*R.length),0,i);
 
-			var planetM:Mesh = createPlanetMesh(planetRad,R[0],Mtls["TexPlanets"]);	// create planet sphere of radius 50
+			var planetM:Mesh = createPlanetMesh(planetRad,0,0,0.5,0.25,Mtls["TexPlanets"]);	// create planet sphere of radius 50
 			planetM.material.setSpecular(0);
 			planetM.material.setAmbient(0,0,0);
 			planetSpace.addChild(planetM);
@@ -940,7 +940,7 @@
 				{
 					var moonRad:int = 75/(i*2+1);
 					var orbitRad:int = i*100 + 200/(i+1) + Math.random()*50;
-					var moonM:Mesh = createPlanetMesh(moonRad,R[i],Mtls["TexPlanets"]);	// create planet sphere of radius 50
+					var moonM:Mesh = createPlanetMesh(moonRad,R[i]%2*0.5,Math.floor(R[i]/2)%4*0.25,0.5,0.25,Mtls["TexPlanets"]);	// create planet sphere of radius 50
 					moonM.material.setSpecular(0);
 					moonM.material.setAmbient(0,0,0);
 					planetSpace.addChild(moonM);
@@ -1085,44 +1085,11 @@
 		//===============================================================================================
 		private static function createPlanetMesh(r:Number,ux:Number,uy:Number,uw:Number,uh:Number,tex:BitmapData) : Mesh
 		{
-			if (planetType>=8)	planetType = planetType%8;
 			var lon:uint=32;
 			var lat:uint=16;
 			if (r>60) {lon*=2; lat*=2;}	// higher tri count for larger radius spheres
-			var S:Vector.<Number> = new Vector.<Number>();
-			var i:int = 0;
-			while (i<lat)
-			{
-				var sinL0:Number = Math.sin(Math.PI*i/lat)+0.0001;			// prevent UV artifact at poles of planet
-				var sinL1:Number = Math.sin(Math.PI*(i+1)/lat)+0.0001;
-				var cosL0:Number = Math.cos(Math.PI*i/lat);
-				var cosL1:Number = Math.cos(Math.PI*(i+1)/lat);
-				var A:Vector.<Number> = Mesh.createTrianglesBand(sinL0*r,
-															sinL1*r,
-															-cosL0*r,
-															-cosL1*r,
-															lon,true);
-
-				for (var j:int=0; j<A.length; j+=8)
-				{
-					// ----- recalculate normals
-					var nx:Number = A[j+0];
-					var ny:Number = A[j+1];
-					var nz:Number = A[j+2];
-					var nl:Number = Math.sqrt(nx*nx+ny*ny+nz*nz);
-					nx/=nl; ny/=nl; nz/=nl;
-					A[j+3]=nx; A[j+4]=ny; A[j+5]=nz;
-					// ----- adjust UVs
-					A[j+7]=i/lat+A[j+7]/lat;
-					A[j+6] = ux + A[j+6]*uw;
-					A[j+7] = uy + A[j+7]*uh;
-				}
-				S = S.concat(A);
-				i++;
-			}//endfor
-
-			var m:Mesh = new Mesh();
-			m.createGeometry(S);
+			var m:Mesh = Mesh.createSphere(r,lon,lat);
+			m.setUVRectangle(ux,uy,uw,uh);
 			m.material.setTexMap(tex);
 			return m;
 		}//endfunction

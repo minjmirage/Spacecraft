@@ -543,6 +543,20 @@
 		}//endfunction
 
 		/**
+		* scales the default uv values of this mesh to be within the specified uv rectangle
+		*/
+		public function setUVRectangle(u:Number,v:Number,w:Number,h:Number) : void
+		{
+			if (vertData==null)	return;
+			for (var i:int=0; i<vertData.length; i+=11)
+			{
+				vertData[i+9] = u+vertData[i+9]*w;
+				vertData[i+10] = v+vertData[i+10]*h;
+			}
+			setGeometry(vertData,idxsData);
+		}//endfunction
+
+		/**
 		* gives/overrides new geometry and triangle indices to this mesh
 		* verticesData : [vx,vy,vz,nx,ny,nz,tx,ty,tz,u,v, ...]
 		* indicesData : [idx1,idx2,idx3, idx1,idx2,idx3, ...]
