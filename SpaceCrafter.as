@@ -84,7 +84,22 @@
 		[Embed(source="3D/textures/TexSpace4.jpg")] 		private static var TexSpace4:Class;
 		[Embed(source="3D/textures/TexSpace5.jpg")] 		private static var TexSpace5:Class;
 
-		[Embed(source="3D/textures/TexPlanets.jpg")] 		private static var TexPlanets:Class;
+		[Embed(source="3D/textures/texPlanets.jpg")] 					private static var TexPlanets:Class;
+		[Embed(source="3D/textures/planets/planet01.jpg")] 		private static var TexPlanet01:Class;
+		[Embed(source="3D/textures/planets/planet02.jpg")] 		private static var TexPlanet02:Class;
+		[Embed(source="3D/textures/planets/planet03.jpg")] 		private static var TexPlanet03:Class;
+		[Embed(source="3D/textures/planets/planet04.jpg")] 		private static var TexPlanet04:Class;
+		[Embed(source="3D/textures/planets/planet05.jpg")] 		private static var TexPlanet05:Class;
+		[Embed(source="3D/textures/planets/planet06.jpg")] 		private static var TexPlanet06:Class;
+		[Embed(source="3D/textures/planets/planet07.jpg")] 		private static var TexPlanet07:Class;
+		[Embed(source="3D/textures/planets/planet08.jpg")] 		private static var TexPlanet08:Class;
+		[Embed(source="3D/textures/planets/planet09.jpg")] 		private static var TexPlanet09:Class;
+		[Embed(source="3D/textures/planets/planet10.jpg")] 		private static var TexPlanet10:Class;
+		[Embed(source="3D/textures/planets/planet11.jpg")] 		private static var TexPlanet11:Class;
+		[Embed(source="3D/textures/planets/planet12.jpg")] 		private static var TexPlanet12:Class;
+		[Embed(source="3D/textures/planets/planet13.jpg")] 		private static var TexPlanet13:Class;
+		[Embed(source="3D/textures/planets/planet14.jpg")] 		private static var TexPlanet14:Class;
+
 		[Embed(source="3D/textures/smoke3.png")] 				private static var TexSmoke3:Class;
 		[Embed(source="3D/textures/flareWhite.jpg")] 			private static var TexFlareWhite:Class;
 		[Embed(source="3D/textures/flareYellow.jpg")] 		private static var TexFlareYellow:Class;
@@ -916,35 +931,25 @@
 		//===============================================================================================
 		// generate a random planet system with moons and rings
 		//===============================================================================================
-		private function randomPlanet(planetRad:Number=50):Mesh
+		private function randomPlanet(planetRad:Number=50,orbitRad:Number=0,depth:int=0):Planet
 		{
-			var planetSpace:Mesh = new Mesh();
-			planetSpace.transform = planetSpace.transform.rotX((Math.random()-0.5)*Math.PI*0.9).rotY(Math.random()*Math.PI*2); // planet system rotX, rotY
-
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
 				R.splice(Math.floor(Math.random()*R.length),0,i);
 
-			var planetM:Mesh = createPlanetMesh(planetRad,0,0,0.5,0.25,Mtls["TexPlanets"]);	// create planet sphere of radius 50
-			planetM.material.setSpecular(0);
-			planetM.material.setAmbient(0,0,0);
-			planetSpace.addChild(planetM);
-			var p:Planet = new Planet(planetM,0,1,0,Math.random()*Math.PI*2,0);	//mesh, axisXYZ, rotation, orbit rad
-			planetsDat = new Vector.<Planet>();
-			planetsDat.push(p);
+			var p:Planet = new Planet(Mtls["TexPlanets"],planetRad,0,1,0,orbitRad);	//mesh, axisXYZ, rotation, orbit rad
+
+			if (depth<=0)	return p;
 
 			var ringsGap:Vector.<Number> = new Vector.<Number>();		// the gaps taken up by moons
 			for (var i:int=1; i<8; i++)
 			{
 				if (Math.random()<0.7)
 				{
-					var moonRad:int = 75/(i*2+1);
-					var orbitRad:int = i*100 + 200/(i+1) + Math.random()*50;
-					var moonM:Mesh = createPlanetMesh(moonRad,R[i]%2*0.5,Math.floor(R[i]/2)%4*0.25,0.5,0.25,Mtls["TexPlanets"]);	// create planet sphere of radius 50
-					moonM.material.setSpecular(0);
-					moonM.material.setAmbient(0,0,0);
-					planetSpace.addChild(moonM);
-					p.Moons.push(new Planet(moonM,Math.random()-0.5,1,Math.random()-0.5,Math.random()*Math.PI*2,orbitRad));
+					var moonRad:Number = planetRad*1.5/(i*2+1);
+					var moonOrbitRad:int = i*planetRad*2 + 200/(i+1) + Math.random()*50;
+					var moon:Planet = randomPlanet(moonRad,moonOrbitRad,depth-1);
+					p.Moons.push(moon);
 					ringsGap.push(orbitRad-moonRad,orbitRad+moonRad);
 				}
 			}
@@ -964,11 +969,11 @@
 			}
 			rings = rings.mergeTree();
 			rings.material.setBlendMode("add");
-			rings.depthWrite = false;
-			planetSpace.addChild(rings);
 			rings.setLightingParameters(1,1,1,0,0,false,true);
+			rings.depthWrite = false;
+			p.skin.addChild(rings);
 
-			return planetSpace;
+			return p;
 		}//endfunction
 
 		//===============================================================================================
@@ -995,9 +1000,13 @@
 			sky.setLightingParameters(1,1,1,0,0,false,true);
 			sky.depthWrite = false;
 
-			var planet:Mesh = randomPlanet();
-			planet.transform = planet.transform.translate(0,-100,0);
-			sky.addChild(planet);
+			var planetsSystem:Planet = randomPlanet(50,0,1);
+			planetsDat = new Vector.<Planet>();
+			planetsDat.push(planetsSystem);
+			var planetMesh:Mesh = new Mesh();
+			planetMesh.transform = new Matrix4x4().rotFromTo(0,0,1,Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).translate(0,-100,0);
+			planetsSystem.addSkinTo(planetMesh);
+			sky.addChild(planetMesh);
 
 			world.addChild(sky);
 
@@ -1078,20 +1087,6 @@
 			{
 				planetsDat[i].posnRotationUpdate();
 			}
-		}//endfunction
-
-		//===============================================================================================
-		// create a sphere of given texture with uv mapped within uv rectangle (ux,uy, uw,uh)
-		//===============================================================================================
-		private static function createPlanetMesh(r:Number,ux:Number,uy:Number,uw:Number,uh:Number,tex:BitmapData) : Mesh
-		{
-			var lon:uint=32;
-			var lat:uint=16;
-			if (r>60) {lon*=2; lat*=2;}	// higher tri count for larger radius spheres
-			var m:Mesh = Mesh.createSphere(r,lon,lat);
-			m.setUVRectangle(ux,uy,uw,uh);
-			m.material.setTexMap(tex);
-			return m;
 		}//endfunction
 
 		//===============================================================================================
@@ -4589,34 +4584,57 @@ class Planet
 
 	private var r:Number=0;		// planet orbit radius
 
-	private var m:Mesh = null;
+	private var sc:Number=1;
+
+	public var skin:Mesh = null;
 
 	public var Moons:Vector.<Planet> = null;
 
-	public function Planet(planetMesh:Mesh,axisX:Number,axisY:Number,axisZ:Number,w:Number,orbitRad:Number):void
+	public function Planet(tex:BitmapData,radius:Number,axisX:Number,axisY:Number,axisZ:Number,orbitRad:Number):void
 	{
 		Moons = new Vector.<Planet>();
-		m = planetMesh;
+
+		var lon:uint=32;
+		var lat:uint=16;
+		if (r>60) {lon*=2; lat*=2;}	// higher tri count for larger radius spheres
+		skin = Mesh.createSphere(radius,lon,lat);
+		skin.material.setSpecular(0);
+		skin.material.setAmbient(0,0,0);
+		skin.material.setTexMap(tex);
 		ax = axisX;
 		ay = axisY;
 		az = axisZ;
-		aw = w;
+		aw = Math.random()*Math.PI*2;
 		r = orbitRad;
-
 		posnRotationUpdate(0);
 	}//endconstr
 
-	public function posnRotationUpdate(t:Number=1):void
+	public function addSkinTo(con:Mesh):void
 	{
-			m.transform = new Matrix4x4().rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(r*Math.cos(aw),0,r*Math.sin(aw));
-			if (r>100)
-				aw += 0.002/Math.sqrt(r+100);
-			else
-				aw += 0.0001;
+		con.addChild(skin);
+		for (var i:int=Moons.length-1; i>-1; i--)
+			Moons[i].addSkinTo(con);
+	}//endfunction
+
+	public function setScale(scale:Number):void
+	{
+		sc = scale;
+	}//endfunction
+
+	public function posnRotationUpdate(t:Number=1,ox:Number=0,oy:Number=0,oz:Number=0):void
+	{
+		var px:Number = ox+r*Math.cos(aw);	// planet position
+		var py:Number = oy;
+		var pz:Number = oz+r*Math.sin(aw);
+		skin.transform = new Matrix4x4().scale(sc,sc,sc).rotFromTo(0,0,1,ax,ay,az).rotAbout(ax,ay,az,aw).translate(px,py,pz);
+		if (r>100)
+			aw += 0.002/Math.sqrt(r+100);
+		else
+			aw += 0.0001;
 
 		// ----- update all its moons
 		for (var i:int=Moons.length-1; i>-1; i--)
-			Moons[i].posnRotationUpdate(t);
+			Moons[i].posnRotationUpdate(t,px,py,pz);
 	}//endfunction
 }//endclass
 
