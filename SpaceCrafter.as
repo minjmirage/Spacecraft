@@ -947,10 +947,10 @@
 				if (Math.random()<0.7)
 				{
 					var moonRad:Number = planetRad*1.5/(i*2+1);
-					var moonOrbitRad:int = i*planetRad*2 + 200/(i+1) + Math.random()*50;
+					var moonOrbitRad:int = planetRad*(i*2 + 4/(i+1) + Math.random());
 					var moon:Planet = randomPlanet(moonRad,moonOrbitRad,depth-1);
 					p.Moons.push(moon);
-					ringsGap.push(orbitRad-moonRad,orbitRad+moonRad);
+					ringsGap.push(moonOrbitRad-moonRad,moonOrbitRad+moonRad);
 				}
 			}
 
@@ -958,14 +958,16 @@
 			ringsGap.shift();
 			ringsGap.pop();
 			var rings:Mesh = new Mesh();
-			rings.transform = new Matrix4x4().rotX(Math.PI/2);
 			for (i=0; i<ringsGap.length; i+=2)
 			{
+				rings.addChild(createPlanetRing(ringsGap[i+1],ringsGap[i]));
+				/*
 				var a:Number = Math.random()*0.8;
 				var b:Number = 0.2 + Math.random()*0.8;
 				if (a<b)
 					rings.addChild(createPlanetRing(ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]),
 																					ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i])));
+																					*/
 			}
 			rings = rings.mergeTree();
 			rings.material.setBlendMode("add");
@@ -1000,11 +1002,11 @@
 			sky.setLightingParameters(1,1,1,0,0,false,true);
 			sky.depthWrite = false;
 
-			var planetsSystem:Planet = randomPlanet(50,0,1);
+			var planetsSystem:Planet = randomPlanet(50,0,2);
 			planetsDat = new Vector.<Planet>();
 			planetsDat.push(planetsSystem);
 			var planetMesh:Mesh = new Mesh();
-			planetMesh.transform = new Matrix4x4().rotFromTo(0,0,1,Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).translate(0,-100,0);
+			planetMesh.transform = new Matrix4x4().translate(0,-100,0);
 			planetsSystem.addSkinTo(planetMesh);
 			sky.addChild(planetMesh);
 
