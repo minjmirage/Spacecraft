@@ -19,6 +19,10 @@
 		private var Assets:Object = null;
 		private var Mtls:Object = null;
 
+		private var sunTexs:Vector.<BitmapData> = null;
+		private var planetTexs:Vector.<BitmapData> = null;
+		private var moonTexs:Vector.<BitmapData> = null;
+
 		private var Projectiles:Vector.<Projectile> = null;
 		private var Entities:Vector.<Hull> = null;
 		private var DropItems:Vector.<DropItem> = null;
@@ -85,6 +89,7 @@
 		[Embed(source="3D/textures/TexSpace5.jpg")] 		private static var TexSpace5:Class;
 
 		[Embed(source="3D/textures/texPlanets.jpg")] 					private static var TexPlanets:Class;
+		[Embed(source="3D/textures/planets/sunMap.jpg")] 			private static var TexSun:Class;
 		[Embed(source="3D/textures/planets/planet01.jpg")] 		private static var TexPlanet01:Class;
 		[Embed(source="3D/textures/planets/planet02.jpg")] 		private static var TexPlanet02:Class;
 		[Embed(source="3D/textures/planets/planet03.jpg")] 		private static var TexPlanet03:Class;
@@ -99,6 +104,21 @@
 		[Embed(source="3D/textures/planets/planet12.jpg")] 		private static var TexPlanet12:Class;
 		[Embed(source="3D/textures/planets/planet13.jpg")] 		private static var TexPlanet13:Class;
 		[Embed(source="3D/textures/planets/planet14.jpg")] 		private static var TexPlanet14:Class;
+
+		[Embed(source="3D/textures/planets/moon01.jpg")] 		private static var TexMoon01:Class;
+		[Embed(source="3D/textures/planets/moon02.jpg")] 		private static var TexMoon02:Class;
+		[Embed(source="3D/textures/planets/moon03.jpg")] 		private static var TexMoon03:Class;
+		[Embed(source="3D/textures/planets/moon04.jpg")] 		private static var TexMoon04:Class;
+		[Embed(source="3D/textures/planets/moon05.jpg")] 		private static var TexMoon05:Class;
+		[Embed(source="3D/textures/planets/moon06.jpg")] 		private static var TexMoon06:Class;
+		[Embed(source="3D/textures/planets/moon07.jpg")] 		private static var TexMoon07:Class;
+		[Embed(source="3D/textures/planets/moon08.jpg")] 		private static var TexMoon08:Class;
+		[Embed(source="3D/textures/planets/moon09.jpg")] 		private static var TexMoon09:Class;
+		[Embed(source="3D/textures/planets/moon10.jpg")] 		private static var TexMoon10:Class;
+		[Embed(source="3D/textures/planets/moon11.jpg")] 		private static var TexMoon11:Class;
+		[Embed(source="3D/textures/planets/moon12.jpg")] 		private static var TexMoon12:Class;
+		[Embed(source="3D/textures/planets/moon13.jpg")] 		private static var TexMoon13:Class;
+		[Embed(source="3D/textures/planets/moon14.jpg")] 		private static var TexMoon14:Class;
 
 		[Embed(source="3D/textures/smoke3.png")] 				private static var TexSmoke3:Class;
 		[Embed(source="3D/textures/flareWhite.jpg")] 			private static var TexFlareWhite:Class;
@@ -285,6 +305,22 @@
 							TexSpace3:fadeVertEnds(new TexSpace3().bitmapData),
 							TexSpace4:fadeVertEnds(new TexSpace4().bitmapData),
 							TexSpace5:fadeVertEnds(new TexSpace5().bitmapData)};
+
+			planetTexs = new <BitmapData>[new TexSun().bitmapData,
+																				new TexPlanet01().bitmapData,
+																				new TexPlanet02().bitmapData,
+																				new TexPlanet03().bitmapData,
+																				new TexPlanet04().bitmapData,
+																				new TexPlanet05().bitmapData,
+																				new TexPlanet06().bitmapData,
+																				new TexPlanet07().bitmapData,
+																				new TexPlanet08().bitmapData,
+																				new TexPlanet09().bitmapData,
+																				new TexPlanet10().bitmapData,
+																				new TexPlanet11().bitmapData,
+																				new TexPlanet12().bitmapData,
+																				new TexPlanet13().bitmapData,
+																				new TexPlanet14().bitmapData];
 			var tex:BitmapData = Mtls["Tex"];
 			for (var id:String in Assets)
 			{
@@ -931,13 +967,14 @@
 		//===============================================================================================
 		// generate a random planet system with moons and rings
 		//===============================================================================================
-		private function randomPlanet(planetRad:Number=50,orbitRad:Number=0,depth:int=0):Planet
+		private function randomPlanet(planetRad:Number=50,orbitRad:Number=0,depth:int=1):Planet
 		{
 			var R:Vector.<int> = new Vector.<int>();	// random ordered vector of numbers 0-7
 			for (i=0; i<8; i++)
 				R.splice(Math.floor(Math.random()*R.length),0,i);
 
-			var p:Planet = new Planet(Mtls["TexPlanets"],planetRad,0,1,0,orbitRad);	//mesh, axisXYZ, rotation, orbit rad
+			var p:Planet = new Planet(planetTexs[0],planetRad,0,1,0,orbitRad);	//mesh, axisXYZ, rotation, orbit rad
+			planetTexs.push(planetTexs.shift());
 
 			if (depth<=0)	return p;
 
@@ -955,26 +992,26 @@
 			}
 
 			// ----- create planetary rings
-			ringsGap.shift();
-			ringsGap.pop();
-			var rings:Mesh = new Mesh();
-			for (i=0; i<ringsGap.length; i+=2)
+			if (depth==1)
 			{
-				rings.addChild(createPlanetRing(ringsGap[i+1],ringsGap[i]));
-				/*
-				var a:Number = Math.random()*0.8;
-				var b:Number = 0.2 + Math.random()*0.8;
-				if (a<b)
-					rings.addChild(createPlanetRing(ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]),
-																					ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i])));
-																					*/
+				ringsGap.shift();
+				ringsGap.pop();
+				var rings:Mesh = new Mesh();
+				for (i=0; i<ringsGap.length; i+=2)
+				{
+					//rings.addChild(createPlanetRing(ringsGap[i+1],ringsGap[i]));
+					var a:Number = Math.random()*0.8;
+					var b:Number = 0.2 + Math.random()*0.8;
+					if (a<b)
+						rings.addChild(createPlanetRing(ringsGap[i] + a*(ringsGap[i+1]-ringsGap[i]),
+																						ringsGap[i] + b*(ringsGap[i+1]-ringsGap[i])));																
+				}
+				rings = rings.mergeTree();
+				rings.material.setBlendMode("add");
+				rings.setLightingParameters(1,1,1,0,0,false,true);
+				rings.depthWrite = false;
+				p.skin.addChild(rings);
 			}
-			rings = rings.mergeTree();
-			rings.material.setBlendMode("add");
-			rings.setLightingParameters(1,1,1,0,0,false,true);
-			rings.depthWrite = false;
-			p.skin.addChild(rings);
-
 			return p;
 		}//endfunction
 

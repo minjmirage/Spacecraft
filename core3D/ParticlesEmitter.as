@@ -6,6 +6,7 @@
 	import flash.geom.Rectangle;
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
+	import flash.system.ApplicationDomain;
 
 	/**
 	* Author: Lin Minjiang	2012/07/10	updated
@@ -62,11 +63,6 @@
 		*/
 		private function createNewRenderMesh():Mesh
 		{
-			if (Mesh.context3d!=null && Mesh.context3d.profile.indexOf("standard")!=-1)
-				numPerMesh = 242;
-			else
-				numPerMesh = 120;
-
 			var sw:int = spriteSheet.width/nsp;		// width of single sprite in sheet
 			var sh:int = spriteSheet.height/nsp;	// height of single sprite in sheet
 
@@ -95,17 +91,6 @@
 			m.material.setBlendMode(blendMode);
 			m.setParticles(V,I);
 			return m;
-		}//endfunction
-
-		/**
-		* sets time to live for the particles
-		*/
-		public function setLifetime(t:uint) : void
-		{
-			for (var i:int=PData.length-1; i>=0; i--)
-				if (PData[i].idx>=lifeTime)
-					PData[i].idx=t;
-			lifeTime = t;
 		}//endfunction
 
 		/**
@@ -198,23 +183,36 @@
 			pt = invT.transform(pt);	// posn relative to particles space
 
 			// ----- write particles positions data -----------------
+			var n:int = PData.length;
 			var T:ByteArray = PDataBytes;
 			T.position = 0;
-			T.writeFloat(0);
-			T.writeFloat(1);
-			T.writeFloat(2);
-			T.writeFloat(nsp);		// nsp=num of cols in spritesheet
-			T.writeFloat(pt.x);		// lookAt point
-			T.writeFloat(pt.y);		// lookAt point
-			T.writeFloat(pt.z);		// lookAt point
-			T.writeFloat(0.001);	// 0.001 to address rounding error
-			var baOffset:int = 0;
 			var mcnt:int = 0;
-			var pcnt:int = 0;
 			var rmesh:Mesh = null;
 
-			for (var i:int=PData.length-1; i>-1; i--)
+			for (var i:int=0; i<n; i++)
 			{
+				if (i%numPerMesh==0)
+				{
+					var mshIdx:int = Math.floor(i/numPerMesh);
+					if (skin.numChildren()<mshIdx+1)
+						skin.addChild(createNewRenderMesh());
+					rmesh = skin.getChildAt(mshIdx);
+					rmesh.vcData = T;			// send particle transforms to mesh for GPU transformation
+					rmesh.vcDataOffset = mshIdx*(numPerMesh+2)*16;
+					rmesh.vcDataNumReg = Math.min(numPerMesh,n-i)+2;
+					rmesh.trisCnt = Math.min(numPerMesh,n-i)*2;
+
+					T.writeFloat(0);
+					T.writeFloat(1);
+					T.writeFloat(2);
+					T.writeFloat(nsp);		// nsp=num of cols in spritesheet
+					T.writeFloat(pt.x);		// lookAt point
+					T.writeFloat(pt.y);		// lookAt point
+					T.writeFloat(pt.z);		// lookAt point
+					T.writeFloat(0.001);	// 0.001 to address rounding error
+					mcnt++;
+				}//endif
+
 				var p:VertexData = PData[i];
 				T.writeFloat(p.nx);
 				T.writeFloat(p.ny);
@@ -229,37 +227,15 @@
 					p.ny+=p.vy;
 					p.nz+=p.vz;
 					p.idx++;	// increment frame index
-					if (p.idx>=lifeTime)
-					{
-						p.w=0;		// last elements in PData are oldest
-						Pool.push(PData.pop());
-					}
 				}
-				pcnt++;
-
-				if (pcnt>=numPerMesh || i==0)
-				{
-					if (skin.numChildren()<=mcnt)
-						skin.addChild(createNewRenderMesh());
-					rmesh = skin.getChildAt(mcnt);
-					rmesh.trisCnt = pcnt*2;
-					rmesh.vcData = T;		// send particle transforms to mesh for GPU transformation
-					rmesh.vcDataNumReg = pcnt+2;
-					rmesh.vcDataOffset = baOffset;
-
-					T.writeFloat(0);
-					T.writeFloat(1);
-					T.writeFloat(2);
-					T.writeFloat(nsp);		// nsp=num of cols in spritesheet
-					T.writeFloat(pt.x);		// lookAt point
-					T.writeFloat(pt.y);		// lookAt point
-					T.writeFloat(pt.z);		// lookAt point
-					T.writeFloat(0.001);	// 0.001 to address rounding error
-					baOffset += (pcnt+2)*16;
-					mcnt++;
-					pcnt=0;
-				}//endif
 			}//endfor
+
+			// ----- remove particles past lifetime from PData
+			while (PData.length>0 && PData[PData.length-1].idx>=lifeTime)
+			{
+				PData[PData.length-1].w=0;		// last elements in PData are oldest
+				Pool.push(PData.pop());
+			}
 
 			// ----- disable rest of unused render meshes
 			for (i=skin.numChildren()-1; i>=mcnt; i--)
