@@ -2,6 +2,8 @@ package core3D
 {
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
+	import flash.system.ApplicationDomain;
+	import avm2.intrinsics.memory.sf32;
 
 	/**
 	* Author: Lin Minjiang
@@ -177,38 +179,50 @@ package core3D
 			// ----- write particles positions data -----------------
 			var T:ByteArray = MDataBytes;
 			T.position = 0;
-			var baOffset:int = 0;
 			var mcnt:int = 0;
-			var pcnt:int = 0;
 			var rmesh:Mesh = null;
 
-			for (var i:int=numLiveParticles-1; i>-1; i--)
+			if (numLiveParticles>0)
 			{
-				var m:VertexData = MData[i];
-				T.writeFloat(m.nx);	// quaternion x
-				T.writeFloat(m.ny);	// quaternion y
-				T.writeFloat(m.nz);	// quaternion z
-				T.writeFloat(0);		// 0 
-				T.writeFloat(m.vx);	// translation x
-				T.writeFloat(m.vy);	// translation y
-				T.writeFloat(m.vz);	// translation z
-				T.writeFloat(m.w);	// scale
-				pcnt++;
+				T.length = Math.max(ApplicationDomain.MIN_DOMAIN_MEMORY_LENGTH,numLiveParticles*32);
+				ApplicationDomain.currentDomain.domainMemory = T;
+			}
 
-				if (pcnt>=particlesPerMesh || i==0)
+			for (var i:int=0; i<numLiveParticles; i++)
+			{
+				if (i%particlesPerMesh==0)
 				{
 					if (skin.numChildren()==mcnt)
 						skin.addChild(createNewRenderMesh());
 					rmesh = skin.getChildAt(mcnt);
-					rmesh.trisCnt = trisPerParticle*pcnt;
+					var numP:int = Math.min(particlesPerMesh,numLiveParticles-i);
+					rmesh.trisCnt = trisPerParticle*numP;
 					rmesh.vcData = T;		// send particle transforms to mesh for GPU transformation
-					rmesh.vcDataNumReg = pcnt*2;
-					rmesh.vcDataOffset = baOffset;
-
-					baOffset += pcnt*2*16;
+					rmesh.vcDataNumReg = numP*2;
+					rmesh.vcDataOffset = i*32;
 					mcnt++;
-					pcnt=0;
 				}//endif
+
+				var m:VertexData = MData[i];
+				var idx:int = i*32;
+				sf32(m.nx,idx);			// quaternion x
+				sf32(m.ny,idx+4);		// quaternion y
+				sf32(m.nz,idx+8);		// quaternion z
+				sf32(0,idx+12);			// 0
+				sf32(m.vx,idx+16);	// translation x
+				sf32(m.vy,idx+20);	// translation y
+				sf32(m.vz,idx+24);	// translation z
+				sf32(m.w,idx+28);		// scale
+				/*
+				T.writeFloat(m.nx);	// quaternion x
+				T.writeFloat(m.ny);	// quaternion y
+				T.writeFloat(m.nz);	// quaternion z
+				T.writeFloat(0);		// 0
+				T.writeFloat(m.vx);	// translation x
+				T.writeFloat(m.vy);	// translation y
+				T.writeFloat(m.vz);	// translation z
+				T.writeFloat(m.w);	// scale
+				*/
 			}//endfor
 
 			// ----- disable rest of unused render meshes

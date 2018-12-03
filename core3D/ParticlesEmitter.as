@@ -7,6 +7,7 @@
 	import flash.geom.Vector3D;
 	import flash.utils.ByteArray;
 	import flash.system.ApplicationDomain;
+	import avm2.intrinsics.memory.sf32;
 
 	/**
 	* Author: Lin Minjiang	2012/07/10	updated
@@ -174,7 +175,7 @@
 		{
 			if (Mesh.context3d==null) return;
 			if (Mesh.context3d.profile.indexOf("standard")!=-1)
-				numPerMesh = 240;
+				numPerMesh = 240;	// num quad floats constants lines possible per mesh
 
 			// ----- transform look at point to local coordinates ---
 			var pt:Vector3D = new Vector3D(lx,ly,lz);
@@ -189,6 +190,12 @@
 			var mcnt:int = 0;
 			var rmesh:Mesh = null;
 
+			if (n>0)
+			{
+				T.length = Math.max(ApplicationDomain.MIN_DOMAIN_MEMORY_LENGTH,(n + (1+Math.floor(n/numPerMesh))*2)*16);
+				ApplicationDomain.currentDomain.domainMemory = T;
+			}
+
 			for (var i:int=0; i<n; i++)
 			{
 				if (i%numPerMesh==0)
@@ -202,6 +209,16 @@
 					rmesh.vcDataNumReg = Math.min(numPerMesh,n-i)+2;
 					rmesh.trisCnt = Math.min(numPerMesh,n-i)*2;
 
+					var posn:int = rmesh.vcDataOffset;
+					sf32(0,posn);
+					sf32(1,posn+4);
+					sf32(2,posn+8);
+					sf32(nsp,posn+12);
+					sf32(pt.x,posn+16);		// lookAt point
+					sf32(pt.y,posn+20);		// lookAt point
+					sf32(pt.z,posn+24);		// lookAt point
+					sf32(0.001,posn+28);	// 0.001 to address rounding error
+					/*
 					T.writeFloat(0);
 					T.writeFloat(1);
 					T.writeFloat(2);
@@ -210,14 +227,22 @@
 					T.writeFloat(pt.y);		// lookAt point
 					T.writeFloat(pt.z);		// lookAt point
 					T.writeFloat(0.001);	// 0.001 to address rounding error
+					*/
 					mcnt++;
 				}//endif
 
 				var p:VertexData = PData[i];
+				var idx:int = rmesh.vcDataOffset + (i%numPerMesh + 2)*16;
+				sf32(p.nx,idx);
+				sf32(p.ny,idx+4);
+				sf32(p.nz,idx+8);
+				sf32(p.idx%totalFrames+p.w,idx+12);
+				/*
 				T.writeFloat(p.nx);
 				T.writeFloat(p.ny);
 				T.writeFloat(p.nz);
 				T.writeFloat(p.idx%totalFrames+p.w);		// tx,ty,tx,idx+scale
+				*/
 				if (!isPaused)
 				{
 					p.vx = p.vx*slowdown + wind.x;
